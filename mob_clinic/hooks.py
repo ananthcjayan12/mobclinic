@@ -83,13 +83,13 @@ required_apps = ["healthcare"]
 # ------------
 
 # before_install = "mob_clinic.install.before_install"
-# after_install = "mob_clinic.install.after_install"
+after_install = "mob_clinic.mob_clinic.install.after_install"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "mob_clinic.uninstall.before_uninstall"
-# after_uninstall = "mob_clinic.uninstall.after_uninstall"
+before_uninstall = "mob_clinic.mob_clinic.install.before_uninstall"
+after_uninstall = "mob_clinic.mob_clinic.install.after_uninstall"
 
 # Integration Setup
 # ------------------
