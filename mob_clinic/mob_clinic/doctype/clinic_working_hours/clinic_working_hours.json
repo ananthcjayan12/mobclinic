@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "creation": "2025-10-21 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "day",
+  "is_working_day", 
+  "column_break_3",
+  "start_time",
+  "end_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "day",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Day",
+   "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_working_day",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Working Day"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "is_working_day",
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Start Time"
+  },
+  {
+   "depends_on": "is_working_day",
+   "fieldname": "end_time",
+   "fieldtype": "Time", 
+   "in_list_view": 1,
+   "label": "End Time"
+  }
+ ],
+ "istable": 1,
+ "modified": "2025-10-21 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Clinic Working Hours",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
