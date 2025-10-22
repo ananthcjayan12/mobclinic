@@ -15,10 +15,56 @@ import frappe
 import os
 import json
 import base64
+import re
 from frappe import _
 from frappe.utils import get_files_path, get_url, cstr, now_datetime
-from frappe.core.doctype.file.file import create_new_folder
-from werkzeug.utils import secure_filename
+
+
+def secure_filename(filename):
+    """
+    Simple secure filename function - removes/replaces unsafe characters
+    """
+    if not filename:
+        return filename
+    # Remove or replace unsafe characters
+    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    filename = re.sub(r'\s+', '_', filename)
+    return filename.strip('.')
+
+
+def create_folder_if_not_exists(folder_name, parent_folder="Home"):
+    """
+    Create a folder if it doesn't exist
+    
+    Args:
+        folder_name (str): Name of the folder to create
+        parent_folder (str): Parent folder name
+        
+    Returns:
+        str: The folder path
+    """
+    try:
+        # Check if folder already exists
+        folder_path = f"{parent_folder}/{folder_name}" if parent_folder != "Home" else folder_name
+        
+        if frappe.db.exists("File", {"file_name": folder_name, "is_folder": 1, "folder": parent_folder}):
+            return folder_path
+            
+        # Create the folder
+        folder_doc = frappe.get_doc({
+            "doctype": "File",
+            "file_name": folder_name,
+            "is_folder": 1,
+            "folder": parent_folder,
+            "is_private": 0
+        })
+        folder_doc.insert(ignore_permissions=True)
+        
+        return folder_path
+        
+    except Exception as e:
+        frappe.logger().warning(f"Could not create folder {folder_name}: {str(e)}")
+        return parent_folder  # Fall back to parent folder
 
 
 @frappe.whitelist()
@@ -70,14 +116,14 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
         # Create folder for clinic files if it doesn't exist
         clinic_folder = "Clinic Files"
         if not frappe.db.exists("File", {"file_name": clinic_folder, "is_folder": 1}):
-            create_new_folder(clinic_folder, "Home")
+            create_folder_if_not_exists(clinic_folder, "Home")
             
         # Create category subfolder
         if file_category:
             category_folder = f"{file_category.title()} Files"
             full_folder_path = f"{clinic_folder}/{category_folder}"
             if not frappe.db.exists("File", {"file_name": category_folder, "folder": clinic_folder, "is_folder": 1}):
-                create_new_folder(category_folder, clinic_folder)
+                create_folder_if_not_exists(category_folder, clinic_folder)
             folder = full_folder_path
         else:
             folder = clinic_folder
