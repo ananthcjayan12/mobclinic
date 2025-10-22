@@ -294,11 +294,14 @@ def create_prescription(patient_id, **kwargs):
                 investigations = json.loads(investigations)
             
             for inv in investigations:
-                record.append("lab_test_prescription", {
-                    "lab_test_code": inv.get("lab_test_code"),
-                    "lab_test_name": inv.get("lab_test_name"),
-                    "lab_test_comment": inv.get("lab_test_comment")
-                })
+                # lab_test_code is mandatory - skip if not provided or doesn't exist
+                lab_test_code = inv.get("lab_test_code")
+                if lab_test_code and frappe.db.exists("Lab Test Template", lab_test_code):
+                    record.append("lab_test_prescription", {
+                        "lab_test_code": lab_test_code,
+                        "lab_test_name": inv.get("lab_test_name") or lab_test_code,
+                        "lab_test_comment": inv.get("lab_test_comment")
+                    })
         
         record.insert(ignore_permissions=True)
         frappe.db.commit()
@@ -410,11 +413,14 @@ def update_prescription(record_id, **kwargs):
             # Clear existing and add new
             record.lab_test_prescription = []
             for inv in investigations:
-                record.append("lab_test_prescription", {
-                    "lab_test_code": inv.get("lab_test_code"),
-                    "lab_test_name": inv.get("lab_test_name"),
-                    "lab_test_comment": inv.get("lab_test_comment")
-                })
+                # lab_test_code is mandatory - skip if not provided or doesn't exist
+                lab_test_code = inv.get("lab_test_code")
+                if lab_test_code and frappe.db.exists("Lab Test Template", lab_test_code):
+                    record.append("lab_test_prescription", {
+                        "lab_test_code": lab_test_code,
+                        "lab_test_name": inv.get("lab_test_name") or lab_test_code,
+                        "lab_test_comment": inv.get("lab_test_comment")
+                    })
             updated_fields.append("investigations")
         
         record.save(ignore_permissions=True)
