@@ -385,7 +385,7 @@ def search_patients(search_term, limit=10):
         # Base filters
         base_filters = {}
         
-        # If practitioner exists, filter by their patients
+        # If practitioner exists, filter by their patients (only if they have appointments)
         if practitioner:
             patient_names = frappe.get_all(
                 "Patient Appointment",
@@ -394,8 +394,11 @@ def search_patients(search_term, limit=10):
                 distinct=True,
                 pluck="patient"
             )
+            # Only add filter if practitioner has patients with appointments
+            # If no appointments exist, allow searching all patients
             if patient_names:
                 base_filters["name"] = ["in", patient_names]
+            # If patient_names is empty, don't add filter - search all patients
         
         patients = frappe.get_all(
             "Patient",
