@@ -365,9 +365,10 @@ class TestPaymentAPI(unittest.TestCase):
         
         # Cleanup
         if invoice.docstatus == 1:
+            invoice.flags.ignore_permissions = True
             invoice.cancel()
-        frappe.delete_doc("Sales Invoice", invoice.name, force=True)
-        frappe.delete_doc("Patient Appointment", appointment.name, force=True)
+        frappe.delete_doc("Sales Invoice", invoice.name, force=True, ignore_permissions=True)
+        frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
     
     def test_08_filter_invoices_by_status(self):
         """Test filtering invoices by status"""
