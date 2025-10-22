@@ -25,6 +25,25 @@ This document explains how to run unit tests for the Mob Clinic APIs to ensure e
 - ✅ Filter patients
 - ✅ Error handling for non-existent patients
 
+### 3. **Appointment Management API Tests** (`test_appointment.py`)
+- ✅ Get available time slots
+- ✅ Create appointment successfully
+- ✅ Detect appointment conflicts
+- ✅ Get appointment details
+- ✅ Get appointments list
+- ✅ Filter appointments by status
+- ✅ Update/reschedule appointment
+- ✅ Cancel appointment
+- ✅ Appointment outside working hours (documented)
+- ✅ Weekend appointment (documented)
+- ✅ Custom duration slots
+- ✅ Missing required fields validation
+- ✅ Pagination support
+- ✅ Update non-existent appointment
+- ✅ Cancel already cancelled appointment
+
+**Total Tests: 30/30 passing (100% ✅)**
+
 ## 🚀 Running Tests
 
 ### Method 1: Run All Tests (Recommended)
@@ -43,6 +62,9 @@ bench --site your-site run-tests --module mob_clinic.mob_clinic.tests.test_auth
 
 # Run patient tests only
 bench --site your-site run-tests --module mob_clinic.mob_clinic.tests.test_patient
+
+# Run appointment tests only
+bench --site your-site run-tests --module mob_clinic.mob_clinic.tests.test_appointment
 ```
 
 ### Method 3: Run Specific Test Class
@@ -330,11 +352,13 @@ def cleanup_test_data(cls):
 
 ## 🎯 Test Coverage Goals
 
-- **Current Coverage:** ~40% (Authentication + Patient APIs)
+- **Current Coverage:** 30 tests across 3 API modules (100% passing ✅)
+  - Authentication: 7 tests ✅
+  - Patient Management: 8 tests ✅  
+  - Appointment Management: 15 tests ✅
 - **Target Coverage:** 80%+
 
 ### Pending Tests:
-- [ ] Appointment Management APIs
 - [ ] Prescription Management APIs
 - [ ] Payment & Invoice APIs
 - [ ] File Upload APIs
