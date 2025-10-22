@@ -358,6 +358,9 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
             # Fallback to default cash account
             mode_of_payment_account = frappe.db.get_value("Company", company, "default_cash_account")
         
+        # Get company currency
+        company_currency = frappe.db.get_value("Company", company, "default_currency") or "INR"
+        
         # Create Payment Entry manually
         payment_entry = frappe.get_doc({
             "doctype": "Payment Entry",
@@ -369,8 +372,11 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
             "party": invoice.customer,
             "paid_from": debit_account,
             "paid_to": mode_of_payment_account,
+            "paid_from_account_currency": company_currency,
+            "paid_to_account_currency": company_currency,
             "paid_amount": paid_amount,
             "received_amount": paid_amount,
+            "source_exchange_rate": 1,
             "target_exchange_rate": 1,
             "reference_no": reference_no,
             "reference_date": reference_date or payment_date or today(),
@@ -388,8 +394,17 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         payment_entry.insert(ignore_permissions=True)
         
         # Submit payment entry properly (GL entries will be created)
-        payment_entry.flags.ignore_permissions = True  # Maintain permission bypass for submit hooks
-        payment_entry.submit()
+        # The submit may try to create exchange gain/loss journal which checks permissions
+        # So we temporarily set user to Administrator for this operation
+        current_user = frappe.session.user
+        frappe.set_user("Administrator")
+        
+        try:
+            payment_entry.flags.ignore_permissions = True
+            payment_entry.submit()
+        finally:
+            # Restore original user
+            frappe.set_user(current_user)
         
         # Reload invoice to get updated status
         invoice.reload()
