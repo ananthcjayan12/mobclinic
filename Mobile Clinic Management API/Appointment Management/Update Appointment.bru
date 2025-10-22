@@ -1,0 +1,23 @@
+meta {
+  name: Update Appointment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.update_appointment
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "appointment_id": "{{appointment_id}}",
+    "appointment_time": "11:00:00",
+    "notes": "Rescheduled appointment - patient requested later time"
+  }
+}

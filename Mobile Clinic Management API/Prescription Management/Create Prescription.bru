@@ -1,0 +1,63 @@
+meta {
+  name: Create Prescription
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.create_prescription
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "patient_id": "{{patient_id}}",
+    "chief_complaint": "Severe tooth pain",
+    "symptoms": "Pain in lower right molar, sensitivity to cold",
+    "diagnosis": "Deep dental cavity with possible nerve involvement",
+    "treatment_plan": "Root canal treatment followed by crown placement",
+    "medications": [
+      {
+        "drug_code": "PARACETAMOL",
+        "drug_name": "Paracetamol 500mg",
+        "dosage": "500mg",
+        "period": "3 days",
+        "dosage_form": "Tablet",
+        "interval": "Every 6 hours",
+        "comment": "Take after meals"
+      },
+      {
+        "drug_code": "AMOXICILLIN",
+        "drug_name": "Amoxicillin 250mg",
+        "dosage": "250mg",
+        "period": "5 days",
+        "dosage_form": "Capsule",
+        "interval": "Every 8 hours",
+        "comment": "Complete the full course"
+      }
+    ],
+    "investigations": [
+      {
+        "lab_test_code": "DENTAL-XRAY",
+        "lab_test_name": "Dental X-Ray",
+        "lab_test_comment": "Periapical X-ray of lower right quadrant"
+      }
+    ]
+  }
+}
+
+tests {
+  // Store prescription ID for future requests
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.message === 'Prescription created successfully') {
+          bru.setEnvVar('prescription_id', response.data.record_id);
+          console.log('Prescription created with ID:', response.data.record_id);
+      }
+  }
+}

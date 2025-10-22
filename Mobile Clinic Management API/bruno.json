@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Mobile Clinic Management API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

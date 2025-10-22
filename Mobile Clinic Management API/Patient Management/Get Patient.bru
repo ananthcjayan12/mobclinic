@@ -1,0 +1,15 @@
+meta {
+  name: Get Patient
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.get_patient?patient_id={{patient_id}}
+  body: none
+  auth: none
+}
+
+query {
+  patient_id: {{patient_id}}
+}

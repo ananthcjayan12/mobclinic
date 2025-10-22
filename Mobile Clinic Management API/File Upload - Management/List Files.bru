@@ -1,0 +1,20 @@
+meta {
+  name: List Files
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.list_files?limit=20&offset=0
+  body: none
+  auth: none
+}
+
+query {
+  limit: 20
+  offset: 0
+  ~file_category: xray
+  ~reference_doctype: Patient
+  ~reference_name: {{patient_id}}
+  ~search_term: xray
+}

@@ -1,0 +1,1156 @@
+{
+	"info": {
+		"_postman_id": "mobile-clinic-api-collection",
+		"name": "Mobile Clinic Management API",
+		"description": "Complete API collection for Mobile Clinic Management System\n\n## Overview\nThis collection contains all the APIs for the mobile clinic management system including:\n- Authentication & Authorization\n- Patient Management\n- Appointment Scheduling\n- Prescription Management\n- Payment & Invoice System\n- File Upload & Management\n\n## Base URL\n`{{base_url}}/api/method/mob_clinic.mob_clinic.api`\n\n## Authentication\nMost endpoints require authentication. Use the login endpoint first to get session cookies.\n\n## Environment Variables\nSet up these variables in your Postman environment:\n- `base_url`: Your Frappe site URL (e.g., http://localhost:8000)\n- `practitioner_email`: Doctor's email for testing\n- `patient_id`: Test patient ID\n- `appointment_id`: Test appointment ID\n- `prescription_id`: Test prescription ID\n- `invoice_id`: Test invoice ID\n- `file_id`: Test file ID",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register Doctor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Dr. John Smith\",\n  \"email\": \"doctor@clinic.com\",\n  \"phone\": \"+1234567890\",\n  \"password\": \"SecurePass123!\",\n  \"clinic_name\": \"City Medical Clinic\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.mobile_register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.auth.mobile_register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store login response data",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.message === 'Logged In') {",
+									"        pm.environment.set('practitioner_email', response.user.email);",
+									"        console.log('Login successful for:', response.user.email);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"usr\": \"doctor@clinic.com\",\n  \"pwd\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.mobile_login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.auth.mobile_login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Practitioner Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.get_practitioner_profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.auth.get_practitioner_profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Practitioner Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"consultation_fee\": 500,\n  \"clinic_description\": \"Specialized in dental care and orthodontics\",\n  \"online_consultation\": 1,\n  \"years_of_experience\": 10\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.update_practitioner_profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.auth.update_practitioner_profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.mobile_logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.auth.mobile_logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Patient Management",
+			"item": [
+				{
+					"name": "Create Patient",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store patient ID for future requests",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.message === 'Patient created successfully') {",
+									"        pm.environment.set('patient_id', response.data.patient_id);",
+									"        console.log('Patient created with ID:', response.data.patient_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"sex\": \"Male\",\n  \"mobile\": \"+1987654321\",\n  \"email\": \"john.doe@email.com\",\n  \"dob\": \"1990-05-15\",\n  \"address\": \"123 Main Street, City\",\n  \"occupation\": \"Software Engineer\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.create_patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.create_patient"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Patient",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.get_patient?patient_id={{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.get_patient"
+							],
+							"query": [
+								{
+									"key": "patient_id",
+									"value": "{{patient_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Patients List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.get_patients?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.get_patients"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								},
+								{
+									"key": "filters",
+									"value": "{\"sex\": \"Male\"}",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Patients",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.search_patients?search_term=John&limit=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.search_patients"
+							],
+							"query": [
+								{
+									"key": "search_term",
+									"value": "John"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Patient",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"email\": \"john.doe.updated@email.com\",\n  \"occupation\": \"Senior Software Engineer\",\n  \"address\": \"456 New Address, Updated City\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.update_patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.update_patient"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Appointment Management",
+			"item": [
+				{
+					"name": "Get Available Slots",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_available_slots?date=2025-10-25&duration=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.get_available_slots"
+							],
+							"query": [
+								{
+									"key": "date",
+									"value": "2025-10-25"
+								},
+								{
+									"key": "duration",
+									"value": "30"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Appointment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store appointment ID for future requests",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.appointment_id) {",
+									"        pm.environment.set('appointment_id', response.data.appointment_id);",
+									"        console.log('Appointment created with ID:', response.data.appointment_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"appointment_date\": \"2025-10-25\",\n  \"appointment_time\": \"10:00:00\",\n  \"duration\": 30,\n  \"notes\": \"Regular checkup appointment\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.create_appointment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.create_appointment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Appointment",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_appointment?appointment_id={{appointment_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.get_appointment"
+							],
+							"query": [
+								{
+									"key": "appointment_id",
+									"value": "{{appointment_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Appointments List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_appointments?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.get_appointments"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								},
+								{
+									"key": "filters",
+									"value": "{\"status\": \"Scheduled\"}",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"appointment_id\": \"{{appointment_id}}\",\n  \"appointment_time\": \"11:00:00\",\n  \"notes\": \"Rescheduled appointment - patient requested later time\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.update_appointment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.update_appointment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"appointment_id\": \"{{appointment_id}}\",\n  \"reason\": \"Patient requested cancellation due to emergency\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.cancel_appointment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.cancel_appointment"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Prescription Management",
+			"item": [
+				{
+					"name": "Create Prescription",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store prescription ID for future requests",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.message === 'Prescription created successfully') {",
+									"        pm.environment.set('prescription_id', response.data.record_id);",
+									"        console.log('Prescription created with ID:', response.data.record_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"chief_complaint\": \"Severe tooth pain\",\n  \"symptoms\": \"Pain in lower right molar, sensitivity to cold\",\n  \"diagnosis\": \"Deep dental cavity with possible nerve involvement\",\n  \"treatment_plan\": \"Root canal treatment followed by crown placement\",\n  \"medications\": [\n    {\n      \"drug_code\": \"PARACETAMOL\",\n      \"drug_name\": \"Paracetamol 500mg\",\n      \"dosage\": \"500mg\",\n      \"period\": \"3 days\",\n      \"dosage_form\": \"Tablet\",\n      \"interval\": \"Every 6 hours\",\n      \"comment\": \"Take after meals\"\n    },\n    {\n      \"drug_code\": \"AMOXICILLIN\",\n      \"drug_name\": \"Amoxicillin 250mg\",\n      \"dosage\": \"250mg\",\n      \"period\": \"5 days\",\n      \"dosage_form\": \"Capsule\",\n      \"interval\": \"Every 8 hours\",\n      \"comment\": \"Complete the full course\"\n    }\n  ],\n  \"investigations\": [\n    {\n      \"lab_test_code\": \"DENTAL-XRAY\",\n      \"lab_test_name\": \"Dental X-Ray\",\n      \"lab_test_comment\": \"Periapical X-ray of lower right quadrant\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.create_prescription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.create_prescription"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Prescription",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.get_prescription?record_id={{prescription_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.get_prescription"
+							],
+							"query": [
+								{
+									"key": "record_id",
+									"value": "{{prescription_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Prescriptions List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.get_prescriptions?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.get_prescriptions"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								},
+								{
+									"key": "patient_id",
+									"value": "{{patient_id}}",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Prescription",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"record_id\": \"{{prescription_id}}\",\n  \"treatment_plan\": \"Root canal completed successfully. Crown placement scheduled for next week.\",\n  \"status\": \"In Progress\",\n  \"follow_up_notes\": \"Patient responded well to treatment. No complications observed.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.update_prescription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.update_prescription"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Share Prescription",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"record_id\": \"{{prescription_id}}\",\n  \"patient_email\": \"john.doe@email.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.share_prescription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.share_prescription"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Patient History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.get_patient_history?patient_id={{patient_id}}&limit=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.get_patient_history"
+							],
+							"query": [
+								{
+									"key": "patient_id",
+									"value": "{{patient_id}}"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "from_date",
+									"value": "2025-01-01",
+									"disabled": true
+								},
+								{
+									"key": "to_date",
+									"value": "2025-12-31",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payment & Invoice Management",
+			"item": [
+				{
+					"name": "Create Invoice",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store invoice ID for future requests",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.invoice_id) {",
+									"        pm.environment.set('invoice_id', response.invoice_id);",
+									"        console.log('Invoice created with ID:', response.invoice_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"items\": [\n    {\n      \"item_code\": \"CONSULTATION\",\n      \"qty\": 1,\n      \"rate\": 500,\n      \"description\": \"General consultation\"\n    },\n    {\n      \"item_code\": \"ROOT-CANAL\",\n      \"qty\": 1,\n      \"rate\": 3000,\n      \"description\": \"Root canal treatment\"\n    }\n  ],\n  \"posting_date\": \"2025-10-22\",\n  \"due_date\": \"2025-10-29\",\n  \"remarks\": \"Treatment invoice for dental procedure\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.create_invoice",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.create_invoice"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Invoice",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.get_invoice?invoice_id={{invoice_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.get_invoice"
+							],
+							"query": [
+								{
+									"key": "invoice_id",
+									"value": "{{invoice_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Invoices List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.get_invoices?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.get_invoices"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								},
+								{
+									"key": "patient_id",
+									"value": "{{patient_id}}",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "Unpaid",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Record Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"invoice_id\": \"{{invoice_id}}\",\n  \"paid_amount\": 3500,\n  \"mode_of_payment\": \"Cash\",\n  \"payment_date\": \"2025-10-22\",\n  \"reference_no\": \"CASH001\",\n  \"reference_date\": \"2025-10-22\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.update_payment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.update_payment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.get_payment_summary?patient_id={{patient_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.get_payment_summary"
+							],
+							"query": [
+								{
+									"key": "patient_id",
+									"value": "{{patient_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Payment Reminder",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"invoice_id\": \"{{invoice_id}}\",\n  \"reminder_type\": \"email\",\n  \"message\": \"This is a friendly reminder that your invoice is due for payment.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.send_payment_reminder",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.payment.send_payment_reminder"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "File Upload & Management",
+			"item": [
+				{
+					"name": "Get File Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.get_file_categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.get_file_categories"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload File (Base64)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Store file ID for future requests",
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.message === 'File uploaded successfully') {",
+									"        pm.environment.set('file_id', response.data.file_id);",
+									"        console.log('File uploaded with ID:', response.data.file_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"file_name\": \"patient_xray.jpg\",\n  \"content\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n  \"decode_base64\": true,\n  \"file_category\": \"xray\",\n  \"description\": \"Patient X-ray for dental assessment\",\n  \"reference_doctype\": \"Patient\",\n  \"reference_name\": \"{{patient_id}}\",\n  \"is_private\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.upload_file",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.upload_file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload File (URL)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"file_name\": \"profile_picture.jpg\",\n  \"file_url\": \"https://example.com/profile.jpg\",\n  \"file_category\": \"profile\",\n  \"description\": \"Patient profile picture\",\n  \"reference_doctype\": \"Patient\",\n  \"reference_name\": \"{{patient_id}}\",\n  \"is_private\": 0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.upload_file",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.upload_file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get File",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.get_file?file_id={{file_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.get_file"
+							],
+							"query": [
+								{
+									"key": "file_id",
+									"value": "{{file_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.list_files?limit=20&offset=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.list_files"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								},
+								{
+									"key": "file_category",
+									"value": "xray",
+									"disabled": true
+								},
+								{
+									"key": "reference_doctype",
+									"value": "Patient",
+									"disabled": true
+								},
+								{
+									"key": "reference_name",
+									"value": "{{patient_id}}",
+									"disabled": true
+								},
+								{
+									"key": "search_term",
+									"value": "xray",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete File",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"file_id\": \"{{file_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.delete_file",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.file_upload.delete_file"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set current date for date fields",
+					"const today = new Date().toISOString().split('T')[0];",
+					"pm.environment.set('current_date', today);",
+					"",
+					"// Auto-set tomorrow's date",
+					"const tomorrow = new Date();",
+					"tomorrow.setDate(tomorrow.getDate() + 1);",
+					"pm.environment.set('tomorrow_date', tomorrow.toISOString().split('T')[0]);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script to log responses",
+					"if (pm.response.code !== 200) {",
+					"    console.log('Response status:', pm.response.code);",
+					"    console.log('Response body:', pm.response.text());",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://dev2.localhost:8800",
+			"type": "string"
+		}
+	]
+}

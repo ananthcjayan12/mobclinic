@@ -1,0 +1,26 @@
+meta {
+  name: Record Payment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.update_payment
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "invoice_id": "{{invoice_id}}",
+    "paid_amount": 3500,
+    "mode_of_payment": "Cash",
+    "payment_date": "2025-10-22",
+    "reference_no": "CASH001",
+    "reference_date": "2025-10-22"
+  }
+}

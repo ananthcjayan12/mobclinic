@@ -1,0 +1,39 @@
+meta {
+  name: Upload File -Base64-
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.upload_file
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "file_name": "patient_xray.jpg",
+    "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "decode_base64": true,
+    "file_category": "xray",
+    "description": "Patient X-ray for dental assessment",
+    "reference_doctype": "Patient",
+    "reference_name": "{{patient_id}}",
+    "is_private": 1
+  }
+}
+
+tests {
+  // Store file ID for future requests
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.message === 'File uploaded successfully') {
+          bru.setEnvVar('file_id', response.data.file_id);
+          console.log('File uploaded with ID:', response.data.file_id);
+      }
+  }
+}

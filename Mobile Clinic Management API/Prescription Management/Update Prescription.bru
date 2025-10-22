@@ -1,0 +1,24 @@
+meta {
+  name: Update Prescription
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.update_prescription
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "record_id": "{{prescription_id}}",
+    "treatment_plan": "Root canal completed successfully. Crown placement scheduled for next week.",
+    "status": "In Progress",
+    "follow_up_notes": "Patient responded well to treatment. No complications observed."
+  }
+}

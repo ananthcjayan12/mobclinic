@@ -1,0 +1,36 @@
+meta {
+  name: Create Appointment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.create_appointment
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "patient_id": "{{patient_id}}",
+    "appointment_date": "2025-10-25",
+    "appointment_time": "10:00:00",
+    "duration": 30,
+    "notes": "Regular checkup appointment"
+  }
+}
+
+tests {
+  // Store appointment ID for future requests
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.data && response.data.appointment_id) {
+          bru.setEnvVar('appointment_id', response.data.appointment_id);
+          console.log('Appointment created with ID:', response.data.appointment_id);
+      }
+  }
+}

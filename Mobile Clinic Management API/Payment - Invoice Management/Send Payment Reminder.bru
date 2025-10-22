@@ -1,0 +1,23 @@
+meta {
+  name: Send Payment Reminder
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.send_payment_reminder
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "invoice_id": "{{invoice_id}}",
+    "reminder_type": "email",
+    "message": "This is a friendly reminder that your invoice is due for payment."
+  }
+}

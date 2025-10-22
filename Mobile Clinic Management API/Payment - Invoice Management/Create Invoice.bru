@@ -1,0 +1,49 @@
+meta {
+  name: Create Invoice
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.create_invoice
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "patient_id": "{{patient_id}}",
+    "items": [
+      {
+        "item_code": "CONSULTATION",
+        "qty": 1,
+        "rate": 500,
+        "description": "General consultation"
+      },
+      {
+        "item_code": "ROOT-CANAL",
+        "qty": 1,
+        "rate": 3000,
+        "description": "Root canal treatment"
+      }
+    ],
+    "posting_date": "2025-10-22",
+    "due_date": "2025-10-29",
+    "remarks": "Treatment invoice for dental procedure"
+  }
+}
+
+tests {
+  // Store invoice ID for future requests
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.invoice_id) {
+          bru.setEnvVar('invoice_id', response.invoice_id);
+          console.log('Invoice created with ID:', response.invoice_id);
+      }
+  }
+}

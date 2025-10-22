@@ -1,0 +1,18 @@
+meta {
+  name: Get Invoices List
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.get_invoices?limit_page_length=20&limit_start=0
+  body: none
+  auth: none
+}
+
+query {
+  limit_page_length: 20
+  limit_start: 0
+  ~patient_id: {{patient_id}}
+  ~status: Unpaid
+}

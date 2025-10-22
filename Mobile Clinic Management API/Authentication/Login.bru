@@ -1,0 +1,33 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.mobile_login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "usr": "Administrator",
+    "pwd": "admin"
+  }
+}
+
+tests {
+  // Store login response data
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.message === 'Logged In') {
+          bru.setEnvVar('practitioner_email', response.user.email);
+          console.log('Login successful for:', response.user.email);
+      }
+  }
+}

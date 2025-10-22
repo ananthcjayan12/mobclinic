@@ -1,0 +1,15 @@
+meta {
+  name: Get File
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.file_upload.get_file?file_id={{file_id}}
+  body: none
+  auth: none
+}
+
+query {
+  file_id: {{file_id}}
+}

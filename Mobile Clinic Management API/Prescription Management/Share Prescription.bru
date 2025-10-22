@@ -1,0 +1,22 @@
+meta {
+  name: Share Prescription
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.share_prescription
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "record_id": "{{prescription_id}}",
+    "patient_email": "john.doe@email.com"
+  }
+}

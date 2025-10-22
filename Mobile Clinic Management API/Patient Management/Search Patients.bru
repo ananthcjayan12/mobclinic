@@ -1,0 +1,16 @@
+meta {
+  name: Search Patients
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.search_patients?search_term=John&limit=10
+  body: none
+  auth: none
+}
+
+query {
+  search_term: John
+  limit: 10
+}

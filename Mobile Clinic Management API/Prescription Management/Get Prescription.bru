@@ -1,0 +1,15 @@
+meta {
+  name: Get Prescription
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.get_prescription?record_id={{prescription_id}}
+  body: none
+  auth: none
+}
+
+query {
+  record_id: {{prescription_id}}
+}

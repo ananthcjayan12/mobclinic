@@ -1,0 +1,25 @@
+meta {
+  name: Register Doctor
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.mobile_register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "full_name": "Dr. John Smith",
+    "email": "doctor@clinic.com",
+    "phone": "+1234567890",
+    "password": "SecurePass123!",
+    "clinic_name": "City Medical Clinic"
+  }
+}

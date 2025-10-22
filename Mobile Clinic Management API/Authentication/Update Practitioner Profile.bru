@@ -1,0 +1,24 @@
+meta {
+  name: Update Practitioner Profile
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.auth.update_practitioner_profile
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "consultation_fee": 500,
+    "clinic_description": "Specialized in dental care and orthodontics",
+    "online_consultation": 1,
+    "years_of_experience": 10
+  }
+}

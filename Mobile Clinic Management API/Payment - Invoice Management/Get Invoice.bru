@@ -1,0 +1,15 @@
+meta {
+  name: Get Invoice
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.payment.get_invoice?invoice_id={{invoice_id}}
+  body: none
+  auth: none
+}
+
+query {
+  invoice_id: {{invoice_id}}
+}

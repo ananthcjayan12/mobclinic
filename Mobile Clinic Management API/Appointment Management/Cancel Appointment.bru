@@ -1,0 +1,22 @@
+meta {
+  name: Cancel Appointment
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.cancel_appointment
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "appointment_id": "{{appointment_id}}",
+    "reason": "Patient requested cancellation due to emergency"
+  }
+}

@@ -1,0 +1,39 @@
+meta {
+  name: Create Patient
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.create_patient
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "sex": "Male",
+    "mobile": "+1987654321",
+    "email": "john.doe@email.com",
+    "dob": "1990-05-15",
+    "address": "123 Main Street, City",
+    "occupation": "Software Engineer"
+  }
+}
+
+tests {
+  // Store patient ID for future requests
+  if (res.getStatus() === 200) {
+      const response = res.getBody();
+      if (response.message === 'Patient created successfully') {
+          bru.setEnvVar('patient_id', response.data.patient_id);
+          console.log('Patient created with ID:', response.data.patient_id);
+      }
+  }
+}

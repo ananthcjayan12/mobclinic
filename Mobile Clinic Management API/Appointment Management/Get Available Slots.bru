@@ -1,0 +1,16 @@
+meta {
+  name: Get Available Slots
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_available_slots?date=2025-10-25&duration=30
+  body: none
+  auth: none
+}
+
+query {
+  date: 2025-10-25
+  duration: 30
+}
