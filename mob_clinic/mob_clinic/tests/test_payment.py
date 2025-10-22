@@ -16,6 +16,14 @@ class TestPaymentAPI(unittest.TestCase):
         """Set up test data once for all tests"""
         frappe.set_user("Administrator")
         
+        # Create test medical department if not exists
+        if not frappe.db.exists("Medical Department", "Dentistry"):
+            dept = frappe.get_doc({
+                "doctype": "Medical Department",
+                "department": "Dentistry"
+            })
+            dept.insert(ignore_permissions=True)
+        
         # Create test practitioner
         if not frappe.db.exists("Healthcare Practitioner", {"first_name": "Test", "last_name": "Payment Doctor"}):
             practitioner = frappe.get_doc({
@@ -152,6 +160,10 @@ class TestPaymentAPI(unittest.TestCase):
         # Delete test user
         if frappe.db.exists("User", "test_payment_doctor@example.com"):
             frappe.delete_doc("User", "test_payment_doctor@example.com", force=True)
+        
+        # Delete test medical department
+        if frappe.db.exists("Medical Department", "Dentistry"):
+            frappe.delete_doc("Medical Department", "Dentistry", force=True)
         
         frappe.db.commit()
     
