@@ -4,20 +4,46 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 def execute():
     """Install custom fields for mobile clinic app"""
     
-    frappe.log_error("Starting mobile clinic custom fields installation")
+    print("="*50)
+    print("STARTING MOBILE CLINIC CUSTOM FIELDS INSTALLATION")
+    print("="*50)
     
     try:
+        # Check if Healthcare app is installed
+        if "healthcare" not in frappe.get_installed_apps():
+            print("WARNING: Healthcare app not found. Please install healthcare app first.")
+            print("Run: bench get-app healthcare && bench --site [site-name] install-app healthcare")
+            return
+            
         # Create all custom fields
+        print("Creating Healthcare Practitioner custom fields...")
         create_healthcare_practitioner_fields()
+        
+        print("Creating Patient custom fields...")
         create_patient_fields() 
+        
+        print("Creating Patient Appointment custom fields...")
         create_patient_appointment_fields()
+        
+        print("Creating Patient Medical Record custom fields...")
         create_patient_medical_record_fields()
+        
+        print("Creating Sales Invoice custom fields...")
         create_sales_invoice_fields()
         
-        frappe.log_error("Mobile clinic custom fields installation completed successfully")
+        # Commit the changes
+        frappe.db.commit()
+        
+        print("="*50)
+        print("MOBILE CLINIC CUSTOM FIELDS INSTALLATION COMPLETED SUCCESSFULLY!")
+        print("="*50)
+        
+        # Log success
+        frappe.log_error("Mobile clinic custom fields installation completed successfully", "Custom Fields Installation")
         
     except Exception as e:
-        frappe.log_error(f"Error installing mobile clinic custom fields: {str(e)}")
+        print(f"ERROR: Failed to install custom fields: {str(e)}")
+        frappe.log_error(f"Error installing mobile clinic custom fields: {str(e)}", "Custom Fields Installation Error")
         raise
 
 def create_healthcare_practitioner_fields():
