@@ -155,7 +155,7 @@ class TestAppointmentAPI(FrappeTestCase):
             "mobile": "+1444444444",
             "email": "test_patient_appt@test.com",
             "sex": "Male",
-            "blood_group": "O+",
+            "blood_group": "O Positive",
             "invite_user": 0  # Don't create website user
         })
         patient.insert(ignore_permissions=True)
