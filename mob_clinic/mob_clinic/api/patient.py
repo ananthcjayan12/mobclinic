@@ -33,19 +33,11 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
         else:
             filters = {}
             
-        # Add practitioner filter to show only patients of current doctor
+                # Get current practitioner for context but don't filter by it in search
         practitioner = get_current_practitioner()
-        if practitioner:
-            # Filter patients who have appointments with this practitioner
-            patient_names = frappe.get_all(
-                "Patient Appointment",
-                filters={"practitioner": practitioner.name},
-                fields=["patient"],
-                distinct=True,
-                pluck="patient"
-            )
-            if patient_names:
-                filters.setdefault("name", ["in", patient_names])
+        
+        # Note: Search should include all patients, not filter by practitioner
+        # This allows practitioners to find and add new patients to their practice
         
         # Get patients
         patients = frappe.get_all(
@@ -375,39 +367,17 @@ def search_patients(search_term, limit=10):
     try:
         practitioner = get_current_practitioner()
         
-        # Build search filters - use proper OR filter syntax
+        # Base filters (empty for search - we want to search ALL patients)
+        base_filters = {}
+        
+        # Build OR conditions for searching across multiple fields
         or_filters = [
             ["patient_name", "like", f"%{search_term}%"],
             ["mobile", "like", f"%{search_term}%"],
             ["name", "like", f"%{search_term}%"]
         ]
         
-        # Base filters
-        base_filters = {}
-        
-        # Debug logging
-        print(f"[DEBUG] Search term: {search_term}")
-        print(f"[DEBUG] Practitioner: {practitioner.name if practitioner else 'None'}")
-        
-        # If practitioner exists, filter by their patients (only if they have appointments)
-        if practitioner:
-            patient_names = frappe.get_all(
-                "Patient Appointment",
-                filters={"practitioner": practitioner.name},
-                fields=["patient"],
-                distinct=True,
-                pluck="patient"
-            )
-            print(f"[DEBUG] Patient names from appointments: {patient_names}")
-            # Only add filter if practitioner has patients with appointments
-            # If no appointments exist, allow searching all patients
-            if patient_names:
-                base_filters["name"] = ["in", patient_names]
-                print(f"[DEBUG] Added name filter: {base_filters}")
-            else:
-                print(f"[DEBUG] No appointments found, searching all patients")
-            # If patient_names is empty, don't add filter - search all patients
-        
+        # Get patients matching search criteria
         patients = frappe.get_all(
             "Patient",
             fields=["name", "patient_name", "mobile", "sex", "dob", "image"],
@@ -416,12 +386,6 @@ def search_patients(search_term, limit=10):
             limit=limit,
             order_by="patient_name"
         )
-        
-        print(f"[DEBUG] Base filters: {base_filters}")
-        print(f"[DEBUG] Or filters: {or_filters}")
-        print(f"[DEBUG] Found {len(patients)} patients")
-        for p in patients:
-            print(f"[DEBUG] Patient: {p.get('name')} - {p.get('patient_name')} - {p.get('mobile')}")
         
         # Enhance search results
         search_results = []
