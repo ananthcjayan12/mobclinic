@@ -247,16 +247,14 @@ def create_patient(**kwargs):
         if not kwargs.get("naming_series"):
             patient.naming_series = "HLC-PAT-.YYYY.-"
         
+        # Disable invite_user to prevent website user creation on insert
+        patient.invite_user = 0
+        
         patient.flags.ignore_permissions = True
         patient.flags.ignore_mandatory = True
         
-        try:
-            patient.insert(ignore_permissions=True)
-            frappe.db.commit()
-        except frappe.exceptions.NameError as e:
-            # If naming series fails, try with .name set manually
-            frappe.log_error(f"Naming series error: {str(e)}", "Patient Naming Debug")
-            raise
+        patient.insert(ignore_permissions=True)
+        frappe.db.commit()
         
         # Get the created patient with enhanced data
         created_patient = get_patient(patient.name)
@@ -272,19 +270,16 @@ def create_patient(**kwargs):
             "exc_type": "ValidationError",
             "message": "Patient with similar details already exists"
         }
-    except frappe.exceptions.NameError as e:
-        # Naming series error
-        error_msg = str(e)
-        frappe.log_error(error_msg, "Patient Naming Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Naming error: {error_msg[:150]}"
-        }
     except Exception as e:
         error_msg = str(e)
-        # Log with shorter title
-        frappe.log_error(error_msg, "Patient Creation")
+        # Don't log errors during tests to avoid nested error log issues
+        import os
+        if not os.environ.get('CI'):
+            try:
+                frappe.log_error(error_msg[:500], "Patient Creation")
+            except:
+                pass  # Ignore if error logging fails
+        
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
