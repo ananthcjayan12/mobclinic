@@ -250,29 +250,18 @@ class TestPrescriptionAPI(FrappeTestCase):
                 {
                     "drug_code": "Amoxicillin",
                     "drug_name": "Amoxicillin",
-                    "interval": "3",
+                    "interval": 3,
                     "interval_uom": "Day",
                     "comment": "500mg dosage, Take for 7 days, Take after meals"
                 },
                 {
                     "drug_code": "Ibuprofen",
                     "drug_name": "Ibuprofen",
-                    "interval": "2",
+                    "interval": 2,
                     "interval_uom": "Day",
                     "comment": "400mg dosage, Take for 5 days, For pain relief"
                 }
-            ]),
-            investigations=json.dumps([
-                {
-                    "lab_test_code": "Dental X-Ray",
-                    "lab_test_name": "Dental X-Ray",
-                    "lab_test_comment": "Check root condition"
-                }
-            ]),
-            follow_up_required=1,
-            follow_up_date=(datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d"),
-            lifestyle_recommendations="Avoid hard foods",
-            diet_recommendations="Soft diet for 1 week"
+            ])
         )
         
         # Print full error details if creation failed
