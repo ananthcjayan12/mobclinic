@@ -18,6 +18,7 @@ import base64
 import re
 from frappe import _
 from frappe.utils import get_files_path, get_url, cstr, now_datetime
+from frappe.core.api.file import create_new_folder
 
 
 def secure_filename(filename):
@@ -31,40 +32,6 @@ def secure_filename(filename):
     filename = re.sub(r'\s+', '_', filename)
     return filename.strip('.')
 
-
-def create_folder_if_not_exists(folder_name, parent_folder="Home"):
-    """
-    Create a folder if it doesn't exist
-    
-    Args:
-        folder_name (str): Name of the folder to create
-        parent_folder (str): Parent folder name
-        
-    Returns:
-        str: The folder path
-    """
-    try:
-        # Check if folder already exists
-        folder_path = f"{parent_folder}/{folder_name}" if parent_folder != "Home" else folder_name
-        
-        if frappe.db.exists("File", {"file_name": folder_name, "is_folder": 1, "folder": parent_folder}):
-            return folder_path
-            
-        # Create the folder
-        folder_doc = frappe.get_doc({
-            "doctype": "File",
-            "file_name": folder_name,
-            "is_folder": 1,
-            "folder": parent_folder,
-            "is_private": 0
-        })
-        folder_doc.insert(ignore_permissions=True)
-        
-        return folder_path
-        
-    except Exception as e:
-        frappe.logger().warning(f"Could not create folder {folder_name}: {str(e)}")
-        return parent_folder  # Fall back to parent folder
 
 
 @frappe.whitelist()
@@ -113,20 +80,31 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
                     "message": f"{reference_doctype} {reference_name} does not exist"
                 }
                 
-        # Create folder for clinic files if it doesn't exist
-        clinic_folder = "Clinic Files"
-        if not frappe.db.exists("File", {"file_name": clinic_folder, "is_folder": 1}):
-            create_folder_if_not_exists(clinic_folder, "Home")
-            
-        # Create category subfolder
-        if file_category:
-            category_folder = f"{file_category.title()} Files"
-            full_folder_path = f"{clinic_folder}/{category_folder}"
-            if not frappe.db.exists("File", {"file_name": category_folder, "folder": clinic_folder, "is_folder": 1}):
-                create_folder_if_not_exists(category_folder, clinic_folder)
-            folder = full_folder_path
+        # Create folder structure using Frappe's pattern
+        clinic_folder_name = "Clinic Files"
+        
+        # Create main clinic folder if it doesn't exist
+        if not frappe.db.exists("File", {"file_name": clinic_folder_name, "is_folder": 1, "folder": "Home"}):
+            clinic_folder = create_new_folder(clinic_folder_name, "Home")
         else:
-            folder = clinic_folder
+            clinic_folder = frappe.get_doc("File", {"file_name": clinic_folder_name, "is_folder": 1, "folder": "Home"})
+        
+        target_folder = clinic_folder.name  # This will be "Home/Clinic Files"
+        
+        # Create category subfolder if specified
+        if file_category:
+            category_folder_name = f"{file_category.title()} Files"
+            category_folder_path = f"{clinic_folder.name}/{category_folder_name}"
+            
+            if not frappe.db.exists("File", {"file_name": category_folder_name, "is_folder": 1, "folder": clinic_folder.name}):
+                category_folder = create_new_folder(category_folder_name, clinic_folder.name)
+                target_folder = category_folder.name
+            else:
+                target_folder = category_folder_path
+            
+        # Secure filename
+        if file_name:
+            file_name = secure_filename(file_name)
             
         # Handle base64 content
         if content and decode_base64:
@@ -138,34 +116,35 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
                     "message": f"Invalid base64 content: {str(e)}"
                 }
                 
-        # Secure filename
-        if file_name:
-            file_name = secure_filename(file_name)
-            
         # Create file document
         file_doc = frappe.get_doc({
             "doctype": "File",
             "file_name": file_name,
-            "folder": folder,
+            "folder": target_folder,
             "is_private": is_private,
-            "file_url": file_url,
             "attached_to_doctype": reference_doctype,
             "attached_to_name": reference_name,
-            "attached_to_field": "file_list",  # Generic field for file attachments
         })
         
-        # Add custom fields for clinic file management
-        if hasattr(file_doc, 'file_category'):
-            file_doc.file_category = file_category
-        if hasattr(file_doc, 'description'):
-            file_doc.description = description
-            
-        # Save content if provided
+        # Add content if provided (this will trigger save_file)
         if content:
             file_doc.content = content
+        elif file_url:
+            file_doc.file_url = file_url
             
-        # Insert the file
+        # Insert the file (this will call save_file and handle content)
         file_doc.insert(ignore_permissions=True)
+        
+        # Store custom metadata in comment or description fields
+        if file_category or description:
+            metadata = {}
+            if file_category:
+                metadata['category'] = file_category
+            if description:
+                metadata['description'] = description
+                
+            # Add metadata as comment
+            file_doc.add_comment("Info", f"Category: {file_category}, Description: {description or 'N/A'}")
         
         # Optimize image files automatically based on category configuration
         if content and file_category:
