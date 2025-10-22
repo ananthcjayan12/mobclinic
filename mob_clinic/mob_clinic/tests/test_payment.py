@@ -342,8 +342,7 @@ class TestPaymentAPI(unittest.TestCase):
             "appointment_date": today(),
             "appointment_time": "10:00:00",
             "appointment_type": "Consultation",
-            "appointment_for": "Routine Checkup",  # Text field
-            "routine_checkup": 1,  # Boolean field
+            "appointment_for": "Practitioner",  # Must be: "", "Practitioner", "Department", or "Service Unit"
             "status": "Open"
         })
         appointment.insert(ignore_permissions=True)
@@ -461,15 +460,16 @@ class TestPaymentAPI(unittest.TestCase):
         """Test sending payment reminder"""
         from mob_clinic.mob_clinic.api.payment import create_invoice, send_payment_reminder
         
-        # Create unpaid invoice with overdue date
-        past_date = add_days(today(), -10)
-        due_date = add_days(today(), -5)  # Due date is in the past (overdue) but AFTER posting date
+        # Create unpaid invoice with recent date but overdue due_date
+        # Use today as posting_date and yesterday as due_date (simpler approach)
+        posting_date_val = add_days(today(), -7)  # Invoice from 7 days ago
+        due_date_val = add_days(today(), -3)  # Was due 3 days ago (overdue now)
         
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
-            posting_date=past_date,
-            due_date=due_date
+            posting_date=posting_date_val,
+            due_date=due_date_val
         )
         invoice_id = result["invoice_id"]
         
@@ -514,14 +514,14 @@ class TestPaymentAPI(unittest.TestCase):
         from mob_clinic.mob_clinic.api.payment import create_invoice, get_invoice
         
         # Create overdue invoice - post it in the past with due date also in past but after posting
-        past_date = add_days(today(), -15)
-        due_date = add_days(today(), -10)  # Due 5 days after posting, but still overdue today
+        posting_date_val = add_days(today(), -10)  # Invoice from 10 days ago
+        due_date_val = add_days(today(), -3)  # Was due 3 days ago (overdue now, 7 days after posting)
         
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
-            posting_date=past_date,
-            due_date=due_date
+            posting_date=posting_date_val,
+            due_date=due_date_val
         )
         invoice_id = result["invoice_id"]
         

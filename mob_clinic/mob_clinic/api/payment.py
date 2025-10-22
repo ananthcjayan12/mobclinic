@@ -261,8 +261,8 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "patient": patient_id,
             "patient_name": patient.patient_name,
             "healthcare_practitioner": practitioner.name,
-            "posting_date": getdate(posting_date) if posting_date else today(),
-            "due_date": getdate(due_date) if due_date else add_days(getdate(posting_date) if posting_date else today(), 7),
+            "posting_date": posting_date or today(),
+            "due_date": due_date or add_days(posting_date or today(), 7),
             "remarks": remarks,
             "items": []
         })
@@ -337,30 +337,38 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         if paid_amount > flt(invoice.outstanding_amount):
             frappe.throw(_("Payment amount cannot exceed outstanding amount"))
         
-        # Create Payment Entry
-        payment_entry = frappe.get_doc({
-            "doctype": "Payment Entry",
-            "payment_type": "Receive",
-            "posting_date": payment_date or today(),
-            "mode_of_payment": mode_of_payment,
-            "party_type": "Customer",
-            "party": invoice.customer,
-            "paid_amount": paid_amount,
-            "received_amount": paid_amount,
-            "reference_no": reference_no,
-            "reference_date": reference_date or payment_date or today(),
-            "references": [{
-                "reference_doctype": "Sales Invoice",
-                "reference_name": invoice_id,
-                "allocated_amount": paid_amount
-            }]
-        })
+        # Set global flag to bypass all permission checks including nested calls
+        original_flags = frappe.flags.ignore_permissions
+        frappe.flags.ignore_permissions = True
         
-        # Set flags to bypass permission checks
-        payment_entry.flags.ignore_permissions = True
-        
-        payment_entry.insert(ignore_permissions=True)
-        payment_entry.submit()
+        try:
+            # Create Payment Entry
+            payment_entry = frappe.get_doc({
+                "doctype": "Payment Entry",
+                "payment_type": "Receive",
+                "posting_date": payment_date or today(),
+                "mode_of_payment": mode_of_payment,
+                "party_type": "Customer",
+                "party": invoice.customer,
+                "paid_amount": paid_amount,
+                "received_amount": paid_amount,
+                "reference_no": reference_no,
+                "reference_date": reference_date or payment_date or today(),
+                "references": [{
+                    "reference_doctype": "Sales Invoice",
+                    "reference_name": invoice_id,
+                    "allocated_amount": paid_amount
+                }]
+            })
+            
+            # Set flags to bypass permission checks
+            payment_entry.flags.ignore_permissions = True
+            
+            payment_entry.insert(ignore_permissions=True)
+            payment_entry.submit()
+        finally:
+            # Restore original flag
+            frappe.flags.ignore_permissions = original_flags
         
         # Reload invoice to get updated status
         invoice.reload()
