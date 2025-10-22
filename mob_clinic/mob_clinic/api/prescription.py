@@ -261,27 +261,28 @@ def create_prescription(patient_id, **kwargs):
                 medications = json.loads(medications)
             
             for med in medications:
-                drug_data = {
-                    "drug_name": med.get("drug_name"),
-                    "comment": med.get("comment")
-                }
+                # Only include absolutely required and safe fields
+                drug_data = {}
                 
-                # Add optional fields only if provided
+                # Required: drug_code (Link to Item)
                 if med.get("drug_code"):
                     drug_data["drug_code"] = med.get("drug_code")
+                    
+                # Optional: drug_name (fetched from drug_code usually)
+                if med.get("drug_name"):
+                    drug_data["drug_name"] = med.get("drug_name")
                 
-                # Only add interval fields if interval is provided
+                # Optional: interval fields
                 if med.get("interval"):
                     drug_data["interval"] = int(med.get("interval"))
-                    if med.get("interval_uom"):
-                        drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                if med.get("interval_uom"):
+                    drug_data["interval_uom"] = med.get("interval_uom")
                 
-                if med.get("medical_code"):
-                    drug_data["medical_code"] = med.get("medical_code")
+                # Optional: comment (stores dosage/period as text)
+                if med.get("comment"):
+                    drug_data["comment"] = med.get("comment")
                 
-                # For dosage, dosage_form, and period - these are Link fields
-                # Only add if they exist as actual records, otherwise skip
-                # (We store this info in comment instead)
+                # Do NOT add: dosage_form, dosage, period - they need master data
                     
                 record.append("drug_prescription", drug_data)
         
@@ -376,25 +377,28 @@ def update_prescription(record_id, **kwargs):
             # Clear existing and add new
             record.drug_prescription = []
             for med in medications:
-                drug_data = {
-                    "drug_name": med.get("drug_name"),
-                    "comment": med.get("comment")
-                }
+                # Only include absolutely required and safe fields
+                drug_data = {}
                 
-                # Add optional fields only if provided
+                # Required: drug_code (Link to Item)
                 if med.get("drug_code"):
                     drug_data["drug_code"] = med.get("drug_code")
+                    
+                # Optional: drug_name
+                if med.get("drug_name"):
+                    drug_data["drug_name"] = med.get("drug_name")
                 
-                # Only add interval fields if interval is provided
+                # Optional: interval fields
                 if med.get("interval"):
                     drug_data["interval"] = int(med.get("interval"))
-                    if med.get("interval_uom"):
-                        drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                if med.get("interval_uom"):
+                    drug_data["interval_uom"] = med.get("interval_uom")
                 
-                if med.get("medical_code"):
-                    drug_data["medical_code"] = med.get("medical_code")
+                # Optional: comment
+                if med.get("comment"):
+                    drug_data["comment"] = med.get("comment")
                 
-                # Skip dosage_form, dosage, period - they're Link fields that need master data
+                # Do NOT add: dosage_form, dosage, period
                     
                 record.append("drug_prescription", drug_data)
             updated_fields.append("medications")
