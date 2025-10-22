@@ -65,21 +65,27 @@ class TestPaymentAPI(unittest.TestCase):
         practitioner_doc.user_id = "test_payment_doctor@example.com"
         practitioner_doc.save(ignore_permissions=True)
         
-        # Create test patient
-        if not frappe.db.exists("Patient", {"first_name": "Payment", "last_name": "Test Patient"}):
+        # Create test patient (check by email to avoid duplicates)
+        patient_email = "payment_test_patient@mobclinic.test"
+        patient_mobile = "+919876543299"
+        
+        existing_patient = frappe.db.get_value("Patient", 
+            {"email": patient_email}, "name")
+        
+        if existing_patient:
+            cls.patient_id = existing_patient
+        else:
             patient = frappe.get_doc({
                 "doctype": "Patient",
                 "first_name": "Payment",
                 "last_name": "Test Patient",
                 "sex": "Male",
-                "mobile": "+919876543210",
-                "email": "payment_patient@example.com"
+                "mobile": patient_mobile,
+                "email": patient_email,
+                "invite_user": 0  # Don't create website user
             })
             patient.insert(ignore_permissions=True)
             cls.patient_id = patient.name
-        else:
-            cls.patient_id = frappe.db.get_value("Patient", 
-                {"first_name": "Payment", "last_name": "Test Patient"})
         
         # Create test items for invoicing
         items_data = [
