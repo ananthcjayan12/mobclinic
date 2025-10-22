@@ -296,10 +296,37 @@ class TestYourFeature(FrappeTestCase):
 ### Best Practices:
 
 1. **Naming Convention:** Use `test_XX_descriptive_name` format
-2. **Cleanup:** Always clean up test data in tearDownClass
-3. **Independence:** Each test should be independent
-4. **Assertions:** Use appropriate assert methods
+2. **Cleanup:** Always clean up test data in both setUpClass and tearDownClass
+3. **Independence:** Each test should be independent and not rely on test execution order
+4. **Assertions:** Use appropriate assert methods (assertEqual, assertTrue, assertIn, etc.)
 5. **Documentation:** Add docstrings to describe test purpose
+6. **Check Before Create:** Use `frappe.db.exists()` to avoid duplicate entries
+7. **Proper User Context:** Set `frappe.set_user("Administrator")` before operations
+8. **Use Frappe ORM:** Prefer `frappe.delete_doc()` over raw SQL for cleanup
+9. **Commit Changes:** Always call `frappe.db.commit()` after data changes
+10. **Validate Field Values:** Check valid options for select fields (e.g., "O Positive" not "O+")
+11. **Child Tables:** Remember child tables don't exist independently - manage through parent
+12. **Unique Test Data:** Use unique identifiers (emails, phones) to avoid conflicts
+
+### Test Cleanup Pattern:
+
+```python
+@classmethod
+def cleanup_test_data(cls):
+    """Clean up test data using Frappe ORM"""
+    frappe.set_user("Administrator")
+    
+    try:
+        # Check before deleting
+        if frappe.db.exists("DocType", "test-record"):
+            frappe.delete_doc("DocType", "test-record", 
+                            force=True, ignore_permissions=True)
+        
+        frappe.db.commit()
+    except Exception as e:
+        print(f"Cleanup error: {str(e)}")
+        frappe.db.rollback()
+```
 
 ## 🎯 Test Coverage Goals
 
