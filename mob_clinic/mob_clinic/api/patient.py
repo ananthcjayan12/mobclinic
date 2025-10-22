@@ -249,8 +249,14 @@ def create_patient(**kwargs):
         
         patient.flags.ignore_permissions = True
         patient.flags.ignore_mandatory = True
-        patient.insert(ignore_permissions=True)
-        frappe.db.commit()
+        
+        try:
+            patient.insert(ignore_permissions=True)
+            frappe.db.commit()
+        except frappe.exceptions.NameError as e:
+            # If naming series fails, try with .name set manually
+            frappe.log_error(f"Naming series error: {str(e)}", "Patient Naming Debug")
+            raise
         
         # Get the created patient with enhanced data
         created_patient = get_patient(patient.name)
@@ -265,6 +271,15 @@ def create_patient(**kwargs):
         return {
             "exc_type": "ValidationError",
             "message": "Patient with similar details already exists"
+        }
+    except frappe.exceptions.NameError as e:
+        # Naming series error
+        error_msg = str(e)
+        frappe.log_error(error_msg, "Patient Naming Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Naming error: {error_msg[:150]}"
         }
     except Exception as e:
         error_msg = str(e)

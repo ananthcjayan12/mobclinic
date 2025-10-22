@@ -50,17 +50,30 @@ class TestPatientAPI(FrappeTestCase):
             current_year = datetime.now().year
             series_name = f"HLC-PAT-.{current_year}.-"
             
+            print(f"\n[DEBUG] Initializing naming series: {series_name}")
+            
             # Try to get or create the series
             if not frappe.db.exists("Series", series_name):
+                print(f"[DEBUG] Series doesn't exist, creating...")
                 frappe.db.sql("""
                     INSERT INTO `tabSeries` (name, current) 
                     VALUES (%s, 0)
                 """, (series_name,))
+                print(f"[DEBUG] Series created successfully")
+            else:
+                print(f"[DEBUG] Series already exists")
             
             frappe.db.commit()
+            
+            # Verify it was created
+            exists = frappe.db.exists("Series", series_name)
+            print(f"[DEBUG] Series exists after commit: {exists}")
+            
         except Exception as e:
-            # If series already exists or any other error, just continue
-            pass
+            # If series already exists or any other error, log and continue
+            print(f"[DEBUG] Error initializing series: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def setUp(self):
         """Set up before each test"""
