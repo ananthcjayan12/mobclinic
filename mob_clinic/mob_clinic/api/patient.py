@@ -253,7 +253,17 @@ def create_patient(**kwargs):
         patient.flags.ignore_permissions = True
         patient.flags.ignore_mandatory = True
         
-        patient.insert(ignore_permissions=True)
+        # Use a different approach: set the name manually to avoid naming series issues
+        try:
+            # Try normal insert first
+            patient.insert(ignore_permissions=True)
+        except frappe.exceptions.NameError:
+            # If naming fails, generate name manually
+            from frappe.model.naming import make_autoname
+            patient.name = make_autoname("HLC-PAT-.YYYY.-.#####")
+            patient.flags.name_set = True
+            patient.insert(ignore_permissions=True, set_name=patient.name)
+        
         frappe.db.commit()
         
         # Get the created patient with enhanced data
