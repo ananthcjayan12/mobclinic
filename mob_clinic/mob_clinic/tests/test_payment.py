@@ -333,14 +333,16 @@ class TestPaymentAPI(unittest.TestCase):
     def test_07_create_invoice_with_appointment(self):
         """Test creating invoice linked to an appointment"""
         from mob_clinic.mob_clinic.api.payment import create_invoice
+        import random
         
-        # Create appointment first
+        # Create appointment with unique time to avoid overlaps (use random minute between 30-59)
+        unique_minute = random.randint(30, 59)
         appointment = frappe.get_doc({
             "doctype": "Patient Appointment",
             "patient": self.patient_id,
             "practitioner": self.practitioner_id,
             "appointment_date": today(),
-            "appointment_time": "10:00:00",
+            "appointment_time": f"14:{unique_minute}:00",  # Unique time in afternoon
             "appointment_type": "Consultation",
             "appointment_for": "Practitioner",  # Must be: "", "Practitioner", "Department", or "Service Unit"
             "status": "Open"
@@ -461,18 +463,19 @@ class TestPaymentAPI(unittest.TestCase):
         """Test sending payment reminder"""
         from mob_clinic.mob_clinic.api.payment import create_invoice, send_payment_reminder
         
-        # Create unpaid invoice with recent date but overdue due_date
-        # Use today as posting_date and yesterday as due_date (simpler approach)
-        posting_date_val = add_days(today(), -7)  # Invoice from 7 days ago
-        due_date_val = add_days(today(), -3)  # Was due 3 days ago (overdue now)
-        
+        # Create unpaid invoice with today's date and short due date
+        # Then manually mark it as overdue by updating the due_date after creation
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
-            posting_date=posting_date_val,
-            due_date=due_date_val
+            posting_date=today(),
+            due_date=add_days(today(), 1)  # Due tomorrow (valid for ERPNext)
         )
         invoice_id = result["invoice_id"]
+        
+        # Manually update the due_date to past to simulate overdue
+        invoice = frappe.get_doc("Sales Invoice", invoice_id)
+        invoice.db_set("due_date", add_days(today(), -3), update_modified=False)
         
         try:
             # Send reminder
@@ -514,17 +517,19 @@ class TestPaymentAPI(unittest.TestCase):
         """Test overdue invoice detection"""
         from mob_clinic.mob_clinic.api.payment import create_invoice, get_invoice
         
-        # Create overdue invoice - post it in the past with due date also in past but after posting
-        posting_date_val = add_days(today(), -10)  # Invoice from 10 days ago
-        due_date_val = add_days(today(), -3)  # Was due 3 days ago (overdue now, 7 days after posting)
-        
+        # Create invoice with today's date and short due date
+        # Then manually mark it as overdue by updating the due_date after creation
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
-            posting_date=posting_date_val,
-            due_date=due_date_val
+            posting_date=today(),
+            due_date=add_days(today(), 1)  # Due tomorrow (valid for ERPNext)
         )
         invoice_id = result["invoice_id"]
+        
+        # Manually update the due_date to past to simulate overdue
+        invoice = frappe.get_doc("Sales Invoice", invoice_id)
+        invoice.db_set("due_date", add_days(today(), -5), update_modified=False)
         
         try:
             # Get invoice details
