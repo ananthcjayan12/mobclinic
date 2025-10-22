@@ -107,6 +107,17 @@ class TestPaymentAPI(unittest.TestCase):
                 })
                 item.insert(ignore_permissions=True)
         
+        # Create Mode of Payment options if they don't exist
+        payment_modes = ["Cash", "UPI", "Card"]
+        for mode in payment_modes:
+            if not frappe.db.exists("Mode of Payment", mode):
+                mop = frappe.get_doc({
+                    "doctype": "Mode of Payment",
+                    "mode_of_payment": mode,
+                    "type": "Cash" if mode == "Cash" else "Bank"
+                })
+                mop.insert(ignore_permissions=True)
+        
         # Create customer for patient (required for Sales Invoice)
         customer_name = f"CUST-{cls.patient_id}"
         if not frappe.db.exists("Customer", customer_name):
@@ -331,7 +342,7 @@ class TestPaymentAPI(unittest.TestCase):
             "appointment_date": today(),
             "appointment_time": "10:00:00",
             "appointment_type": "Consultation",
-            "appointment_for": "Routine Checkup",
+            "routine_checkup": 1,  # This is what the validation is checking for
             "status": "Open"
         })
         appointment.insert(ignore_permissions=True)
@@ -441,6 +452,7 @@ class TestPaymentAPI(unittest.TestCase):
             # Cleanup
             invoice = frappe.get_doc("Sales Invoice", invoice_id)
             if invoice.docstatus == 1:
+                invoice.flags.ignore_permissions = True
                 invoice.cancel()
             frappe.delete_doc("Sales Invoice", invoice_id, force=True)
     
@@ -448,13 +460,15 @@ class TestPaymentAPI(unittest.TestCase):
         """Test sending payment reminder"""
         from mob_clinic.mob_clinic.api.payment import create_invoice, send_payment_reminder
         
-        # Create unpaid invoice with past due date
+        # Create unpaid invoice with overdue date
         past_date = add_days(today(), -10)
+        due_date = add_days(today(), -5)  # Due date is in the past (overdue) but AFTER posting date
+        
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
             posting_date=past_date,
-            due_date=add_days(past_date, 5)  # Due 5 days after posting (now overdue)
+            due_date=due_date
         )
         invoice_id = result["invoice_id"]
         
@@ -474,6 +488,7 @@ class TestPaymentAPI(unittest.TestCase):
             # Cleanup
             invoice = frappe.get_doc("Sales Invoice", invoice_id)
             if invoice.docstatus == 1:
+                invoice.flags.ignore_permissions = True
                 invoice.cancel()
             frappe.delete_doc("Sales Invoice", invoice_id, force=True)
     
@@ -497,13 +512,15 @@ class TestPaymentAPI(unittest.TestCase):
         """Test overdue invoice detection"""
         from mob_clinic.mob_clinic.api.payment import create_invoice, get_invoice
         
-        # Create overdue invoice - post it in the past
+        # Create overdue invoice - post it in the past with due date also in past but after posting
         past_date = add_days(today(), -15)
+        due_date = add_days(today(), -10)  # Due 5 days after posting, but still overdue today
+        
         result = create_invoice(
             patient_id=self.patient_id,
             items=[{"item_code": "CONS-001", "qty": 1, "rate": 500}],
             posting_date=past_date,
-            due_date=add_days(past_date, 5)  # Due 5 days after posting, but still in past
+            due_date=due_date
         )
         invoice_id = result["invoice_id"]
         
@@ -519,6 +536,7 @@ class TestPaymentAPI(unittest.TestCase):
             # Cleanup
             invoice = frappe.get_doc("Sales Invoice", invoice_id)
             if invoice.docstatus == 1:
+                invoice.flags.ignore_permissions = True
                 invoice.cancel()
             frappe.delete_doc("Sales Invoice", invoice_id, force=True)
 
