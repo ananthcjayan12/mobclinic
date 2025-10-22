@@ -1,0 +1,1 @@
+# Tests for mob_clinic app

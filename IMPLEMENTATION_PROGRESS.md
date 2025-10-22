@@ -421,14 +421,22 @@ mob_clinic/mob_clinic/
 ```
 mob_clinic/
 ├── hooks.py (updated with healthcare dependency)
+├── patches.txt (patch registration)
 ├── mob_clinic/
 │   ├── custom_fields/
 │   │   └── __init__.py (complete custom fields setup)
 │   ├── doctype/
 │   │   └── clinic_working_hours/ (child table)
-│   └── api/
-│       ├── auth.py (complete authentication)
-│       └── patient.py (complete patient management)
+│   ├── api/
+│   │   ├── auth.py (complete authentication)
+│   │   └── patient.py (complete patient management)
+│   ├── patches/
+│   │   └── v1_0/
+│   │       └── install_custom_fields.py (custom fields patch)
+│   ├── tests/
+│   │   ├── test_auth.py (authentication tests - 7 tests)
+│   │   └── test_patient.py (patient management tests - 8 tests)
+│   └── install.py (installation hooks)
 ```
 
 ### API Endpoints Ready ✅

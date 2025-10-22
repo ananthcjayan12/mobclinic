@@ -28,6 +28,25 @@ Pre-commit is configured to use the following tools for checking and formatting 
 - prettier
 - pyupgrade
 
+### Testing
+
+Run unit tests to verify APIs are working correctly:
+
+```bash
+# Run all tests
+bench --site your-site run-tests --app mob_clinic
+
+# Run specific test module
+bench --site your-site run-tests --module mob_clinic.mob_clinic.tests.test_auth
+bench --site your-site run-tests --module mob_clinic.mob_clinic.tests.test_patient
+
+# Or use the test runner script
+chmod +x run_tests.sh
+./run_tests.sh your-site
+```
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
+
 ### License
 
 mit
