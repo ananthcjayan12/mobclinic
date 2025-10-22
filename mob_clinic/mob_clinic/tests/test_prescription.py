@@ -46,16 +46,23 @@ class TestPrescriptionAPI(FrappeTestCase):
         frappe.set_user("Administrator")
         
         try:
-            # Delete test medical records
-            test_records = frappe.get_all("Patient Medical Record",
-                filters=[["patient_name", "like", "%Test Patient Pres%"]],
+            # Delete test medical records - first get test patient IDs
+            test_patients = frappe.get_all("Patient",
+                filters=[["mobile", "in", ["+1555555555"]]],
                 pluck="name"
             )
-            for record in test_records:
-                try:
-                    frappe.delete_doc("Patient Medical Record", record, force=True, ignore_permissions=True)
-                except Exception as e:
-                    pass
+            
+            # Delete medical records for test patients
+            if test_patients:
+                test_records = frappe.get_all("Patient Medical Record",
+                    filters=[["patient", "in", test_patients]],
+                    pluck="name"
+                )
+                for record in test_records:
+                    try:
+                        frappe.delete_doc("Patient Medical Record", record, force=True, ignore_permissions=True)
+                    except Exception as e:
+                        pass
             
             # Delete test patients
             test_patients = frappe.get_all("Patient",
@@ -110,7 +117,7 @@ class TestPrescriptionAPI(FrappeTestCase):
             })
             user.insert(ignore_permissions=True)
         
-        # Create Healthcare Practitioner
+        # Create Healthcare Practitioner without department (optional field)
         practitioner = frappe.get_doc({
             "doctype": "Healthcare Practitioner",
             "first_name": "Test",
@@ -118,8 +125,7 @@ class TestPrescriptionAPI(FrappeTestCase):
             "practitioner_name": practitioner_name,
             "mobile_phone": "+1555555555",
             "status": "Active",
-            "user_id": practitioner_email,
-            "department": "Dentistry"
+            "user_id": practitioner_email
         })
         practitioner.insert(ignore_permissions=True)
         frappe.db.commit()
