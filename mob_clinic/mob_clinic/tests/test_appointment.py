@@ -228,8 +228,7 @@ class TestAppointmentAPI(FrappeTestCase):
         
         # Create appointment
         result = create_appointment(
-            patient=self.test_patient,
-            practitioner=self.test_practitioner,
+            patient_id=self.test_patient,
             appointment_date=appointment_date,
             appointment_time=first_slot,
             duration=30,
@@ -249,21 +248,26 @@ class TestAppointmentAPI(FrappeTestCase):
         """Test creating appointment with time conflict"""
         from mob_clinic.mob_clinic.api.appointment import create_appointment
         
+        # Login as practitioner
+        frappe.set_user("test_practitioner_appt@test.com")
+        
         # Try to create appointment at same time as previous test
         if hasattr(self, 'appointment_id'):
             # Get the existing appointment details
             existing_appt = frappe.get_doc("Patient Appointment", self.appointment_id)
             
-            with self.assertRaises(Exception) as context:
-                create_appointment(
-                    patient=self.test_patient,
-                    practitioner=self.test_practitioner,
-                    appointment_date=existing_appt.appointment_date,
-                    appointment_time=existing_appt.appointment_time,
-                    duration=30
-                )
+            result = create_appointment(
+                patient_id=self.test_patient,
+                appointment_date=existing_appt.appointment_date,
+                appointment_time=existing_appt.appointment_time,
+                duration=30
+            )
             
-            self.assertIn("conflict", str(context.exception).lower())
+            # Check if conflict error occurred
+            self.assertEqual(result.get("exc_type"), "ValidationError")
+            self.assertIn("conflict", result.get("message", "").lower())
+        
+        frappe.set_user("Administrator")
 
     def test_04_get_appointment_details(self):
         """Test getting appointment details"""
@@ -373,6 +377,9 @@ class TestAppointmentAPI(FrappeTestCase):
         """Test creating appointment outside working hours"""
         from mob_clinic.mob_clinic.api.appointment import create_appointment
         
+        # Login as practitioner
+        frappe.set_user("test_practitioner_appt@test.com")
+        
         tomorrow = datetime.now() + timedelta(days=1)
         while tomorrow.strftime("%A") not in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
             tomorrow += timedelta(days=1)
@@ -381,8 +388,7 @@ class TestAppointmentAPI(FrappeTestCase):
         
         # Try to book at 20:00 (outside default 09:00-17:00)
         result = create_appointment(
-            patient=self.test_patient,
-            practitioner=self.test_practitioner,
+            patient_id=self.test_patient,
             appointment_date=appointment_date,
             appointment_time="20:00:00",
             duration=30
@@ -400,10 +406,15 @@ class TestAppointmentAPI(FrappeTestCase):
             error_occurred,
             "Should indicate outside working hours"
         )
+        
+        frappe.set_user("Administrator")
 
     def test_10_create_appointment_weekend(self):
         """Test creating appointment on weekend (no working hours)"""
         from mob_clinic.mob_clinic.api.appointment import create_appointment
+        
+        # Login as practitioner
+        frappe.set_user("test_practitioner_appt@test.com")
         
         # Find next Saturday
         date = datetime.now() + timedelta(days=1)
@@ -413,8 +424,7 @@ class TestAppointmentAPI(FrappeTestCase):
         appointment_date = date.strftime("%Y-%m-%d")
         
         result = create_appointment(
-            patient=self.test_patient,
-            practitioner=self.test_practitioner,
+            patient_id=self.test_patient,
             appointment_date=appointment_date,
             appointment_time="10:00:00",
             duration=30
@@ -432,6 +442,8 @@ class TestAppointmentAPI(FrappeTestCase):
             error_occurred,
             "Should indicate practitioner not available on weekend"
         )
+        
+        frappe.set_user("Administrator")
 
     def test_11_get_available_slots_custom_duration(self):
         """Test getting available slots with custom duration"""
@@ -470,13 +482,20 @@ class TestAppointmentAPI(FrappeTestCase):
         """Test creating appointment with missing required fields"""
         from mob_clinic.mob_clinic.api.appointment import create_appointment
         
-        with self.assertRaises(Exception):
-            create_appointment(
-                patient=self.test_patient,
-                # Missing practitioner
-                appointment_date="2025-10-23",
-                appointment_time="10:00:00"
-            )
+        # Login as practitioner
+        frappe.set_user("test_practitioner_appt@test.com")
+        
+        result = create_appointment(
+            patient_id=self.test_patient,
+            # Missing appointment_date and appointment_time
+            appointment_date="2025-10-23",
+            appointment_time=None  # Missing time
+        )
+        
+        # Should return validation error
+        self.assertEqual(result.get("exc_type"), "ValidationError")
+        
+        frappe.set_user("Administrator")
 
     def test_13_get_appointments_pagination(self):
         """Test appointment list pagination"""
@@ -545,8 +564,7 @@ class TestAppointmentAPI(FrappeTestCase):
         
         # Create appointment
         result = create_appointment(
-            patient=self.test_patient,
-            practitioner=self.test_practitioner,
+            patient_id=self.test_patient,
             appointment_date=appointment_date,
             appointment_time=first_slot,
             duration=30
