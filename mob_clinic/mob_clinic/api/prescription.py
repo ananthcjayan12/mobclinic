@@ -35,7 +35,7 @@ def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_l
         practitioner = get_current_practitioner()
         if practitioner and not patient_id:
             # If no specific patient, show practitioner's records
-            filters["healthcare_practitioner"] = practitioner.name
+            filters["healthcare_practitioner"] = practitioner.get("name")
         
         # Get medical records
         records = frappe.get_all(
@@ -263,7 +263,7 @@ def create_prescription(patient_id, **kwargs):
             "patient": patient_id,
             "patient_name": patient.patient_name,
             "healthcare_practitioner": practitioner.name,
-            "medical_department": kwargs.get("department") or practitioner.department,
+            "medical_department": kwargs.get("department") or practitioner.get("department"),
             "date": kwargs.get("date") or nowdate(),
             "chief_complaint": kwargs.get("chief_complaint"),
             "symptoms": kwargs.get("symptoms"),
@@ -573,13 +573,17 @@ def get_current_practitioner():
     if user == "Guest":
         return None
     
-    practitioner = frappe.db.get_value(
-        "Healthcare Practitioner",
-        {"user_id": user},
-        ["name", "practitioner_name", "department", "mobile_phone"],
-        as_dict=True
-    )
-    return practitioner
+    try:
+        practitioner = frappe.db.get_value(
+            "Healthcare Practitioner",
+            {"user_id": user},
+            ["name", "practitioner_name", "department", "mobile_phone"],
+            as_dict=True
+        )
+        return practitioner
+    except Exception as e:
+        frappe.log_error(f"Error getting practitioner for user {user}: {str(e)}", "Get Current Practitioner")
+        return None
 
 
 def get_patient_basic_info(patient_id):

@@ -222,6 +222,10 @@ class TestPrescriptionAPI(FrappeTestCase):
             diet_recommendations="Soft diet for 1 week"
         )
         
+        # Print error details if creation failed
+        if result.get("message") != "Prescription created successfully":
+            print(f"\n[DEBUG] Create prescription error: {result}")
+        
         self.assertEqual(result.get("message"), "Prescription created successfully")
         self.assertIn("data", result)
         self.assertIn("record_id", result["data"])
@@ -244,6 +248,10 @@ class TestPrescriptionAPI(FrappeTestCase):
         
         # Get all prescriptions
         result = get_prescriptions()
+        
+        # Print error details if failed
+        if result.get("message") != "success":
+            print(f"\n[DEBUG] Get prescriptions error: {result}")
         
         self.assertEqual(result.get("message"), "success")
         self.assertIn("data", result)
