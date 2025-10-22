@@ -73,6 +73,7 @@ class TestPatientAPI(FrappeTestCase):
                 "doctype": "Healthcare Practitioner",
                 "first_name": "Test",
                 "last_name": "Practitioner",
+                "status": "Active",
                 "user_id": cls.practitioner_email,
                 "mobile_phone": "+9876543210",
                 "mobile_app_enabled": 1

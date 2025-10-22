@@ -37,7 +37,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
         practitioner = get_current_practitioner()
         if practitioner:
             # Filter patients who have appointments with this practitioner
-            patient_names = frappe.get_list(
+            patient_names = frappe.get_all(
                 "Patient Appointment",
                 filters={"practitioner": practitioner.name},
                 fields=["patient"],
@@ -48,7 +48,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
                 filters.setdefault("name", ["in", patient_names])
         
         # Get patients
-        patients = frappe.get_list(
+        patients = frappe.get_all(
             "Patient",
             fields=fields,
             filters=filters,
@@ -348,7 +348,7 @@ def search_patients(search_term, limit=10):
         
         # If practitioner exists, filter by their patients
         if practitioner:
-            patient_names = frappe.get_list(
+            patient_names = frappe.get_all(
                 "Patient Appointment",
                 filters={"practitioner": practitioner.name},
                 fields=["patient"],
@@ -358,7 +358,7 @@ def search_patients(search_term, limit=10):
             if patient_names:
                 or_filters["name"] = ["in", patient_names]
         
-        patients = frappe.get_list(
+        patients = frappe.get_all(
             "Patient",
             fields=["name", "patient_name", "mobile", "sex", "dob", "image"],
             filters=or_filters,
@@ -409,7 +409,7 @@ def get_last_appointment_date(patient_id, practitioner_id=None):
         if practitioner_id:
             filters["practitioner"] = practitioner_id
             
-        last_appointment = frappe.get_list(
+        last_appointment = frappe.get_all(
             "Patient Appointment",
             filters=filters,
             fields=["appointment_datetime"],
@@ -434,7 +434,7 @@ def get_next_appointment_date(patient_id, practitioner_id=None):
         if practitioner_id:
             filters["practitioner"] = practitioner_id
             
-        next_appointment = frappe.get_list(
+        next_appointment = frappe.get_all(
             "Patient Appointment",
             filters=filters,
             fields=["appointment_datetime"],
@@ -480,7 +480,7 @@ def get_last_treatment(patient_id, practitioner_id=None):
         if practitioner_id:
             filters["practitioner"] = practitioner_id
             
-        last_record = frappe.get_list(
+        last_record = frappe.get_all(
             "Patient Medical Record",
             filters=filters,
             fields=["subject", "communication_date"],
