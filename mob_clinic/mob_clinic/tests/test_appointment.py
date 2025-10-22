@@ -61,7 +61,7 @@ class TestAppointmentAPI(FrappeTestCase):
                 except Exception as e:
                     pass
             
-            # Delete test patients
+            # Delete test patients by specific name and mobile
             test_patients = frappe.get_all("Patient",
                 filters=[
                     ["mobile", "in", ["+1444444444"]]
@@ -74,18 +74,14 @@ class TestAppointmentAPI(FrappeTestCase):
                 except Exception as e:
                     pass
             
-            # Delete test practitioners
-            test_practitioners = frappe.get_all("Healthcare Practitioner",
-                filters=[["practitioner_name", "like", "%Test Practitioner Appt%"]],
-                pluck="name"
-            )
-            for p in test_practitioners:
+            # Delete specific test practitioner by name
+            if frappe.db.exists("Healthcare Practitioner", "Test Practitioner Appt"):
                 try:
-                    frappe.delete_doc("Healthcare Practitioner", p, force=True, ignore_permissions=True)
+                    frappe.delete_doc("Healthcare Practitioner", "Test Practitioner Appt", force=True, ignore_permissions=True)
                 except Exception as e:
                     pass
             
-            # Delete test users
+            # Delete test user
             if frappe.db.exists("User", "test_practitioner_appt@test.com"):
                 try:
                     frappe.delete_doc("User", "test_practitioner_appt@test.com", force=True, ignore_permissions=True)
@@ -101,6 +97,11 @@ class TestAppointmentAPI(FrappeTestCase):
     def create_test_practitioner(cls):
         """Create a test healthcare practitioner"""
         practitioner_email = "test_practitioner_appt@test.com"
+        practitioner_name = "Test Practitioner Appt"
+        
+        # Check if already exists and return it
+        if frappe.db.exists("Healthcare Practitioner", practitioner_name):
+            return practitioner_name
         
         # Create User first
         if not frappe.db.exists("User", practitioner_email):
@@ -116,14 +117,6 @@ class TestAppointmentAPI(FrappeTestCase):
             user.insert(ignore_permissions=True)
         
         # Create Healthcare Practitioner
-        practitioner_name = "Test Practitioner Appt"
-        
-        # Check if already exists
-        existing = frappe.db.get_value("Healthcare Practitioner", 
-                                      {"practitioner_name": practitioner_name}, "name")
-        if existing:
-            return existing
-        
         practitioner = frappe.get_doc({
             "doctype": "Healthcare Practitioner",
             "first_name": "Test",
