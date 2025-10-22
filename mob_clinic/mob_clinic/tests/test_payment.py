@@ -118,6 +118,88 @@ class TestPaymentAPI(unittest.TestCase):
                 })
                 mop.insert(ignore_permissions=True)
         
+        # ========== ACCOUNTING SETUP ==========
+        # Setup proper accounting infrastructure for Payment Entry
+        
+        # Get or create default company
+        company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+        if not company:
+            # Create a test company if none exists
+            if not frappe.db.exists("Company", "Test Mobile Clinic"):
+                company_doc = frappe.get_doc({
+                    "doctype": "Company",
+                    "company_name": "Test Mobile Clinic",
+                    "abbr": "TMC",
+                    "default_currency": "INR",
+                    "country": "India"
+                })
+                company_doc.insert(ignore_permissions=True)
+                company = company_doc.name
+                frappe.db.set_value("Global Defaults", None, "default_company", company)
+            else:
+                company = "Test Mobile Clinic"
+        
+        cls.company = company
+        
+        # Ensure company has required accounts setup
+        # Check if Chart of Accounts exists for this company
+        if not frappe.db.exists("Account", {"company": company, "account_name": "Application of Funds (Assets)"}):
+            # Chart of Accounts doesn't exist, create it
+            from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import create_charts
+            create_charts(company, "Standard")
+        
+        # Get or create default receivable account (Debtors)
+        receivable_account = frappe.db.get_value("Company", company, "default_receivable_account")
+        if not receivable_account:
+            # Find or create Debtors account
+            receivable_account = frappe.db.get_value("Account", {
+                "company": company,
+                "account_type": "Receivable",
+                "is_group": 0
+            }, "name")
+            
+            if receivable_account:
+                frappe.db.set_value("Company", company, "default_receivable_account", receivable_account)
+        
+        # Get or create default cash account
+        cash_account = frappe.db.get_value("Company", company, "default_cash_account")
+        if not cash_account:
+            # Find or create Cash account
+            cash_account = frappe.db.get_value("Account", {
+                "company": company,
+                "account_type": "Cash",
+                "is_group": 0
+            }, "name")
+            
+            if cash_account:
+                frappe.db.set_value("Company", company, "default_cash_account", cash_account)
+        
+        # Get or create income account for services
+        income_account = frappe.db.get_value("Company", company, "default_income_account")
+        if not income_account:
+            # Find or create Income account
+            income_account = frappe.db.get_value("Account", {
+                "company": company,
+                "root_type": "Income",
+                "is_group": 0
+            }, "name")
+            
+            if income_account:
+                frappe.db.set_value("Company", company, "default_income_account", income_account)
+        
+        # Link Mode of Payment to accounts
+        for mode in payment_modes:
+            # Check if Mode of Payment Account already exists
+            if not frappe.db.exists("Mode of Payment Account", {"parent": mode, "company": company}):
+                mop_doc = frappe.get_doc("Mode of Payment", mode)
+                mop_doc.append("accounts", {
+                    "company": company,
+                    "default_account": cash_account
+                })
+                mop_doc.save(ignore_permissions=True)
+        
+        # ========== END ACCOUNTING SETUP ==========
+        
         # Create customer for patient (required for Sales Invoice)
         customer_name = f"CUST-{cls.patient_id}"
         if not frappe.db.exists("Customer", customer_name):
