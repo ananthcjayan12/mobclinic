@@ -261,8 +261,8 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "patient": patient_id,
             "patient_name": patient.patient_name,
             "healthcare_practitioner": practitioner.name,
-            "posting_date": posting_date or today(),
-            "due_date": due_date or add_days(posting_date or today(), 7),  # Default 7 days
+            "posting_date": getdate(posting_date) if posting_date else today(),
+            "due_date": getdate(due_date) if due_date else add_days(getdate(posting_date) if posting_date else today(), 7),
             "remarks": remarks,
             "items": []
         })
@@ -355,6 +355,9 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
                 "allocated_amount": paid_amount
             }]
         })
+        
+        # Set flags to bypass permission checks
+        payment_entry.flags.ignore_permissions = True
         
         payment_entry.insert(ignore_permissions=True)
         payment_entry.submit()

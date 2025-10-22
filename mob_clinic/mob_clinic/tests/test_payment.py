@@ -342,7 +342,8 @@ class TestPaymentAPI(unittest.TestCase):
             "appointment_date": today(),
             "appointment_time": "10:00:00",
             "appointment_type": "Consultation",
-            "routine_checkup": 1,  # This is what the validation is checking for
+            "appointment_for": "Routine Checkup",  # Text field
+            "routine_checkup": 1,  # Boolean field
             "status": "Open"
         })
         appointment.insert(ignore_permissions=True)
@@ -454,7 +455,7 @@ class TestPaymentAPI(unittest.TestCase):
             if invoice.docstatus == 1:
                 invoice.flags.ignore_permissions = True
                 invoice.cancel()
-            frappe.delete_doc("Sales Invoice", invoice_id, force=True)
+            frappe.delete_doc("Sales Invoice", invoice_id, ignore_permissions=True, force=True)
     
     def test_13_send_payment_reminder(self):
         """Test sending payment reminder"""
