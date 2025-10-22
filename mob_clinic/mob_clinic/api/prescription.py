@@ -261,17 +261,31 @@ def create_prescription(patient_id, **kwargs):
                 medications = json.loads(medications)
             
             for med in medications:
-                record.append("drug_prescription", {
-                    "drug_code": med.get("drug_code"),
+                drug_data = {
                     "drug_name": med.get("drug_name"),
-                    "dosage": med.get("dosage"),
-                    "period": med.get("period"),
-                    "dosage_form": med.get("dosage_form"),
-                    "interval": med.get("interval"),
-                    "interval_uom": med.get("interval_uom", "Day"),
-                    "medical_code": med.get("medical_code"),
                     "comment": med.get("comment")
-                })
+                }
+                
+                # Add optional fields only if provided and valid
+                if med.get("drug_code"):
+                    drug_data["drug_code"] = med.get("drug_code")
+                if med.get("dosage_form"):
+                    drug_data["dosage_form"] = med.get("dosage_form")
+                if med.get("interval"):
+                    drug_data["interval"] = int(med.get("interval"))
+                if med.get("interval_uom"):
+                    drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                if med.get("medical_code"):
+                    drug_data["medical_code"] = med.get("medical_code")
+                
+                # For dosage and period, check if they exist as Link records
+                # Otherwise skip them (they're optional)
+                if med.get("dosage") and frappe.db.exists("Prescription Dosage", med.get("dosage")):
+                    drug_data["dosage"] = med.get("dosage")
+                if med.get("period") and frappe.db.exists("Prescription Duration", med.get("period")):
+                    drug_data["period"] = med.get("period")
+                    
+                record.append("drug_prescription", drug_data)
         
         # Add investigations if provided
         investigations = kwargs.get("investigations")
@@ -361,17 +375,30 @@ def update_prescription(record_id, **kwargs):
             # Clear existing and add new
             record.drug_prescription = []
             for med in medications:
-                record.append("drug_prescription", {
-                    "drug_code": med.get("drug_code"),
+                drug_data = {
                     "drug_name": med.get("drug_name"),
-                    "dosage": med.get("dosage"),
-                    "period": med.get("period"),
-                    "dosage_form": med.get("dosage_form"),
-                    "interval": med.get("interval"),
-                    "interval_uom": med.get("interval_uom", "Day"),
-                    "medical_code": med.get("medical_code"),
                     "comment": med.get("comment")
-                })
+                }
+                
+                # Add optional fields only if provided
+                if med.get("drug_code"):
+                    drug_data["drug_code"] = med.get("drug_code")
+                if med.get("dosage_form"):
+                    drug_data["dosage_form"] = med.get("dosage_form")
+                if med.get("interval"):
+                    drug_data["interval"] = int(med.get("interval"))
+                if med.get("interval_uom"):
+                    drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                if med.get("medical_code"):
+                    drug_data["medical_code"] = med.get("medical_code")
+                
+                # Check if dosage/period exist as records
+                if med.get("dosage") and frappe.db.exists("Prescription Dosage", med.get("dosage")):
+                    drug_data["dosage"] = med.get("dosage")
+                if med.get("period") and frappe.db.exists("Prescription Duration", med.get("period")):
+                    drug_data["period"] = med.get("period")
+                    
+                record.append("drug_prescription", drug_data)
             updated_fields.append("medications")
         
         # Update investigations if provided
@@ -505,9 +532,9 @@ def get_patient_history(patient_id, record_type=None, limit=10):
             prescriptions = frappe.get_all(
                 "Patient Encounter",
                 filters={"patient": patient_id},
-                fields=["name", "date", "diagnosis", "treatment_plan", 
-                       "healthcare_practitioner", "status"],
-                order_by="date desc",
+                fields=["name", "encounter_date", "encounter_time", "practitioner", 
+                       "medical_department", "docstatus", "invoiced"],
+                order_by="encounter_date desc",
                 limit=limit
             )
             history["prescriptions"] = prescriptions

@@ -195,19 +195,15 @@ class TestPrescriptionAPI(FrappeTestCase):
             medications=json.dumps([
                 {
                     "drug_name": "Amoxicillin",
-                    "dosage": "500mg",
-                    "period": "7 days",
                     "interval": "3",
                     "interval_uom": "Day",
-                    "comment": "Take after meals"
+                    "comment": "500mg dosage, Take for 7 days, Take after meals"
                 },
                 {
                     "drug_name": "Ibuprofen",
-                    "dosage": "400mg",
-                    "period": "5 days",
                     "interval": "2",
                     "interval_uom": "Day",
-                    "comment": "For pain relief"
+                    "comment": "400mg dosage, Take for 5 days, For pain relief"
                 }
             ]),
             investigations=json.dumps([
@@ -446,10 +442,9 @@ class TestPrescriptionAPI(FrappeTestCase):
             medications=json.dumps([
                 {
                     "drug_name": "Paracetamol",
-                    "dosage": "500mg",
-                    "period": "3 days",
                     "interval": "3",
-                    "interval_uom": "Day"
+                    "interval_uom": "Day",
+                    "comment": "500mg dosage, Take for 3 days"
                 }
             ])
         )
