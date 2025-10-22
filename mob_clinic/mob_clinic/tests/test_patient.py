@@ -27,10 +27,17 @@ class TestPatientAPI(FrappeTestCase):
             "dob": "1990-01-01"
         }
     
+    def setUp(self):
+        """Set up before each test"""
+        super().setUp()
+        frappe.set_user("Administrator")
+    
     @classmethod
     def create_test_practitioner(cls):
         """Create a test healthcare practitioner"""
         cls.practitioner_email = "testpractitioner@mobclinic.com"
+        
+        frappe.set_user("Administrator")
         
         # Create user if not exists
         if not frappe.db.exists("User", cls.practitioner_email):
@@ -40,9 +47,13 @@ class TestPatientAPI(FrappeTestCase):
                 "first_name": "Test",
                 "last_name": "Practitioner",
                 "new_password": "Test@1234",
-                "user_type": "System User"
+                "user_type": "System User",
+                "send_welcome_email": 0
             })
+            user.flags.ignore_permissions = True
+            user.flags.ignore_password_policy = True
             user.insert(ignore_permissions=True)
+            frappe.db.commit()
         
         # Create healthcare practitioner if not exists
         if not frappe.db.exists("Healthcare Practitioner", {"user_id": cls.practitioner_email}):
@@ -54,6 +65,8 @@ class TestPatientAPI(FrappeTestCase):
                 "mobile_phone": "+9876543210",
                 "mobile_app_enabled": 1
             })
+            practitioner.flags.ignore_permissions = True
+            practitioner.flags.ignore_mandatory = True
             practitioner.insert(ignore_permissions=True)
             cls.practitioner_id = practitioner.name
         else:
@@ -65,20 +78,22 @@ class TestPatientAPI(FrappeTestCase):
     @classmethod
     def cleanup_test_data(cls):
         """Clean up test data"""
+        frappe.set_user("Administrator")
+        
         # Delete test patients
         patients = frappe.get_all("Patient", 
                                  filters={"mobile": "+1234567890"})
         for p in patients:
-            frappe.delete_doc("Patient", p.name, force=True)
+            frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
         
         # Delete test practitioner
         if frappe.db.exists("User", "testpractitioner@mobclinic.com"):
             practitioners = frappe.get_all("Healthcare Practitioner", 
                                           filters={"user_id": "testpractitioner@mobclinic.com"})
             for p in practitioners:
-                frappe.delete_doc("Healthcare Practitioner", p.name, force=True)
+                frappe.delete_doc("Healthcare Practitioner", p.name, force=True, ignore_permissions=True)
             
-            frappe.delete_doc("User", "testpractitioner@mobclinic.com", force=True)
+            frappe.delete_doc("User", "testpractitioner@mobclinic.com", force=True, ignore_permissions=True)
         
         frappe.db.commit()
     

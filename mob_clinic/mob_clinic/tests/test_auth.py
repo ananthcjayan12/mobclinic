@@ -21,24 +21,33 @@ class TestAuthenticationAPI(FrappeTestCase):
         cls.test_phone = "+1234567890"
         cls.test_clinic = "Test Clinic"
     
+    def setUp(self):
+        """Set up before each test"""
+        super().setUp()
+        frappe.set_user("Administrator")
+    
     @classmethod
     def cleanup_test_data(cls):
         """Clean up test data"""
-        # Delete test user if exists
-        if frappe.db.exists("User", "test_doctor@mobclinic.com"):
-            frappe.delete_doc("User", "test_doctor@mobclinic.com", force=True)
+        frappe.set_user("Administrator")
         
         # Delete test healthcare practitioner if exists
         practitioners = frappe.get_all("Healthcare Practitioner", 
                                        filters={"user_id": "test_doctor@mobclinic.com"})
         for p in practitioners:
-            frappe.delete_doc("Healthcare Practitioner", p.name, force=True)
+            frappe.delete_doc("Healthcare Practitioner", p.name, force=True, ignore_permissions=True)
+        
+        # Delete test user if exists
+        if frappe.db.exists("User", "test_doctor@mobclinic.com"):
+            frappe.delete_doc("User", "test_doctor@mobclinic.com", force=True, ignore_permissions=True)
         
         frappe.db.commit()
     
     def test_01_mobile_register(self):
         """Test doctor registration"""
         from mob_clinic.mob_clinic.api.auth import mobile_register
+        
+        frappe.set_user("Administrator")
         
         # Test registration with valid data
         result = mobile_register(
@@ -49,8 +58,13 @@ class TestAuthenticationAPI(FrappeTestCase):
             clinic_name=self.test_clinic
         )
         
+        # Print result for debugging
+        if result.get("exc_type"):
+            frappe.log_error(f"Registration test error: {result}")
+        
         # Verify registration success
-        self.assertEqual(result.get("message"), "Registration successful")
+        self.assertEqual(result.get("message"), "Registration successful", 
+                        f"Expected success but got: {result.get('message')}")
         self.assertIsNotNone(result.get("user_id"))
         self.assertIsNotNone(result.get("practitioner_id"))
         
@@ -92,14 +106,21 @@ class TestAuthenticationAPI(FrappeTestCase):
         """Test login with valid credentials"""
         from mob_clinic.mob_clinic.api.auth import mobile_login
         
+        frappe.set_user("Guest")
+        
         # Login with valid credentials
         result = mobile_login(
             usr=self.test_email,
             pwd=self.test_password
         )
         
+        # Print result for debugging
+        if result.get("exc_type"):
+            frappe.log_error(f"Login test error: {result}")
+        
         # Verify login success
-        self.assertEqual(result.get("message"), "Logged In")
+        self.assertEqual(result.get("message"), "Logged In",
+                        f"Expected 'Logged In' but got: {result.get('message')}")
         self.assertIsNotNone(result.get("user"))
         self.assertEqual(result["user"]["email"], self.test_email)
         self.assertEqual(result["user"]["role"], "doctor")
@@ -114,6 +135,8 @@ class TestAuthenticationAPI(FrappeTestCase):
         """Test login with invalid credentials"""
         from mob_clinic.mob_clinic.api.auth import mobile_login
         
+        frappe.set_user("Guest")
+        
         # Try login with wrong password
         result = mobile_login(
             usr=self.test_email,
@@ -121,7 +144,8 @@ class TestAuthenticationAPI(FrappeTestCase):
         )
         
         # Verify login fails
-        self.assertEqual(result.get("exc_type"), "AuthenticationError")
+        self.assertEqual(result.get("exc_type"), "AuthenticationError",
+                        f"Expected 'AuthenticationError' but got: {result.get('exc_type')}")
         self.assertIn("invalid", result.get("message").lower())
         
         print("✓ Invalid credentials test passed")
@@ -195,7 +219,10 @@ class TestAuthenticationAPI(FrappeTestCase):
         result = mobile_logout()
         
         # Verify logout success
-        self.assertEqual(result.get("message"), "Logged Out")
+        self.assertEqual(result.get("message"), "Logged Out",
+                        f"Expected 'Logged Out' but got: {result.get('message')}")
+        
+        frappe.set_user("Administrator")
         
         print("✓ Logout test passed")
     

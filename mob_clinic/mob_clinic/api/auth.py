@@ -152,9 +152,13 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "new_password": password,
             "mobile_no": phone,
             "user_type": "System User",
-            "role_profile_name": "Healthcare Practitioner"
+            "role_profile_name": "Healthcare Practitioner",
+            "send_welcome_email": 0
         })
+        user.flags.ignore_permissions = True
+        user.flags.ignore_password_policy = True
         user.insert(ignore_permissions=True)
+        frappe.db.commit()
         
         # Create Healthcare Practitioner
         practitioner = frappe.get_doc({
@@ -168,6 +172,8 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "clinic_description": clinic_name,
             **kwargs  # Additional fields like specialization, qualification, etc.
         })
+        practitioner.flags.ignore_permissions = True
+        practitioner.flags.ignore_mandatory = True
         practitioner.insert(ignore_permissions=True)
         
         frappe.db.commit()
