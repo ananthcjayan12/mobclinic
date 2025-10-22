@@ -14,6 +14,9 @@ class TestPatientAPI(FrappeTestCase):
         # Clean up any existing test data
         cls.cleanup_test_data()
         
+        # Initialize naming series for Patient
+        cls.initialize_naming_series()
+        
         # Create test practitioner
         cls.create_test_practitioner()
         
@@ -38,6 +41,26 @@ class TestPatientAPI(FrappeTestCase):
             pid = frappe.db.get_value("Patient", {"mobile": cls.test_patient_data["mobile"]})
             cls.test_patient_id = pid
         frappe.set_user("Administrator")
+    
+    @classmethod
+    def initialize_naming_series(cls):
+        """Initialize naming series for Patient DocType"""
+        try:
+            from datetime import datetime
+            current_year = datetime.now().year
+            series_name = f"HLC-PAT-.{current_year}.-"
+            
+            # Try to get or create the series
+            if not frappe.db.exists("Series", series_name):
+                frappe.db.sql("""
+                    INSERT INTO `tabSeries` (name, current) 
+                    VALUES (%s, 0)
+                """, (series_name,))
+            
+            frappe.db.commit()
+        except Exception as e:
+            # If series already exists or any other error, just continue
+            pass
     
     def setUp(self):
         """Set up before each test"""

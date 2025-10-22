@@ -240,9 +240,12 @@ def create_patient(**kwargs):
         # Create patient document
         patient = frappe.get_doc({
             "doctype": "Patient",
-            "naming_series": "HLC-PAT-.YYYY.-",  # Use Healthcare naming series
             **kwargs
         })
+        
+        # Set naming series if not provided
+        if not kwargs.get("naming_series"):
+            patient.naming_series = "HLC-PAT-.YYYY.-"
         
         patient.flags.ignore_permissions = True
         patient.flags.ignore_mandatory = True
