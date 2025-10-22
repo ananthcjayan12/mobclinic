@@ -240,7 +240,7 @@ def create_patient(**kwargs):
         # Create patient document
         patient = frappe.get_doc({
             "doctype": "Patient",
-            "naming_series": "PAT-",  # Set naming series
+            "naming_series": "HLC-PAT-.YYYY.-",  # Use Healthcare naming series
             **kwargs
         })
         
@@ -265,7 +265,8 @@ def create_patient(**kwargs):
         }
     except Exception as e:
         error_msg = str(e)
-        frappe.log_error(f"Create patient error: {error_msg}", "Patient Creation Error")
+        # Log with shorter title
+        frappe.log_error(error_msg, "Patient Creation")
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
@@ -287,6 +288,10 @@ def update_patient(patient_id, **kwargs):
     try:
         patient = frappe.get_doc("Patient", patient_id)
         
+        # Disable invite_user to prevent website user creation
+        if hasattr(patient, 'invite_user'):
+            patient.invite_user = 0
+        
         # Update allowed fields
         allowed_fields = [
             'mobile', 'phone', 'email', 'occupation', 'marital_status',
@@ -301,6 +306,9 @@ def update_patient(patient_id, **kwargs):
         
         if updated_fields:
             patient.flags.ignore_permissions = True
+            patient.flags.ignore_links = True
+            # Prevent on_update hooks that try to create website user
+            patient.flags.ignore_validate_update_after_submit = True
             patient.save(ignore_permissions=True)
             frappe.db.commit()
             
@@ -320,7 +328,9 @@ def update_patient(patient_id, **kwargs):
             "message": f"Patient {patient_id} not found"
         }
     except Exception as e:
-        frappe.log_error(f"Update patient error: {str(e)}")
+        error_msg = str(e)
+        # Log with shorter title
+        frappe.log_error(error_msg, "Patient Update")
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",

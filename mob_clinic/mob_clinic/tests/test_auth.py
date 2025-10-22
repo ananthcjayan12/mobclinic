@@ -18,7 +18,7 @@ class TestAuthenticationAPI(FrappeTestCase):
         cls.test_email = "test_doctor@mobclinic.com"
         cls.test_password = "Test@1234"
         cls.test_name = "Test Doctor"
-        cls.test_phone = "+1234567890"
+        cls.test_phone = "+1111111111"  # Unique phone number
         cls.test_clinic = "Test Clinic"
     
     def setUp(self):
@@ -57,10 +57,6 @@ class TestAuthenticationAPI(FrappeTestCase):
             password=self.test_password,
             clinic_name=self.test_clinic
         )
-        
-        # Print result for debugging
-        if result.get("exc_type"):
-            frappe.log_error(f"Registration test error: {result}")
         
         # Verify registration success
         self.assertEqual(result.get("message"), "Registration successful", 

@@ -208,7 +208,8 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
         }
     except Exception as e:
         error_msg = str(e)
-        frappe.log_error(f"Mobile registration error: {error_msg}", "Registration Error")
+        # Log with shorter title
+        frappe.log_error(error_msg, "Registration Error")
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
