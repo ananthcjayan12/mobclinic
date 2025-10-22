@@ -77,9 +77,7 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
                 "grand_total",
                 "outstanding_amount",
                 "status",
-                "due_date",
-                "treatment_type",
-                "appointment_reference"
+                "due_date"
             ],
             order_by="posting_date desc",
             limit_start=limit_start,
@@ -183,9 +181,6 @@ def get_invoice(invoice_id):
             "grand_total": invoice.grand_total,
             "outstanding_amount": invoice.outstanding_amount,
             "paid_amount": flt(invoice.grand_total) - flt(invoice.outstanding_amount),
-            "treatment_type": invoice.get("treatment_type"),
-            "treatment_description": invoice.get("treatment_description"),
-            "appointment_reference": invoice.get("appointment_reference"),
             "items": items,
             "payments": payments,
             "is_overdue": False,
@@ -244,17 +239,30 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         # Get patient
         patient = frappe.get_doc("Patient", patient_id)
         
+        # Get or create customer for patient
+        customer_name = f"CUST-{patient_id}"
+        if not frappe.db.exists("Customer", customer_name):
+            customer = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": patient.patient_name,
+                "customer_type": "Individual",
+                "customer_group": "Individual",
+                "territory": "All Territories"
+            })
+            customer.insert(ignore_permissions=True)
+            customer_id = customer.name
+        else:
+            customer_id = customer_name
+        
         # Create Sales Invoice
         invoice = frappe.get_doc({
             "doctype": "Sales Invoice",
+            "customer": customer_id,
             "patient": patient_id,
             "patient_name": patient.patient_name,
             "healthcare_practitioner": practitioner.name,
             "posting_date": posting_date or today(),
-            "due_date": due_date or add_days(today(), 7),  # Default 7 days
-            "treatment_type": treatment_type,
-            "treatment_description": treatment_description,
-            "appointment_reference": appointment_reference,
+            "due_date": due_date or add_days(posting_date or today(), 7),  # Default 7 days
             "remarks": remarks,
             "items": []
         })
