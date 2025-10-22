@@ -335,7 +335,7 @@ def update_prescription(record_id, **kwargs):
         dict: Updated medical record information
     """
     try:
-        record = frappe.get_doc("Patient Encounter", record_id)
+        record = frappe.get_doc("Patient Medical Record", record_id)
         
         # Update allowed fields
         updatable_fields = [
@@ -432,7 +432,7 @@ def share_prescription(record_id, patient_email=None):
         dict: Share status
     """
     try:
-        record = frappe.get_doc("Patient Encounter", record_id)
+        record = frappe.get_doc("Patient Medical Record", record_id)
         
         # Mark as shared
         record.shared_with_patient = 1
@@ -503,7 +503,7 @@ def get_patient_history(patient_id, record_type=None, limit=10):
         # Get recent prescriptions
         if not record_type or record_type == "prescriptions":
             prescriptions = frappe.get_all(
-                "Patient Encounter",
+                "Patient Medical Record",
                 filters={"patient": patient_id},
                 fields=["name", "date", "diagnosis", "treatment_plan", 
                        "healthcare_practitioner", "status"],
@@ -581,7 +581,7 @@ def has_attachments(record_id):
     return frappe.db.exists(
         "File",
         {
-            "attached_to_doctype": "Patient Encounter",
+            "attached_to_doctype": "Patient Medical Record",
             "attached_to_name": record_id
         }
     )
@@ -595,7 +595,7 @@ def can_edit_record(record_id):
             return False
         
         record_practitioner = frappe.db.get_value(
-            "Patient Encounter",
+            "Patient Medical Record",
             record_id,
             "healthcare_practitioner"
         )
