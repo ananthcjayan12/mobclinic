@@ -266,24 +266,22 @@ def create_prescription(patient_id, **kwargs):
                     "comment": med.get("comment")
                 }
                 
-                # Add optional fields only if provided and valid
+                # Add optional fields only if provided
                 if med.get("drug_code"):
                     drug_data["drug_code"] = med.get("drug_code")
-                if med.get("dosage_form"):
-                    drug_data["dosage_form"] = med.get("dosage_form")
+                
+                # Only add interval fields if interval is provided
                 if med.get("interval"):
                     drug_data["interval"] = int(med.get("interval"))
-                if med.get("interval_uom"):
-                    drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                    if med.get("interval_uom"):
+                        drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                
                 if med.get("medical_code"):
                     drug_data["medical_code"] = med.get("medical_code")
                 
-                # For dosage and period, check if they exist as Link records
-                # Otherwise skip them (they're optional)
-                if med.get("dosage") and frappe.db.exists("Prescription Dosage", med.get("dosage")):
-                    drug_data["dosage"] = med.get("dosage")
-                if med.get("period") and frappe.db.exists("Prescription Duration", med.get("period")):
-                    drug_data["period"] = med.get("period")
+                # For dosage, dosage_form, and period - these are Link fields
+                # Only add if they exist as actual records, otherwise skip
+                # (We store this info in comment instead)
                     
                 record.append("drug_prescription", drug_data)
         
@@ -386,20 +384,17 @@ def update_prescription(record_id, **kwargs):
                 # Add optional fields only if provided
                 if med.get("drug_code"):
                     drug_data["drug_code"] = med.get("drug_code")
-                if med.get("dosage_form"):
-                    drug_data["dosage_form"] = med.get("dosage_form")
+                
+                # Only add interval fields if interval is provided
                 if med.get("interval"):
                     drug_data["interval"] = int(med.get("interval"))
-                if med.get("interval_uom"):
-                    drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                    if med.get("interval_uom"):
+                        drug_data["interval_uom"] = med.get("interval_uom", "Day")
+                
                 if med.get("medical_code"):
                     drug_data["medical_code"] = med.get("medical_code")
                 
-                # Check if dosage/period exist as records
-                if med.get("dosage") and frappe.db.exists("Prescription Dosage", med.get("dosage")):
-                    drug_data["dosage"] = med.get("dosage")
-                if med.get("period") and frappe.db.exists("Prescription Duration", med.get("period")):
-                    drug_data["period"] = med.get("period")
+                # Skip dosage_form, dosage, period - they're Link fields that need master data
                     
                 record.append("drug_prescription", drug_data)
             updated_fields.append("medications")

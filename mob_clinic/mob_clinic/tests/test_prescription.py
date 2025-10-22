@@ -56,8 +56,8 @@ class TestPrescriptionAPI(FrappeTestCase):
                 template = frappe.get_doc({
                     "doctype": "Lab Test Template",
                     "lab_test_name": lab_test,
-                    "lab_test_code": lab_test,
-                    "department": "Radiology" if "X-Ray" in lab_test else "Laboratory"
+                    "lab_test_code": lab_test
+                    # Don't set department - it's optional and requires Medical Department records
                 })
                 try:
                     template.insert(ignore_permissions=True)
