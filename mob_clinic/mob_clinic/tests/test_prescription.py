@@ -48,6 +48,21 @@ class TestPrescriptionAPI(FrappeTestCase):
                     drug.insert(ignore_permissions=True)
                 except Exception as e:
                     print(f"Note: Could not create drug {drug_name}: {str(e)}")
+        
+        # Create test lab test templates
+        lab_tests = ["Dental X-Ray", "Blood Test", "Urine Test"]
+        for lab_test in lab_tests:
+            if not frappe.db.exists("Lab Test Template", lab_test):
+                template = frappe.get_doc({
+                    "doctype": "Lab Test Template",
+                    "lab_test_name": lab_test,
+                    "lab_test_code": lab_test,
+                    "department": "Radiology" if "X-Ray" in lab_test else "Laboratory"
+                })
+                try:
+                    template.insert(ignore_permissions=True)
+                except Exception as e:
+                    print(f"Note: Could not create lab test {lab_test}: {str(e)}")
 
     @classmethod
     def initialize_naming_series(cls):
@@ -117,6 +132,14 @@ class TestPrescriptionAPI(FrappeTestCase):
                 if frappe.db.exists("Item", drug_name):
                     try:
                         frappe.delete_doc("Item", drug_name, force=True, ignore_permissions=True)
+                    except Exception as e:
+                        pass
+            
+            # Delete test lab templates
+            for lab_test in ["Dental X-Ray", "Blood Test", "Urine Test"]:
+                if frappe.db.exists("Lab Test Template", lab_test):
+                    try:
+                        frappe.delete_doc("Lab Test Template", lab_test, force=True, ignore_permissions=True)
                     except Exception as e:
                         pass
             
@@ -241,6 +264,7 @@ class TestPrescriptionAPI(FrappeTestCase):
             ]),
             investigations=json.dumps([
                 {
+                    "lab_test_code": "Dental X-Ray",
                     "lab_test_name": "Dental X-Ray",
                     "lab_test_comment": "Check root condition"
                 }
