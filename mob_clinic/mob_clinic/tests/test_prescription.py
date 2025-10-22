@@ -20,11 +20,34 @@ class TestPrescriptionAPI(FrappeTestCase):
         # Initialize naming series for patients if not exists
         cls.initialize_naming_series()
         
+        # Create test drug items
+        cls.create_test_drugs()
+        
         # Create test practitioner
         cls.test_practitioner = cls.create_test_practitioner()
         
         # Create test patient
         cls.test_patient = cls.create_test_patient()
+    
+    @classmethod
+    def create_test_drugs(cls):
+        """Create test drug items"""
+        drugs = ["Amoxicillin", "Ibuprofen", "Paracetamol"]
+        
+        for drug_name in drugs:
+            if not frappe.db.exists("Item", drug_name):
+                drug = frappe.get_doc({
+                    "doctype": "Item",
+                    "item_code": drug_name,
+                    "item_name": drug_name,
+                    "item_group": "Drug",
+                    "stock_uom": "Nos",
+                    "is_stock_item": 1
+                })
+                try:
+                    drug.insert(ignore_permissions=True)
+                except Exception as e:
+                    print(f"Note: Could not create drug {drug_name}: {str(e)}")
 
     @classmethod
     def initialize_naming_series(cls):
@@ -88,6 +111,14 @@ class TestPrescriptionAPI(FrappeTestCase):
                     frappe.delete_doc("User", "test_practitioner_pres@test.com", force=True, ignore_permissions=True)
                 except Exception as e:
                     pass
+            
+            # Delete test drugs
+            for drug_name in ["Amoxicillin", "Ibuprofen", "Paracetamol"]:
+                if frappe.db.exists("Item", drug_name):
+                    try:
+                        frappe.delete_doc("Item", drug_name, force=True, ignore_permissions=True)
+                    except Exception as e:
+                        pass
             
             frappe.db.commit()
         except Exception as e:
@@ -194,12 +225,14 @@ class TestPrescriptionAPI(FrappeTestCase):
             treatment_plan="Root canal treatment required",
             medications=json.dumps([
                 {
+                    "drug_code": "Amoxicillin",
                     "drug_name": "Amoxicillin",
                     "interval": "3",
                     "interval_uom": "Day",
                     "comment": "500mg dosage, Take for 7 days, Take after meals"
                 },
                 {
+                    "drug_code": "Ibuprofen",
                     "drug_name": "Ibuprofen",
                     "interval": "2",
                     "interval_uom": "Day",
@@ -441,6 +474,7 @@ class TestPrescriptionAPI(FrappeTestCase):
             record_id=self.prescription_id,
             medications=json.dumps([
                 {
+                    "drug_code": "Paracetamol",
                     "drug_name": "Paracetamol",
                     "interval": "3",
                     "interval_uom": "Day",

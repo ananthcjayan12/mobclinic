@@ -509,10 +509,7 @@ def get_patient_history(patient_id, record_type=None, limit=10):
     try:
         history = {
             "patient_id": patient_id,
-            "patient_name": frappe.db.get_value("Patient", patient_id, "patient_name"),
-            "appointments": [],
-            "prescriptions": [],
-            "invoices": []
+            "patient_name": frappe.db.get_value("Patient", patient_id, "patient_name")
         }
         
         # Get recent appointments
