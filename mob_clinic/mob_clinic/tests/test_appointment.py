@@ -11,6 +11,10 @@ class TestAppointmentAPI(FrappeTestCase):
     def setUpClass(cls):
         """Set up test data once for all tests"""
         super().setUpClass()
+        frappe.set_user("Administrator")
+        
+        # Clean up any existing test data first
+        cls.cleanup_test_data()
         
         # Initialize naming series for patients if not exists
         cls.initialize_naming_series()
@@ -37,11 +41,60 @@ class TestAppointmentAPI(FrappeTestCase):
                 frappe.db.commit()
         except Exception as e:
             print(f"Note: Series initialization: {str(e)}")
+    
+    @classmethod
+    def cleanup_test_data(cls):
+        """Clean up all test data"""
+        frappe.set_user("Administrator")
+        
+        # Delete test appointments
+        frappe.db.sql("""
+            DELETE FROM `tabPatient Appointment` 
+            WHERE practitioner LIKE '%Test Practitioner%'
+            OR patient LIKE '%Test Patient%'
+        """)
+        
+        # Delete test working hours
+        frappe.db.sql("""
+            DELETE FROM `tabClinic Working Hours` 
+            WHERE practitioner LIKE '%Test Practitioner%'
+        """)
+        
+        # Delete test patients
+        frappe.db.sql("""
+            DELETE FROM `tabPatient` 
+            WHERE patient_name LIKE '%Test Patient%'
+            OR mobile IN ('+1333333333', '+1444444444')
+        """)
+        
+        # Delete test practitioners
+        test_practitioners = frappe.get_all("Healthcare Practitioner",
+            filters=[["practitioner_name", "like", "%Test Practitioner%"]],
+            pluck="name"
+        )
+        for p in test_practitioners:
+            try:
+                frappe.delete_doc("Healthcare Practitioner", p, force=True, ignore_permissions=True)
+            except:
+                pass
+        
+        # Delete test users
+        test_users = frappe.get_all("User",
+            filters=[["email", "like", "%test_practitioner%@test.com"]],
+            pluck="name"
+        )
+        for u in test_users:
+            try:
+                frappe.delete_doc("User", u, force=True, ignore_permissions=True)
+            except:
+                pass
+        
+        frappe.db.commit()
 
     @classmethod
     def create_test_practitioner(cls):
         """Create a test healthcare practitioner"""
-        practitioner_email = f"test_practitioner_{frappe.generate_hash(length=8)}@test.com"
+        practitioner_email = "test_practitioner_appt@test.com"
         
         # Create User first
         if not frappe.db.exists("User", practitioner_email):
@@ -50,20 +103,27 @@ class TestAppointmentAPI(FrappeTestCase):
                 "email": practitioner_email,
                 "first_name": "Test",
                 "last_name": "Practitioner",
-                "mobile_no": "+1222222222",
+                "mobile_no": "+1444444444",  # Unique mobile number for appointment tests
                 "enabled": 1,
                 "send_welcome_email": 0
             })
             user.insert(ignore_permissions=True)
         
         # Create Healthcare Practitioner
-        practitioner_name = f"Test Practitioner {frappe.generate_hash(length=8)}"
+        practitioner_name = "Test Practitioner Appt"
+        
+        # Check if already exists
+        existing = frappe.db.get_value("Healthcare Practitioner", 
+                                      {"practitioner_name": practitioner_name}, "name")
+        if existing:
+            return existing
+        
         practitioner = frappe.get_doc({
             "doctype": "Healthcare Practitioner",
             "first_name": "Test",
             "last_name": "Practitioner",
             "practitioner_name": practitioner_name,
-            "mobile_phone": "+1222222222",
+            "mobile_phone": "+1444444444",  # Unique mobile number for appointment tests
             "status": "Active",
             "user_id": practitioner_email,
             "department": "Cardiology"
@@ -76,21 +136,25 @@ class TestAppointmentAPI(FrappeTestCase):
     @classmethod
     def create_test_patient(cls):
         """Create a test patient"""
-        from mob_clinic.mob_clinic.api.patient import create_patient
+        # Check if patient already exists
+        existing = frappe.db.get_value("Patient", {"mobile": "+1444444444"}, "name")
+        if existing:
+            return existing
         
-        patient_email = f"test_patient_{frappe.generate_hash(length=8)}@test.com"
-        patient_data = {
+        patient = frappe.get_doc({
+            "doctype": "Patient",
             "first_name": "Test",
-            "last_name": "Patient",
-            "mobile": "+1333333333",
-            "email": patient_email,
+            "last_name": "Patient Appt",
+            "patient_name": "Test Patient Appt",
+            "mobile": "+1444444444",
+            "email": "test_patient_appt@test.com",
             "sex": "Male",
-            "blood_group": "O+"
-        }
-        
-        result = create_patient(**patient_data)
+            "blood_group": "O+",
+            "invite_user": 0  # Don't create website user
+        })
+        patient.insert(ignore_permissions=True)
         frappe.db.commit()
-        return result.get("patient_id")
+        return patient.name
 
     @classmethod
     def setup_working_hours(cls):
@@ -116,11 +180,26 @@ class TestAppointmentAPI(FrappeTestCase):
 
     def setUp(self):
         """Set up before each test"""
+        super().setUp()
         frappe.set_user("Administrator")
         
     def tearDown(self):
         """Clean up after each test"""
+        super().tearDown()
         frappe.set_user("Administrator")
+        # Clean up appointments created in individual tests
+        frappe.db.sql("""
+            DELETE FROM `tabPatient Appointment` 
+            WHERE patient = %s 
+            AND creation > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+        """, (self.test_patient,))
+        frappe.db.commit()
+    
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after all tests"""
+        cls.cleanup_test_data()
+        super().tearDownClass()
 
     def test_01_get_available_slots(self):
         """Test getting available time slots"""
