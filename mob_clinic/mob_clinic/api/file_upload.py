@@ -135,16 +135,14 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
         # Insert the file (this will call save_file and handle content)
         file_doc.insert(ignore_permissions=True)
         
-        # Store custom metadata in comment or description fields
+        # Store custom metadata in comment
         if file_category or description:
-            metadata = {}
-            if file_category:
-                metadata['category'] = file_category
-            if description:
-                metadata['description'] = description
-                
-            # Add metadata as comment
-            file_doc.add_comment("Info", f"Category: {file_category}, Description: {description or 'N/A'}")
+            try:
+                # Add metadata as comment
+                file_doc.add_comment("Info", f"Category: {file_category or 'None'}, Description: {description or 'N/A'}")
+            except Exception as e:
+                # Don't fail upload if comment fails
+                frappe.logger().warning(f"Could not add metadata comment to {file_doc.name}: {str(e)}")
         
         # Optimize image files automatically based on category configuration
         if content and file_category:
@@ -236,11 +234,35 @@ def get_file(file_id):
             "reference_name": file_doc.attached_to_name,
         }
         
-        # Add custom fields if available
-        if hasattr(file_doc, 'file_category'):
-            file_info["file_category"] = file_doc.file_category
-        if hasattr(file_doc, 'description'):
-            file_info["description"] = file_doc.description
+        # Extract custom metadata from comments
+        comments = frappe.get_all("Comment", 
+            filters={"reference_doctype": "File", "reference_name": file_doc.name, "comment_type": "Info"},
+            fields=["content"], 
+            order_by="creation desc", 
+            limit=1
+        )
+        
+        file_category = None
+        description = None
+        
+        if comments:
+            comment_content = comments[0].content
+            # Parse category and description from comment
+            if "Category:" in comment_content:
+                try:
+                    parts = comment_content.split(", ")
+                    if len(parts) >= 1:
+                        category_part = parts[0].replace("Category: ", "")
+                        file_category = category_part if category_part != "None" else None
+                    if len(parts) >= 2:
+                        desc_part = parts[1].replace("Description: ", "")
+                        description = desc_part if desc_part != "N/A" else None
+                except:
+                    pass
+        
+        # Add parsed metadata
+        file_info["file_category"] = file_category
+        file_info["description"] = description
             
         # Add download URL
         if file_doc.file_url:
@@ -377,16 +399,41 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
             limit_page_length=limit
         )
         
-        # Enhance file information
+        # Enhance file information and apply category filter if needed
+        filtered_files = []
         for file_info in files:
-            # Add custom fields if available
-            if frappe.db.has_column("File", "file_category"):
-                file_category = frappe.db.get_value("File", file_info["file_id"], "file_category")
-                file_info["file_category"] = file_category
+            # Extract category and description from comments
+            comments = frappe.get_all("Comment", 
+                filters={"reference_doctype": "File", "reference_name": file_info["file_id"], "comment_type": "Info"},
+                fields=["content"], 
+                order_by="creation desc", 
+                limit=1
+            )
+            
+            file_category_found = None
+            description_found = None
+            
+            if comments:
+                comment_content = comments[0].content
+                if "Category:" in comment_content:
+                    try:
+                        parts = comment_content.split(", ")
+                        if len(parts) >= 1:
+                            category_part = parts[0].replace("Category: ", "")
+                            file_category_found = category_part if category_part != "None" else None
+                        if len(parts) >= 2:
+                            desc_part = parts[1].replace("Description: ", "")
+                            description_found = desc_part if desc_part != "N/A" else None
+                    except:
+                        pass
+            
+            # Apply category filter
+            if file_category and file_category_found != file_category:
+                continue
                 
-            if frappe.db.has_column("File", "description"):
-                description = frappe.db.get_value("File", file_info["file_id"], "description")
-                file_info["description"] = description
+            # Add metadata to file info
+            file_info["file_category"] = file_category_found
+            file_info["description"] = description_found
                 
             # Add download URL
             if file_info["file_url"]:
@@ -399,16 +446,15 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
             if file_info["file_size"]:
                 file_info["file_size_formatted"] = format_file_size(file_info["file_size"])
                 
-        # Get total count for pagination
-        total_count = frappe.db.count(
-            "File",
-            filters=filters
-        )
+            filtered_files.append(file_info)
+                
+        # Get total count for pagination (approximate since we're filtering)
+        total_count = len(filtered_files) if file_category else frappe.db.count("File", filters=filters)
         
         return {
             "message": "success",
             "data": {
-                "files": files,
+                "files": filtered_files,
                 "total_count": total_count,
                 "limit": limit,
                 "offset": offset,
