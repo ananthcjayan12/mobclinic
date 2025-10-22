@@ -60,18 +60,20 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
         # Enhance patient data with custom fields
         enhanced_patients = []
         for patient in patients:
-            patient_doc = frappe.get_doc("Patient", patient.name)
-            
-            enhanced_patient = patient.copy()
+            # patient is a dict returned by frappe.get_list
+            patient_name = patient.get("name")
+            patient_doc = frappe.get_doc("Patient", patient_name)
+
+            enhanced_patient = dict(patient)
             enhanced_patient.update({
                 "age": patient_doc.get("age_html", ""),
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient_doc.get("image"),
-                "last_visit": get_last_appointment_date(patient.name, practitioner.name if practitioner else None),
-                "total_visits": get_total_appointments(patient.name, practitioner.name if practitioner else None),
-                "pending_amount": get_pending_amount(patient.name),
+                "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None),
+                "total_visits": get_total_appointments(patient_name, practitioner.name if practitioner else None),
+                "pending_amount": get_pending_amount(patient_name),
                 "preferred_language": getattr(patient_doc, 'preferred_language', 'English')
             })
-            
+
             enhanced_patients.append(enhanced_patient)
         
         # Get total count for pagination
@@ -367,15 +369,16 @@ def search_patients(search_term, limit=10):
         # Enhance search results
         search_results = []
         for patient in patients:
-            patient_doc = frappe.get_doc("Patient", patient.name)
+            patient_name = patient.get("name")
+            patient_doc = frappe.get_doc("Patient", patient_name)
             search_results.append({
-                "patient_id": patient.name,
-                "name": patient.patient_name,
-                "mobile": patient.mobile,
-                "sex": patient.sex,
-                "dob": cstr(patient.dob),
-                "avatar": getattr(patient_doc, 'profile_image', None) or patient.image,
-                "last_visit": get_last_appointment_date(patient.name, practitioner.name if practitioner else None)
+                "patient_id": patient_name,
+                "name": patient.get("patient_name"),
+                "mobile": patient.get("mobile"),
+                "sex": patient.get("sex"),
+                "dob": cstr(patient.get("dob")),
+                "avatar": getattr(patient_doc, 'profile_image', None) or patient.get("image"),
+                "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None)
             })
         
         return {

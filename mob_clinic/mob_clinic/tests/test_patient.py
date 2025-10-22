@@ -26,6 +26,18 @@ class TestPatientAPI(FrappeTestCase):
             "email": "testpatient@example.com",
             "dob": "1990-01-01"
         }
+        # Ensure a patient exists for tests and store its id
+        from mob_clinic.mob_clinic.api.patient import create_patient
+        frappe.set_user(cls.practitioner_email)
+        result = create_patient(**cls.test_patient_data)
+        # If patient already exists, find it; otherwise use returned id
+        if result.get("message") == "Patient created successfully":
+            cls.test_patient_id = result["data"]["patient_id"]
+        else:
+            # Try to find by mobile
+            pid = frappe.db.get_value("Patient", {"mobile": cls.test_patient_data["mobile"]})
+            cls.test_patient_id = pid
+        frappe.set_user("Administrator")
     
     def setUp(self):
         """Set up before each test"""
