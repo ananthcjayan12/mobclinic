@@ -296,7 +296,8 @@ def update_patient(patient_id, **kwargs):
                 updated_fields.append(field)
         
         if updated_fields:
-            patient.save()
+            patient.flags.ignore_permissions = True
+            patient.save(ignore_permissions=True)
             frappe.db.commit()
             
         # Return updated patient data
@@ -337,14 +338,15 @@ def search_patients(search_term, limit=10):
     try:
         practitioner = get_current_practitioner()
         
-        # Build search filters
-        filters = [
+        # Build search filters - use proper OR filter syntax
+        or_filters = [
             ["patient_name", "like", f"%{search_term}%"],
             ["mobile", "like", f"%{search_term}%"],
             ["name", "like", f"%{search_term}%"]
         ]
         
-        or_filters = {"or": filters}
+        # Base filters
+        base_filters = {}
         
         # If practitioner exists, filter by their patients
         if practitioner:
@@ -356,12 +358,13 @@ def search_patients(search_term, limit=10):
                 pluck="patient"
             )
             if patient_names:
-                or_filters["name"] = ["in", patient_names]
+                base_filters["name"] = ["in", patient_names]
         
         patients = frappe.get_all(
             "Patient",
             fields=["name", "patient_name", "mobile", "sex", "dob", "image"],
-            filters=or_filters,
+            filters=base_filters,
+            or_filters=or_filters,
             limit=limit,
             order_by="patient_name"
         )

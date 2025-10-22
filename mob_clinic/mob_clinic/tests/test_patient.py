@@ -93,9 +93,22 @@ class TestPatientAPI(FrappeTestCase):
         """Clean up test data"""
         frappe.set_user("Administrator")
         
-        # Delete test patients
-        patients = frappe.get_all("Patient", 
-                                 filters={"mobile": "+1234567890"})
+        # Delete test patients - search by multiple criteria
+        test_mobiles = ["+1234567890", "+9876543210"]
+        test_emails = ["testpatient@example.com", "updated@example.com"]
+        
+        for mobile in test_mobiles:
+            patients = frappe.get_all("Patient", filters={"mobile": mobile})
+            for p in patients:
+                frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
+        
+        for email in test_emails:
+            patients = frappe.get_all("Patient", filters={"email": email})
+            for p in patients:
+                frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
+        
+        # Also delete by name pattern
+        patients = frappe.get_all("Patient", filters=[["patient_name", "like", "%Test Patient%"]])
         for p in patients:
             frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
         
@@ -117,20 +130,32 @@ class TestPatientAPI(FrappeTestCase):
         # Login as practitioner
         frappe.set_user(self.practitioner_email)
         
-        # Create patient
-        result = create_patient(**self.test_patient_data)
+        # Create a NEW patient with different data
+        new_patient_data = {
+            "first_name": "New",
+            "last_name": "Patient",
+            "sex": "Female",
+            "mobile": "+9999999999",
+            "email": "newpatient@example.com",
+            "dob": "1995-05-05"
+        }
+        
+        result = create_patient(**new_patient_data)
         
         # Verify creation success
-        self.assertEqual(result.get("message"), "Patient created successfully")
+        self.assertEqual(result.get("message"), "Patient created successfully",
+                        f"Expected success but got: {result.get('message')}")
         self.assertIsNotNone(result.get("data"))
         
         patient_data = result["data"]
-        self.assertEqual(patient_data["name"], "Test Patient")
-        self.assertEqual(patient_data["mobile"], self.test_patient_data["mobile"])
-        self.assertEqual(patient_data["sex"], self.test_patient_data["sex"])
+        self.assertEqual(patient_data["name"], "New Patient")
+        self.assertEqual(patient_data["mobile"], new_patient_data["mobile"])
+        self.assertEqual(patient_data["sex"], new_patient_data["sex"])
         
-        # Store patient ID for other tests
-        self.__class__.test_patient_id = patient_data["patient_id"]
+        # Clean up this test patient
+        if result.get("data"):
+            frappe.delete_doc("Patient", patient_data["patient_id"], force=True, ignore_permissions=True)
+            frappe.db.commit()
         
         # Reset user
         frappe.set_user("Administrator")

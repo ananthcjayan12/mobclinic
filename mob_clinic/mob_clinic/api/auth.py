@@ -162,7 +162,6 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "new_password": password,
             "mobile_no": phone,
             "user_type": "System User",
-            "role_profile_name": "Healthcare Practitioner",
             "send_welcome_email": 0
         })
         user.flags.ignore_permissions = True
