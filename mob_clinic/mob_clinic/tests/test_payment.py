@@ -39,6 +39,14 @@ class TestPaymentAPI(unittest.TestCase):
             cls.practitioner_id = frappe.db.get_value("Healthcare Practitioner", 
                 {"first_name": "Test", "last_name": "Payment Doctor"})
         
+        # Create Healthcare Practitioner role if not exists
+        if not frappe.db.exists("Role", "Healthcare Practitioner"):
+            role = frappe.get_doc({
+                "doctype": "Role",
+                "role_name": "Healthcare Practitioner"
+            })
+            role.insert(ignore_permissions=True)
+        
         # Create test user for practitioner
         if not frappe.db.exists("User", "test_payment_doctor@example.com"):
             user = frappe.get_doc({
@@ -164,6 +172,9 @@ class TestPaymentAPI(unittest.TestCase):
         # Delete test medical department
         if frappe.db.exists("Medical Department", "Dentistry"):
             frappe.delete_doc("Medical Department", "Dentistry", force=True)
+        
+        # Delete test role (only if we created it)
+        # Note: We don't delete the role as it might be used by other tests
         
         frappe.db.commit()
     
