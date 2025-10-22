@@ -387,20 +387,18 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
             }]
         })
         
-        # Set flags and insert
+        # Set flags
         payment_entry.flags.ignore_permissions = True
         payment_entry.flags.ignore_mandatory = True  # Bypass mandatory validations
-        payment_entry.flags.ignore_validate = True  # Skip validation to avoid permission checks
-        payment_entry.insert(ignore_permissions=True)
         
-        # Submit payment entry properly (GL entries will be created)
-        # The submit may try to create exchange gain/loss journal which checks permissions
-        # So we temporarily set user to Administrator for this operation
+        # Use Administrator context for insert and submit to handle all permission checks
+        # This includes validation, GL entries, and any nested document creation
         current_user = frappe.session.user
         frappe.set_user("Administrator")
         
         try:
-            payment_entry.flags.ignore_permissions = True
+            # Insert and submit with full validation (for proper GL entries)
+            payment_entry.insert(ignore_permissions=True)
             payment_entry.submit()
         finally:
             # Restore original user
