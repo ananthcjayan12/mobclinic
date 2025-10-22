@@ -384,6 +384,7 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         # Set flags and insert
         payment_entry.flags.ignore_permissions = True
         payment_entry.flags.ignore_mandatory = True  # Bypass mandatory validations for missing accounts
+        payment_entry.flags.ignore_validate = True  # Skip validation which calls get_account_details
         payment_entry.insert(ignore_permissions=True)
         payment_entry.submit()
         

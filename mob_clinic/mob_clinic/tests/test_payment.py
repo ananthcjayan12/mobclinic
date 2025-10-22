@@ -495,7 +495,7 @@ class TestPaymentAPI(unittest.TestCase):
             if invoice.docstatus == 1:
                 invoice.flags.ignore_permissions = True
                 invoice.cancel()
-            frappe.delete_doc("Sales Invoice", invoice_id, force=True)
+            frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
     
     def test_14_pagination(self):
         """Test invoice list pagination"""
@@ -545,7 +545,7 @@ class TestPaymentAPI(unittest.TestCase):
             if invoice.docstatus == 1:
                 invoice.flags.ignore_permissions = True
                 invoice.cancel()
-            frappe.delete_doc("Sales Invoice", invoice_id, force=True)
+            frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
 
 
 def run_tests():
