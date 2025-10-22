@@ -200,12 +200,19 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "exc_type": "ValidationError",
             "message": "User with this email already exists"
         }
+    except frappe.exceptions.ValidationError as e:
+        frappe.local.response["http_status_code"] = 400
+        return {
+            "exc_type": "ValidationError",
+            "message": str(e)
+        }
     except Exception as e:
-        frappe.log_error(f"Mobile registration error: {str(e)}")
+        error_msg = str(e)
+        frappe.log_error(f"Mobile registration error: {error_msg}", "Registration Error")
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
-            "message": "Internal server error during registration"
+            "message": f"Internal server error during registration: {error_msg[:100]}"
         }
 
 @frappe.whitelist()
@@ -324,7 +331,8 @@ def update_practitioner_profile(**kwargs):
                 updated_fields.append(field)
         
         if updated_fields:
-            practitioner.save()
+            practitioner.flags.ignore_permissions = True
+            practitioner.save(ignore_permissions=True)
             frappe.db.commit()
             
         return {

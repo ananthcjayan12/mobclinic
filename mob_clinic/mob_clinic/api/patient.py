@@ -240,9 +240,12 @@ def create_patient(**kwargs):
         # Create patient document
         patient = frappe.get_doc({
             "doctype": "Patient",
+            "naming_series": "PAT-",  # Set naming series
             **kwargs
         })
         
+        patient.flags.ignore_permissions = True
+        patient.flags.ignore_mandatory = True
         patient.insert(ignore_permissions=True)
         frappe.db.commit()
         
@@ -261,11 +264,12 @@ def create_patient(**kwargs):
             "message": "Patient with similar details already exists"
         }
     except Exception as e:
-        frappe.log_error(f"Create patient error: {str(e)}")
+        error_msg = str(e)
+        frappe.log_error(f"Create patient error: {error_msg}", "Patient Creation Error")
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
-            "message": "Error creating patient"
+            "message": f"Error creating patient: {error_msg[:100]}"
         }
 
 @frappe.whitelist()
