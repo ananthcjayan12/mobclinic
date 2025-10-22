@@ -47,49 +47,55 @@ class TestAppointmentAPI(FrappeTestCase):
         """Clean up all test data"""
         frappe.set_user("Administrator")
         
-        # Delete test appointments
-        frappe.db.sql("""
-            DELETE FROM `tabPatient Appointment` 
-            WHERE practitioner LIKE '%Test Practitioner%'
-            OR patient LIKE '%Test Patient%'
-        """)
-        
-        # Delete test working hours
-        frappe.db.sql("""
-            DELETE FROM `tabClinic Working Hours` 
-            WHERE practitioner LIKE '%Test Practitioner%'
-        """)
-        
-        # Delete test patients
-        frappe.db.sql("""
-            DELETE FROM `tabPatient` 
-            WHERE patient_name LIKE '%Test Patient%'
-            OR mobile IN ('+1333333333', '+1444444444')
-        """)
-        
-        # Delete test practitioners
-        test_practitioners = frappe.get_all("Healthcare Practitioner",
-            filters=[["practitioner_name", "like", "%Test Practitioner%"]],
-            pluck="name"
-        )
-        for p in test_practitioners:
-            try:
-                frappe.delete_doc("Healthcare Practitioner", p, force=True, ignore_permissions=True)
-            except:
-                pass
-        
-        # Delete test users
-        test_users = frappe.get_all("User",
-            filters=[["email", "like", "%test_practitioner%@test.com"]],
-            pluck="name"
-        )
-        for u in test_users:
-            try:
-                frappe.delete_doc("User", u, force=True, ignore_permissions=True)
-            except:
-                pass
-        
-        frappe.db.commit()
+        try:
+            # Delete test appointments using Frappe ORM
+            test_appointments = frappe.get_all("Patient Appointment",
+                filters=[
+                    ["patient_name", "like", "%Test Patient Appt%"]
+                ],
+                pluck="name"
+            )
+            for appt in test_appointments:
+                try:
+                    frappe.delete_doc("Patient Appointment", appt, force=True, ignore_permissions=True)
+                except Exception as e:
+                    pass
+            
+            # Delete test patients
+            test_patients = frappe.get_all("Patient",
+                filters=[
+                    ["mobile", "in", ["+1444444444"]]
+                ],
+                pluck="name"
+            )
+            for patient in test_patients:
+                try:
+                    frappe.delete_doc("Patient", patient, force=True, ignore_permissions=True)
+                except Exception as e:
+                    pass
+            
+            # Delete test practitioners
+            test_practitioners = frappe.get_all("Healthcare Practitioner",
+                filters=[["practitioner_name", "like", "%Test Practitioner Appt%"]],
+                pluck="name"
+            )
+            for p in test_practitioners:
+                try:
+                    frappe.delete_doc("Healthcare Practitioner", p, force=True, ignore_permissions=True)
+                except Exception as e:
+                    pass
+            
+            # Delete test users
+            if frappe.db.exists("User", "test_practitioner_appt@test.com"):
+                try:
+                    frappe.delete_doc("User", "test_practitioner_appt@test.com", force=True, ignore_permissions=True)
+                except Exception as e:
+                    pass
+            
+            frappe.db.commit()
+        except Exception as e:
+            print(f"Cleanup error: {str(e)}")
+            frappe.db.rollback()
 
     @classmethod
     def create_test_practitioner(cls):
@@ -159,24 +165,10 @@ class TestAppointmentAPI(FrappeTestCase):
     @classmethod
     def setup_working_hours(cls):
         """Set up working hours for test practitioner"""
-        # Delete existing working hours
-        frappe.db.delete("Clinic Working Hours", {
-            "practitioner": cls.test_practitioner
-        })
-        
-        # Create working hours for weekdays
-        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-        for day in days:
-            working_hours = frappe.get_doc({
-                "doctype": "Clinic Working Hours",
-                "practitioner": cls.test_practitioner,
-                "day_of_week": day,
-                "start_time": "09:00:00",
-                "end_time": "17:00:00"
-            })
-            working_hours.insert(ignore_permissions=True)
-        
-        frappe.db.commit()
+        # Note: Since Healthcare Practitioner doesn't have clinic_working_hours child table by default,
+        # we'll rely on the default working hours (9 AM - 5 PM) in the get_working_hours function
+        # This can be enhanced later by adding custom fields
+        pass
 
     def setUp(self):
         """Set up before each test"""
