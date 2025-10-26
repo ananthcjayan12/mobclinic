@@ -8,6 +8,7 @@ import json
 def mobile_login(usr, pwd):
     """
     Custom login method for mobile app with enhanced response
+    Uses Frappe's standard login mechanism to ensure proper session management
     
     Args:
         usr (str): Username (email or phone)
@@ -26,11 +27,13 @@ def mobile_login(usr, pwd):
             frappe.set_user(usr)
             logged_in = True
         else:
-            # For HTTP requests: use LoginManager
+            # For HTTP requests: use LoginManager with proper initialization
             login_manager = LoginManager()
             login_manager.authenticate(user=usr, pwd=pwd)
             login_manager.post_login()
-            logged_in = frappe.response.get("message") == "Logged In"
+            
+            # IMPORTANT: Check if login was successful by verifying the session user
+            logged_in = frappe.session.user != "Guest"
         
         if logged_in:
             # Get user details
