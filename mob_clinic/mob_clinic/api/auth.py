@@ -43,7 +43,8 @@ def mobile_login(usr, pwd):
             practitioner = None
             try:
                 practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": user.name})
-            except frappe.DoesNotExistError:
+            except (frappe.DoesNotExistError, Exception):
+                # No practitioner profile - user might be admin or non-healthcare user
                 pass
             
             # Prepare enhanced response

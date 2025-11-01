@@ -30,6 +30,15 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         practitioner = get_current_practitioner()
         if practitioner:
             filters["practitioner"] = practitioner.name
+        elif frappe.session.user != "Administrator":
+            # Only return empty if not Administrator (who can see all)
+            return {
+                "message": "success",
+                "data": [],
+                "total_count": 0,
+                "page_length": limit_page_length,
+                "start": limit_start
+            }
         
         # Get appointments
         appointments = frappe.get_all(
@@ -463,7 +472,8 @@ def get_current_practitioner():
     """Get current user's healthcare practitioner record"""
     try:
         return frappe.get_doc("Healthcare Practitioner", {"user_id": frappe.session.user})
-    except frappe.DoesNotExistError:
+    except (frappe.DoesNotExistError, Exception):
+        # Silently return None if no practitioner found (e.g., Administrator user)
         return None
 
 def get_patient_basic_info(patient_id):
@@ -477,8 +487,15 @@ def get_patient_basic_info(patient_id):
             "age": patient.get("age_html", ""),
             "sex": patient.sex
         }
-    except:
-        return {}
+    except (frappe.DoesNotExistError, Exception):
+        # Return empty dict if patient not found
+        return {
+            "mobile": None,
+            "email": None,
+            "image": None,
+            "age": "",
+            "sex": None
+        }
 
 def check_appointment_conflict(practitioner, date, time, duration, exclude_appointment=None):
     """
