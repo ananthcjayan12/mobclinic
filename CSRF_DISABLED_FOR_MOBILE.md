@@ -21,23 +21,45 @@ CSRF protection is designed to prevent attacks in **browser-based web applicatio
 
 ### Method Used
 
-All API endpoints now include the `methods` parameter in the `@frappe.whitelist()` decorator:
+CSRF protection is disabled using a **request hook** that sets `frappe.flags.ignore_csrf = True` for all mobile API endpoints before the request is processed.
 
+**In `mob_clinic/hooks.py`:**
 ```python
-# Before (CSRF required for POST requests)
-@frappe.whitelist()
-def create_patient(**kwargs):
-    pass
-
-# After (CSRF bypassed)
-@frappe.whitelist(methods=['POST'])
-def create_patient(**kwargs):
-    pass
+before_request = ["mob_clinic.mob_clinic.utils.before_request"]
 ```
 
-### HTTP Method Specifications
+**In `mob_clinic/mob_clinic/utils.py`:**
+```python
+def before_request():
+    """Handle CORS and CSRF exemption for API requests"""
+    
+    # Exempt mobile API endpoints from CSRF validation
+    if frappe.request and frappe.request.path:
+        csrf_exempt_paths = [
+            "/api/method/mob_clinic.mob_clinic.api.auth.",
+            "/api/method/mob_clinic.mob_clinic.api.patient.",
+            "/api/method/mob_clinic.mob_clinic.api.appointment.",
+            "/api/method/mob_clinic.mob_clinic.api.prescription.",
+            "/api/method/mob_clinic.mob_clinic.api.payment.",
+            "/api/method/mob_clinic.mob_clinic.api.file_upload.",
+        ]
+        
+        for exempt_path in csrf_exempt_paths:
+            if exempt_path in frappe.request.path:
+                frappe.flags.ignore_csrf = True
+                break
+```
 
-Each endpoint specifies which HTTP methods it accepts:
+### Why This Approach?
+
+1. **Early Interception**: The `before_request` hook runs before CSRF validation
+2. **Centralized Control**: All mobile API exemptions are managed in one place
+3. **Path-Based**: Only specific API paths are exempted, not the entire application
+4. **Maintainable**: Easy to add or remove exempt paths as needed
+
+### HTTP Method Specifications (Still Applied)
+
+Each endpoint still specifies which HTTP methods it accepts for additional validation:
 
 - **GET requests**: `methods=['GET']` - Used for fetching data
 - **POST requests**: `methods=['POST']` - Used for creating resources
@@ -95,12 +117,15 @@ All API files have been updated:
 
 ## How Frappe Handles This
 
-When you specify `methods` in `@frappe.whitelist()`:
+The implementation works as follows:
 
-1. Frappe checks the HTTP method of the incoming request
-2. If the method is in the allowed list, **CSRF validation is skipped**
-3. The request is processed without requiring the `X-Frappe-CSRF-Token` header
-4. Session authentication (via cookies) still works normally
+1. **Request Arrives**: Client makes a POST request to a mobile API endpoint
+2. **Before Request Hook**: `before_request()` function is called
+3. **Path Check**: Function checks if the request path matches any exempt pattern
+4. **Set Flag**: If matched, sets `frappe.flags.ignore_csrf = True`
+5. **CSRF Check**: Frappe's CSRF validation sees the flag and skips validation
+6. **Request Processed**: The API endpoint executes normally
+7. **Session Auth**: Session authentication and permissions are still enforced
 
 ## Security Considerations
 
@@ -161,25 +186,34 @@ const createPatient = async (patientData) => {
 
 ## Alternative Approaches (NOT Used)
 
-We chose the `methods` approach, but here are other ways to disable CSRF:
+We chose the `before_request` hook approach for these reasons:
 
-### 1. Using `xss_safe=True` (Not Recommended for POST)
+### Why Not `methods` Parameter Alone?
+```python
+@frappe.whitelist(methods=['POST'])  # This DOESN'T disable CSRF!
+```
+The `methods` parameter only restricts which HTTP methods are allowed. CSRF validation happens earlier in the request lifecycle, before the endpoint is reached.
+
+### Why Not `xss_safe=True`?
 ```python
 @frappe.whitelist(xss_safe=True)  # Only for GET-like operations
-def safe_endpoint():
-    pass
 ```
+This is meant for operations that don't modify data and isn't appropriate for POST/PUT/DELETE operations.
 
-### 2. Manual CSRF Bypass (Not Recommended)
+### Why Not Per-Endpoint Flags?
 ```python
 @frappe.whitelist()
 def endpoint():
-    frappe.flags.ignore_csrf = True  # Discouraged
-    pass
+    frappe.flags.ignore_csrf = True  # Too late - CSRF already checked!
 ```
+By the time your endpoint executes, CSRF validation has already happened.
 
-### 3. Token-Based Auth (Future Enhancement)
-For additional security, consider implementing JWT or OAuth tokens instead of session cookies.
+### Why the Hook Approach Works Best
+- ✅ Runs before CSRF validation
+- ✅ Centralized management
+- ✅ Easy to add/remove paths
+- ✅ Clean and maintainable
+- ✅ Doesn't require modifying every endpoint
 
 ## Testing
 
@@ -200,13 +234,30 @@ curl -X POST 'https://your-site.com/api/method/mob_clinic.mob_clinic.api.patient
 
 ## Rollback (If Needed)
 
-To re-enable CSRF protection, simply remove the `methods` parameter:
+To re-enable CSRF protection:
 
+**1. Comment out the before_request hook in `mob_clinic/hooks.py`:**
 ```python
-# Re-enable CSRF
-@frappe.whitelist()  # Remove methods parameter
-def endpoint():
-    pass
+# Request Events
+# ----------------
+# before_request = ["mob_clinic.mob_clinic.utils.before_request"]
+```
+
+**2. Or remove the CSRF exemption logic from `utils.py`:**
+```python
+def before_request():
+    """Handle only CORS, not CSRF exemption"""
+    # Remove or comment out the CSRF exemption code
+    # frappe.flags.ignore_csrf = True
+    
+    # Keep only CORS handling
+    origin = frappe.get_request_header("Origin")
+    # ... rest of CORS code
+```
+
+**3. Restart the bench:**
+```bash
+bench restart
 ```
 
 ## Notes

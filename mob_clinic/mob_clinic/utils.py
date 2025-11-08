@@ -6,7 +6,26 @@ from frappe import _
 
 
 def before_request():
-    """Handle CORS for API requests from frontend applications"""
+    """Handle CORS and CSRF exemption for API requests from frontend applications"""
+    
+    # Exempt mobile API endpoints from CSRF validation
+    if frappe.request and frappe.request.path:
+        # List of API paths that should be exempt from CSRF
+        csrf_exempt_paths = [
+            "/api/method/mob_clinic.mob_clinic.api.auth.",
+            "/api/method/mob_clinic.mob_clinic.api.patient.",
+            "/api/method/mob_clinic.mob_clinic.api.appointment.",
+            "/api/method/mob_clinic.mob_clinic.api.prescription.",
+            "/api/method/mob_clinic.mob_clinic.api.payment.",
+            "/api/method/mob_clinic.mob_clinic.api.file_upload.",
+        ]
+        
+        # Check if current request path matches any exempt path
+        for exempt_path in csrf_exempt_paths:
+            if exempt_path in frappe.request.path:
+                # Set flag to ignore CSRF validation
+                frappe.flags.ignore_csrf = True
+                break
     
     # Get the request origin
     origin = frappe.get_request_header("Origin")

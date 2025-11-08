@@ -196,7 +196,7 @@ after_uninstall = "mob_clinic.mob_clinic.install.after_uninstall"
 
 # Request Events
 # ----------------
-# before_request = ["mob_clinic.mob_clinic.utils.before_request"]
+before_request = ["mob_clinic.mob_clinic.utils.before_request"]
 # after_request = ["mob_clinic.utils.after_request"]
 
 # Job Events
