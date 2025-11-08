@@ -3,7 +3,7 @@ from frappe import _
 from frappe.utils import cstr, get_datetime, nowdate
 import json
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc"):
     """
     Get list of patients with pagination and filtering
@@ -87,7 +87,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             "message": "Error retrieving patients"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_patient(patient_id):
     """
     Get detailed patient information
@@ -197,7 +197,7 @@ def get_patient(patient_id):
             "message": "Error retrieving patient details"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def create_patient(**kwargs):
     """
     Create a new patient record
@@ -288,7 +288,7 @@ def create_patient(**kwargs):
             "message": f"Error creating patient: {error_msg[:100]}"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'PUT'])
 def update_patient(patient_id, **kwargs):
     """
     Update patient information
@@ -352,7 +352,7 @@ def update_patient(patient_id, **kwargs):
             "message": "Error updating patient"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def search_patients(search_term, limit=10):
     """
     Search patients by name, mobile, or patient ID

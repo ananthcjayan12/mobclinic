@@ -7,3 +7,4 @@ node_modules
 __pycache__
 other_apps/
 docs/
+env/

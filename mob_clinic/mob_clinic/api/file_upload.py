@@ -34,7 +34,7 @@ def secure_filename(filename):
 
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def upload_file(file_name=None, content=None, decode_base64=False, folder="Home", 
                 is_private=0, file_url=None, reference_doctype=None, reference_name=None,
                 file_category=None, description=None):
@@ -197,7 +197,7 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_file(file_id):
     """
     Get file information by file ID
@@ -289,7 +289,7 @@ def get_file(file_id):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'DELETE'])
 def delete_file(file_id):
     """
     Delete a file
@@ -334,7 +334,7 @@ def delete_file(file_id):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def list_files(reference_doctype=None, reference_name=None, file_category=None, 
                folder=None, limit=20, offset=0, search_term=None):
     """
@@ -470,7 +470,7 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_file_categories():
     """
     Get available file categories and their configurations

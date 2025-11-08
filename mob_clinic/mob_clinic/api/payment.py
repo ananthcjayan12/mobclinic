@@ -24,7 +24,7 @@ def get_current_practitioner():
     return practitioner
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_invoices(patient_id=None, status=None, start_date=None, end_date=None, 
                  limit_start=0, limit_page_length=20):
     """
@@ -103,7 +103,7 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
         frappe.throw(_("Error fetching invoices: {0}").format(str(e)))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_invoice(invoice_id):
     """
     Get detailed invoice information
@@ -201,7 +201,7 @@ def get_invoice(invoice_id):
         frappe.throw(_("Error fetching invoice: {0}").format(str(e)))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def create_invoice(patient_id, items, posting_date=None, due_date=None, 
                    treatment_type=None, treatment_description=None,
                    appointment_reference=None, remarks=None):
@@ -299,7 +299,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         frappe.throw(_("Error creating invoice: {0}").format(str(e)))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def update_payment(invoice_id, paid_amount, mode_of_payment, 
                    payment_date=None, reference_no=None, reference_date=None):
     """
@@ -423,7 +423,7 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         frappe.throw(_("Error recording payment: {0}").format(str(e)))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_payment_summary(patient_id):
     """
     Get payment summary for a patient
@@ -508,7 +508,7 @@ def get_payment_summary(patient_id):
         frappe.throw(_("Error fetching payment summary: {0}").format(str(e)))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def send_payment_reminder(invoice_id, reminder_type="sms", message=None):
     """
     Send payment reminder to patient

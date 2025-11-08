@@ -4,7 +4,7 @@ from frappe.utils import nowdate, now_datetime, getdate
 import json
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc"):
     """
     Get list of prescriptions/medical records with filtering
@@ -104,7 +104,7 @@ def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_l
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_prescription(record_id):
     """
     Get detailed prescription/medical record information
@@ -209,7 +209,7 @@ def get_prescription(record_id):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def create_prescription(patient_id, **kwargs):
     """
     Create a new prescription/medical record
@@ -338,7 +338,7 @@ def create_prescription(patient_id, **kwargs):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'PUT'])
 def update_prescription(record_id, **kwargs):
     """
     Update an existing prescription/medical record
@@ -451,7 +451,7 @@ def update_prescription(record_id, **kwargs):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def share_prescription(record_id, patient_email=None):
     """
     Share prescription with patient
@@ -498,7 +498,7 @@ def share_prescription(record_id, patient_email=None):
         }
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_patient_history(patient_id, record_type=None, limit=10):
     """
     Get patient's medical history

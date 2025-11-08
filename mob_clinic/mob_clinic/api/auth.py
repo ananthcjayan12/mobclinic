@@ -4,7 +4,7 @@ from frappe.auth import LoginManager
 from frappe.utils import cstr, get_fullname
 import json
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=['POST'])
 def mobile_login(usr, pwd):
     """
     Custom login method for mobile app with enhanced response
@@ -119,7 +119,7 @@ def mobile_login(usr, pwd):
             "message": "Internal server error during login"
         }
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=['POST'])
 def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
     """
     Register a new doctor/healthcare practitioner
@@ -220,7 +220,7 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "message": f"Internal server error during registration: {error_msg[:100]}"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def mobile_logout():
     """
     Custom logout method for mobile app
@@ -246,7 +246,7 @@ def mobile_logout():
             "message": "Error during logout"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_practitioner_profile():
     """
     Get current healthcare practitioner's profile
@@ -308,7 +308,7 @@ def get_practitioner_profile():
             "message": "Error retrieving practitioner profile"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'PUT'])
 def update_practitioner_profile(**kwargs):
     """
     Update healthcare practitioner profile

@@ -4,7 +4,7 @@ from frappe.utils import cstr, get_datetime, nowdate, add_days, getdate, now_dat
 import json
 from datetime import datetime, timedelta
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by="appointment_date desc"):
     """
     Get list of appointments with pagination and filtering
@@ -91,7 +91,7 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
             "message": "Error retrieving appointments"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_appointment(appointment_id):
     """
     Get detailed appointment information
@@ -156,7 +156,7 @@ def get_appointment(appointment_id):
             "message": "Error retrieving appointment"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST'])
 def create_appointment(patient_id, appointment_date, appointment_time, **kwargs):
     """
     Create a new appointment with conflict detection
@@ -246,7 +246,7 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
             "message": f"Error creating appointment: {error_msg[:100]}"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'PUT'])
 def update_appointment(appointment_id, **kwargs):
     """
     Update appointment (reschedule or update details)
@@ -333,7 +333,7 @@ def update_appointment(appointment_id, **kwargs):
             "message": "Error updating appointment"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['POST', 'DELETE'])
 def cancel_appointment(appointment_id, cancellation_reason=None):
     """
     Cancel an appointment
@@ -385,7 +385,7 @@ def cancel_appointment(appointment_id, cancellation_reason=None):
             "message": "Error cancelling appointment"
         }
 
-@frappe.whitelist()
+@frappe.whitelist(methods=['GET'])
 def get_available_slots(date, duration=30):
     """
     Get available time slots for a specific date
