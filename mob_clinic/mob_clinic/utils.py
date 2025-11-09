@@ -6,26 +6,14 @@ from frappe import _
 
 
 def before_request():
-    """Handle CORS and CSRF exemption for API requests from frontend applications"""
-    
-    # Exempt mobile API endpoints from CSRF validation
-    if frappe.request and frappe.request.path:
-        # List of API paths that should be exempt from CSRF
-        csrf_exempt_paths = [
-            "/api/method/mob_clinic.mob_clinic.api.auth.",
-            "/api/method/mob_clinic.mob_clinic.api.patient.",
-            "/api/method/mob_clinic.mob_clinic.api.appointment.",
-            "/api/method/mob_clinic.mob_clinic.api.prescription.",
-            "/api/method/mob_clinic.mob_clinic.api.payment.",
-            "/api/method/mob_clinic.mob_clinic.api.file_upload.",
-        ]
-        
-        # Check if current request path matches any exempt path
-        for exempt_path in csrf_exempt_paths:
-            if exempt_path in frappe.request.path:
-                # Set flag to ignore CSRF validation
-                frappe.flags.ignore_csrf = True
-                break
+    """Handle pre-request processing for mobile API"""
+    # Note: CSRF exemption is handled via ignore_csrf hook in hooks.py
+    # This hook can be used for other pre-request logic if needed
+    pass
+
+
+def after_request():
+    """Handle CORS headers after request processing"""
     
     # Get the request origin
     origin = frappe.get_request_header("Origin")
@@ -42,36 +30,30 @@ def before_request():
     # Check if origin is in allowed list
     if origin and any(origin.startswith(allowed) for allowed in allowed_origins):
         # Set CORS headers
-        frappe.response.headers.update({
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token, X-Requested-With",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Max-Age": "86400"  # 24 hours
-        })
-        
-        # Handle preflight OPTIONS requests
-        if frappe.request.method == "OPTIONS":
-            frappe.response.status_code = 200
-            frappe.response.data = ""
-            return
-    
-    # For development, be more permissive
-    if frappe.conf.get("developer_mode"):
-        # Allow localhost variants for development
-        if origin and ("localhost" in origin or "127.0.0.1" in origin):
+        if frappe.response and hasattr(frappe.response, 'headers') and frappe.response.headers:
             frappe.response.headers.update({
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token, X-Requested-With",
                 "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Max-Age": "86400"
+                "Access-Control-Max-Age": "86400"  # 24 hours
             })
-            
-            if frappe.request.method == "OPTIONS":
-                frappe.response.status_code = 200
-                frappe.response.data = ""
-                return
+    
+    # For development, be more permissive
+    if frappe.conf.get("developer_mode"):
+        # Allow localhost variants for development
+        if origin and ("localhost" in origin or "127.0.0.1" in origin):
+            if frappe.response and hasattr(frappe.response, 'headers') and frappe.response.headers:
+                frappe.response.headers.update({
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Frappe-CSRF-Token, X-Requested-With",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "86400"
+                })
+    
+    # Return None to continue normal processing
+    return None
 
 
 def get_patient_by_mobile(mobile):

@@ -197,7 +197,29 @@ after_uninstall = "mob_clinic.mob_clinic.install.after_uninstall"
 # Request Events
 # ----------------
 before_request = ["mob_clinic.mob_clinic.utils.before_request"]
-# after_request = ["mob_clinic.utils.after_request"]
+after_request = ["mob_clinic.mob_clinic.utils.after_request"]
+
+# CSRF Exemption for Mobile API
+# ------------------------------
+# Exempt mobile API endpoints from CSRF token validation
+ignore_csrf = [
+	"mob_clinic.mob_clinic.api.auth.mobile_login",
+	"mob_clinic.mob_clinic.api.auth.mobile_logout",
+	"mob_clinic.mob_clinic.api.auth.verify_otp",
+	"mob_clinic.mob_clinic.api.auth.resend_otp",
+	"mob_clinic.mob_clinic.api.auth.forgot_password",
+	"mob_clinic.mob_clinic.api.auth.reset_password",
+	"mob_clinic.mob_clinic.api.patient.create_patient",
+	"mob_clinic.mob_clinic.api.patient.update_patient",
+	"mob_clinic.mob_clinic.api.appointment.create_appointment",
+	"mob_clinic.mob_clinic.api.appointment.update_appointment",
+	"mob_clinic.mob_clinic.api.appointment.cancel_appointment",
+	"mob_clinic.mob_clinic.api.prescription.create_prescription",
+	"mob_clinic.mob_clinic.api.prescription.update_prescription",
+	"mob_clinic.mob_clinic.api.payment.create_payment",
+	"mob_clinic.mob_clinic.api.payment.update_payment",
+	"mob_clinic.mob_clinic.api.file_upload.upload_file",
+]
 
 # Job Events
 # ----------
