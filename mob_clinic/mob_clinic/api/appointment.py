@@ -40,6 +40,13 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
                 "start": limit_start
             }
         
+        # Handle date range filters
+        query_filters = dict(filters)
+        if "date_from" in query_filters:
+            date_from = query_filters.pop("date_from")
+            date_to = query_filters.pop("date_to", date_from)
+            query_filters["appointment_date"] = ["between", [date_from, date_to]]
+        
         # Get appointments
         appointments = frappe.get_all(
             "Patient Appointment",
@@ -48,7 +55,7 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
                 "appointment_time", "duration", "status", "appointment_type",
                 "chief_complaint", "notes", "invoiced", "paid_amount"
             ],
-            filters=filters,
+            filters=query_filters,
             limit_start=limit_start,
             limit_page_length=limit_page_length,
             order_by=order_by
@@ -72,8 +79,8 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
             
             enhanced_appointments.append(enhanced_appt)
         
-        # Get total count
-        total_count = frappe.db.count("Patient Appointment", filters)
+        # Get total count using the same query_filters
+        total_count = frappe.db.count("Patient Appointment", query_filters)
         
         return {
             "message": "success",

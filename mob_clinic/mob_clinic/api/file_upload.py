@@ -353,6 +353,20 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
         dict: List of files with pagination
     """
     try:
+        # Convert limit and offset to integers with validation
+        try:
+            limit = int(limit) if limit else 20
+            offset = int(offset) if offset else 0
+            
+            # Validate reasonable limits
+            if limit < 1 or limit > 1000:
+                limit = 20
+            if offset < 0:
+                offset = 0
+        except (ValueError, TypeError):
+            limit = 20
+            offset = 0
+        
         # Build filters
         filters = {}
         

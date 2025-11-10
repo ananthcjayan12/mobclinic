@@ -8,6 +8,43 @@ from frappe import _
 from frappe.utils import today, add_days, getdate, flt, nowdate
 
 
+def get_or_create_default_service_item():
+    """
+    Get or create a default 'Clinic Service' item for dynamic treatments
+    
+    Returns:
+        str: Item code of the default service item
+    """
+    item_code = "CLINIC-SERVICE"
+    
+    # Check if default service item exists
+    if not frappe.db.exists("Item", item_code):
+        try:
+            # Create default service item
+            item = frappe.get_doc({
+                "doctype": "Item",
+                "item_code": item_code,
+                "item_name": "Clinic Service",
+                "item_group": "Services",
+                "stock_uom": "Nos",
+                "is_stock_item": 0,  # Service items don't maintain stock
+                "is_sales_item": 1,
+                "description": "Generic clinic service item for treatments and consultations"
+            })
+            item.insert(ignore_permissions=True)
+            frappe.logger().info(f"Created default service item: {item_code}")
+        except Exception as e:
+            frappe.log_error(f"Error creating default service item: {str(e)}", "Default Service Item Creation Error")
+            # If creation fails, try to find any service item as fallback
+            existing_service = frappe.db.get_value("Item", {"is_sales_item": 1, "is_stock_item": 0}, "item_code")
+            if existing_service:
+                return existing_service
+            # Last resort - throw error
+            frappe.throw(_("Could not create or find a default service item. Please create an Item with code 'CLINIC-SERVICE' manually."))
+    
+    return item_code
+
+
 def get_current_practitioner():
     """Get the Healthcare Practitioner linked to current user"""
     user = frappe.session.user
@@ -273,11 +310,39 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         
         # Add items
         for item in items:
+            item_code = item.get("item_code")
+            
+            # If item_code doesn't exist, create it dynamically or use default service item
+            if item_code:
+                # Check if item exists
+                if not frappe.db.exists("Item", item_code):
+                    # Create the item dynamically
+                    try:
+                        new_item = frappe.get_doc({
+                            "doctype": "Item",
+                            "item_code": item_code,
+                            "item_name": item.get("description") or item_code,
+                            "item_group": "Services",  # or "Products" depending on your setup
+                            "stock_uom": "Nos",
+                            "is_stock_item": 0,  # Service items don't maintain stock
+                            "is_sales_item": 1,
+                            "description": item.get("description") or item_code
+                        })
+                        new_item.insert(ignore_permissions=True)
+                        frappe.logger().info(f"Created new service item: {item_code}")
+                    except Exception as item_error:
+                        frappe.logger().warning(f"Could not create item {item_code}: {str(item_error)}")
+                        # Use default service item as fallback
+                        item_code = get_or_create_default_service_item()
+            else:
+                # No item_code provided, use default service item
+                item_code = get_or_create_default_service_item()
+            
             invoice.append("items", {
-                "item_code": item.get("item_code"),
+                "item_code": item_code,
                 "qty": item.get("qty", 1),
                 "rate": item.get("rate"),
-                "description": item.get("description")
+                "description": item.get("description") or item.get("item_name") or item_code
             })
         
         # Insert invoice
