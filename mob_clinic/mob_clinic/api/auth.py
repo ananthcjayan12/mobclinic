@@ -17,6 +17,9 @@ def mobile_login(usr, pwd):
     Returns:
         dict: Enhanced login response with user profile and clinic details
     """
+    # Explicitly ignore CSRF for mobile login
+    frappe.flags.ignore_csrf = True
+    
     try:
         # Check if we're in test context (no HTTP request)
         in_test_context = not hasattr(frappe.local, 'request')

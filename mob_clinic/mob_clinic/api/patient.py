@@ -56,9 +56,17 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             patient_name = patient.get("name")
             patient_doc = frappe.get_doc("Patient", patient_name)
 
+            # Calculate numeric age from DOB
+            age_years = None
+            if patient_doc.dob:
+                from dateutil.relativedelta import relativedelta
+                from frappe.utils import getdate
+                age_obj = relativedelta(getdate(), getdate(patient_doc.dob))
+                age_years = age_obj.years
+
             enhanced_patient = dict(patient)
             enhanced_patient.update({
-                "age": patient_doc.get("age_html", ""),
+                "age": age_years,
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient_doc.get("image"),
                 "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None),
                 "total_visits": get_total_appointments(patient_name, practitioner.name if practitioner else None),
@@ -102,6 +110,14 @@ def get_patient(patient_id):
         patient = frappe.get_doc("Patient", patient_id)
         practitioner = get_current_practitioner()
         
+        # Calculate numeric age from DOB
+        age_years = None
+        if patient.dob:
+            from dateutil.relativedelta import relativedelta
+            from frappe.utils import getdate
+            age_obj = relativedelta(getdate(), getdate(patient.dob))
+            age_years = age_obj.years
+        
         patient_data = {
             "patient_id": patient.name,
             "name": patient.patient_name,
@@ -111,7 +127,7 @@ def get_patient(patient_id):
             "sex": patient.sex,
             "blood_group": patient.blood_group,
             "dob": cstr(patient.dob),
-            "age": patient.get("age_html", ""),
+            "age": age_years,
             "mobile": patient.mobile,
             "phone": patient.phone,
             "email": patient.email,
@@ -228,6 +244,23 @@ def create_patient(**kwargs):
                     "exc_type": "ValidationError", 
                     "message": "Patient with this mobile number already exists"
                 }
+        
+        # Handle age to dob conversion if age is provided but dob is not
+        if kwargs.get("age") and not kwargs.get("dob"):
+            from frappe.utils import add_years, today, getdate
+            try:
+                age = int(kwargs.get("age"))
+                # Calculate approximate DOB (first day of birth year)
+                dob = add_years(getdate(today()), -age)
+                kwargs["dob"] = dob
+                # Remove age from kwargs as it's a calculated field
+                kwargs.pop("age", None)
+            except (ValueError, TypeError):
+                # If age conversion fails, just skip it
+                kwargs.pop("age", None)
+        else:
+            # Remove age if provided, as it's read-only and calculated from dob
+            kwargs.pop("age", None)
         
         # Create patient document
         patient = frappe.get_doc({
