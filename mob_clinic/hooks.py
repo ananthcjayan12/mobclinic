@@ -250,6 +250,13 @@ ignore_csrf = [
 # 	}
 # ]
 
+# Patches
+# --------
+# Run migration patches to install custom fields and configurations
+patches = [
+    "mob_clinic.mob_clinic.patches.v1_0.install_custom_fields.execute"
+]
+
 # Authentication and authorization
 # --------------------------------
 

@@ -176,10 +176,16 @@ def create_patient_fields():
                 "insert_after": "preferred_language"
             },
             {
+                "fieldname": "address",
+                "label": "Address",
+                "fieldtype": "Small Text",
+                "insert_after": "last_app_login"
+            },
+            {
                 "fieldname": "notification_preferences_section",
                 "label": "Notification Preferences", 
                 "fieldtype": "Section Break",
-                "insert_after": "last_app_login",
+                "insert_after": "address",
                 "collapsible": 1
             },
             {

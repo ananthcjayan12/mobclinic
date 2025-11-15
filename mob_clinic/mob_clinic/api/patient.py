@@ -113,10 +113,13 @@ def get_patient(patient_id):
         # Calculate numeric age from DOB
         age_years = None
         if patient.dob:
-            from dateutil.relativedelta import relativedelta
-            from frappe.utils import getdate
-            age_obj = relativedelta(getdate(), getdate(patient.dob))
-            age_years = age_obj.years
+            try:
+                from dateutil.relativedelta import relativedelta
+                from frappe.utils import getdate
+                age_obj = relativedelta(getdate(), getdate(patient.dob))
+                age_years = age_obj.years
+            except Exception as age_error:
+                frappe.log_error(f"Error calculating age: {str(age_error)}", "Get Patient Age")
         
         patient_data = {
             "patient_id": patient.name,
@@ -139,8 +142,43 @@ def get_patient(patient_id):
             "occupation": patient.occupation,
             "marital_status": patient.marital_status,
             "insurance_details": getattr(patient, 'insurance_details', ''),
+            "medical_history": patient.medical_history if hasattr(patient, 'medical_history') else None,
+            "address": getattr(patient, 'address', None),
             "uid": patient.uid
         }
+        
+        # Get address - try custom field first, then linked address
+        address = None
+        if hasattr(patient, 'address') and patient.address:
+            address = patient.address
+        else:
+            # Try to get linked address
+            try:
+                addresses = frappe.get_all(
+                    "Dynamic Link",
+                    filters={
+                        "link_doctype": "Patient",
+                        "link_name": patient.name,
+                        "parenttype": "Address"
+                    },
+                    fields=["parent"],
+                    limit=1
+                )
+                if addresses:
+                    addr_doc = frappe.get_doc("Address", addresses[0].parent)
+                    # Combine address fields
+                    address_parts = [
+                        addr_doc.address_line1,
+                        addr_doc.address_line2,
+                        addr_doc.city,
+                        addr_doc.state,
+                        addr_doc.pincode
+                    ]
+                    address = ", ".join([part for part in address_parts if part])
+            except Exception:
+                pass
+        
+        patient_data["address"] = address
         
         # Get medical history
         if hasattr(patient, 'allergies') and patient.allergies:
@@ -154,6 +192,7 @@ def get_patient(patient_id):
             
         # Get medication history
         if hasattr(patient, 'medication') and patient.medication:
+            print(f"DEBUG get_patient: Processing medications")
             medications = []
             for med in patient.medication:
                 medications.append({
@@ -162,15 +201,8 @@ def get_patient(patient_id):
                 })
             patient_data["medications"] = medications
             
-        # Get medical conditions
-        if hasattr(patient, 'medical_history') and patient.medical_history:
-            conditions = []
-            for condition in patient.medical_history:
-                conditions.append({
-                    "condition": condition.medical_history,
-                    "medical_code": condition.medical_code
-                })
-            patient_data["medical_history"] = conditions
+        # Note: medical_history is already handled in patient_data dict above as a text field
+        # Skip the child table processing as we're using the Small Text field instead
             
         # Get emergency contact
         if hasattr(patient, 'patient_relation') and patient.patient_relation:
@@ -186,13 +218,17 @@ def get_patient(patient_id):
             
         # Get appointment statistics
         if practitioner:
-            patient_data.update({
-                "last_visit": get_last_appointment_date(patient.name, practitioner.name),
-                "next_appointment": get_next_appointment_date(patient.name, practitioner.name),
-                "total_visits": get_total_appointments(patient.name, practitioner.name),
-                "pending_amount": get_pending_amount(patient.name),
-                "last_treatment": get_last_treatment(patient.name, practitioner.name)
-            })
+            try:
+                patient_data.update({
+                    "last_visit": get_last_appointment_date(patient.name, practitioner.name),
+                    "next_appointment": get_next_appointment_date(patient.name, practitioner.name),
+                    "total_visits": get_total_appointments(patient.name, practitioner.name),
+                    "pending_amount": get_pending_amount(patient.name),
+                    "last_treatment": get_last_treatment(patient.name, practitioner.name)
+                })
+            except Exception as stats_error:
+                frappe.log_error(f"Error getting patient statistics: {str(stats_error)}", "Get Patient Stats")
+                # Continue without statistics
         
         return {
             "message": "success",
@@ -206,6 +242,8 @@ def get_patient(patient_id):
             "message": f"Patient {patient_id} not found"
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         frappe.log_error(f"Get patient error: {str(e)}")
         frappe.local.response["http_status_code"] = 500
         return {
@@ -262,6 +300,20 @@ def create_patient(**kwargs):
             # Remove age if provided, as it's read-only and calculated from dob
             kwargs.pop("age", None)
         
+        # Handle medical_history - if it's a JSON string, keep it as is
+        # The Patient DocType has medical_history as Small Text field which can store JSON
+        if kwargs.get("medical_history"):
+            # If it's already a string (JSON), keep it
+            if isinstance(kwargs["medical_history"], str):
+                pass  # Keep as is
+            else:
+                # If it's a dict/object, convert to JSON string
+                kwargs["medical_history"] = json.dumps(kwargs["medical_history"])
+        
+        # Handle address field - Patient DocType doesn't have a direct address field
+        # Remove it to prevent field not found error
+        address_data = kwargs.pop("address", None)
+        
         # Create patient document
         patient = frappe.get_doc({
             "doctype": "Patient",
@@ -291,12 +343,23 @@ def create_patient(**kwargs):
         
         frappe.db.commit()
         
+        # If address was provided, store it as a custom field or create address document
+        if address_data:
+            try:
+                # Try to set it as a custom field if it exists
+                frappe.db.set_value("Patient", patient.name, "address", address_data, update_modified=False)
+                frappe.db.commit()
+            except Exception:
+                # If custom field doesn't exist, just log and continue
+                pass
+        
         # Get the created patient with enhanced data
         created_patient = get_patient(patient.name)
+        patient_data = created_patient.get("data")
         
         return {
             "message": "Patient created successfully",
-            "data": created_patient.get("data")
+            "data": patient_data
         }
         
     except frappe.DuplicateEntryError:
