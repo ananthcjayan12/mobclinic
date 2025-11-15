@@ -24,7 +24,7 @@ def after_request():
         "http://localhost:3001",  # Alternative React port
         "http://127.0.0.1:3000",  # Local IP variant
         "http://192.168.1.100:3000",  # Local network access (adjust IP as needed)
-        "https://yourdomain.com",  # Production domain (replace with actual domain)
+        "http://82.112.235.216:3000",  # Production domain (replace with actual domain)
     ]
     
     # Check if origin is in allowed list
