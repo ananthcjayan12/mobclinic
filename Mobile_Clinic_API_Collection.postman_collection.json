@@ -1331,6 +1331,276 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Dental Chart Management",
+			"item": [
+				{
+					"name": "Get Dental Chart",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_dental_chart?patient_id={{patient_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_dental_chart"],
+							"query": [{"key": "patient_id", "value": "{{patient_id}}"}]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Dental Chart",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"chart_type\": \"adult\",\n  \"teeth_data\": {\n    \"11\": {\n      \"tooth_number\": 11,\n      \"status\": \"has-condition\",\n      \"conditions\": [{\n        \"type\": \"cavity\",\n        \"severity\": \"moderate\",\n        \"notes\": \"Small cavity on mesial surface\",\n        \"date\": \"2024-11-20\"\n      }],\n      \"procedures\": [{\n        \"name\": \"Filling\",\n        \"status\": \"planned\",\n        \"notes\": \"Composite filling scheduled\",\n        \"date\": \"2024-11-25\",\n        \"cost\": 1500,\n        \"duration_minutes\": 30\n      }]\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.save_dental_chart",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.save_dental_chart"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Tooth Condition",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_numbers\": [11, 12, 13],\n  \"condition\": {\n    \"type\": \"cavity\",\n    \"severity\": \"moderate\",\n    \"notes\": \"Cavities detected during routine checkup\",\n    \"date\": \"2024-11-20\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.add_condition",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.add_condition"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Tooth Condition",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_number\": 11,\n  \"condition_id\": \"COND-11-001\",\n  \"updates\": {\n    \"severity\": \"severe\",\n    \"notes\": \"Condition worsened, urgent treatment required\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.update_condition",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.update_condition"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Tooth Condition",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_number\": 11,\n  \"condition_id\": \"COND-11-001\",\n  \"reason\": \"Condition resolved after treatment\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.remove_condition",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.remove_condition"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Condition Types",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_condition_types",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_condition_types"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Tooth Procedure",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_numbers\": [11],\n  \"procedure\": {\n    \"name\": \"Root Canal Treatment\",\n    \"status\": \"planned\",\n    \"notes\": \"Deep cavity requires root canal\",\n    \"date\": \"2024-11-25\",\n    \"cost\": 3000,\n    \"duration_minutes\": 90\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.add_procedure",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.add_procedure"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Procedure Status",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_number\": 11,\n  \"procedure_id\": \"PROC-11-001\",\n  \"status\": \"in-progress\",\n  \"notes\": \"First session completed - canal cleaned and shaped\",\n  \"cost\": 3500\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.update_procedure_status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.update_procedure_status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Procedure",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_number\": 11,\n  \"procedure_id\": \"PROC-11-001\",\n  \"updates\": {\n    \"name\": \"Root Canal Treatment with Crown\",\n    \"notes\": \"Additional crown placement required\",\n    \"cost\": 5000,\n    \"duration_minutes\": 120\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.update_procedure",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.update_procedure"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Tooth Procedure",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\",\n  \"tooth_number\": 11,\n  \"procedure_id\": \"PROC-11-001\",\n  \"reason\": \"Patient cancelled procedure\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.remove_procedure",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.remove_procedure"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Procedure Timeline",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_procedure_timeline?patient_id={{patient_id}}&tooth_number=11&procedure_id=PROC-11-001",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_procedure_timeline"],
+							"query": [
+								{"key": "patient_id", "value": "{{patient_id}}"},
+								{"key": "tooth_number", "value": "11"},
+								{"key": "procedure_id", "value": "PROC-11-001"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Procedure Types",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_procedure_types",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_procedure_types"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Dental Chart Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_chart_summary?patient_id={{patient_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_chart_summary"],
+							"query": [{"key": "patient_id", "value": "{{patient_id}}"}]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export Dental Chart",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.export_chart?patient_id={{patient_id}}&format=json",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.export_chart"],
+							"query": [
+								{"key": "patient_id", "value": "{{patient_id}}"},
+								{"key": "format", "value": "json"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Treatment Progress",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_treatment_progress?patient_id={{patient_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_treatment_progress"],
+							"query": [{"key": "patient_id", "value": "{{patient_id}}"}]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Chart Types",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_chart_types",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_chart_types"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tooth Status Options",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_tooth_status_options",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_tooth_status_options"]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"event": [

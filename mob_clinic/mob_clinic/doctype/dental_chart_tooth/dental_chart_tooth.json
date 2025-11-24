@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2024-11-24 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tooth_number",
+  "status",
+  "notes",
+  "conditions",
+  "procedures"
+ ],
+ "fields": [
+  {
+   "fieldname": "tooth_number",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Tooth Number",
+   "reqd": 1
+  },
+  {
+   "default": "healthy",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "healthy\nhas-condition\nin-treatment\ntreated",
+   "reqd": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "conditions",
+   "fieldtype": "Table",
+   "label": "Conditions",
+   "options": "Dental Chart Condition"
+  },
+  {
+   "fieldname": "procedures",
+   "fieldtype": "Table",
+   "label": "Procedures",
+   "options": "Dental Chart Procedure"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-11-24 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Dental Chart Tooth",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "creation": "2024-11-24 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "condition_id",
+  "type",
+  "severity",
+  "notes",
+  "date",
+  "created_by",
+  "section_break_soft_delete",
+  "is_deleted",
+  "deleted_at",
+  "deleted_by",
+  "deletion_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "condition_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Condition ID",
+   "unique": 1
+  },
+  {
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "cavity\ncrown\nbridge\nimplant\nroot-canal\nextraction\nfilling\nfracture\nabscess\nother",
+   "reqd": 1
+  },
+  {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "label": "Severity",
+   "options": "\nmild\nmoderate\nsevere"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "created_by",
+   "fieldtype": "Link",
+   "label": "Created By",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_soft_delete",
+   "fieldtype": "Section Break",
+   "label": "Soft Delete"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_deleted",
+   "fieldtype": "Check",
+   "label": "Is Deleted"
+  },
+  {
+   "fieldname": "deleted_at",
+   "fieldtype": "Datetime",
+   "label": "Deleted At"
+  },
+  {
+   "fieldname": "deleted_by",
+   "fieldtype": "Link",
+   "label": "Deleted By",
+   "options": "User"
+  },
+  {
+   "fieldname": "deletion_reason",
+   "fieldtype": "Text",
+   "label": "Deletion Reason"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-11-24 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Dental Chart Condition",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
