@@ -260,6 +260,35 @@
 					"response": []
 				},
 				{
+					"name": "Get Patients List (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.get_patients?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.get_patients"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Search Patients",
 					"request": {
 						"method": "GET",
@@ -311,6 +340,34 @@
 								"api",
 								"method",
 								"mob_clinic.mob_clinic.api.patient.update_patient"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Patient",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.patient.delete_patient",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.patient.delete_patient"
 							]
 						}
 					},
@@ -456,6 +513,35 @@
 					"response": []
 				},
 				{
+					"name": "Get Appointments List (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_appointments?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.get_appointments"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Update Appointment",
 					"request": {
 						"method": "POST",
@@ -506,6 +592,81 @@
 								"api",
 								"method",
 								"mob_clinic.mob_clinic.api.appointment.cancel_appointment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"appointment_id\": \"{{appointment_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.delete_appointment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.delete_appointment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add to Today's Queue",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patient_id\": \"{{patient_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.add_to_todays_queue",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.add_to_todays_queue"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Today's Queue",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.appointment.get_todays_queue",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.appointment.get_todays_queue"
 							]
 						}
 					},
@@ -622,6 +783,35 @@
 					"response": []
 				},
 				{
+					"name": "Get Prescriptions List (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.get_prescriptions?limit_page_length=20&limit_start=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.get_prescriptions"
+							],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								},
+								{
+									"key": "limit_start",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Update Prescription",
 					"request": {
 						"method": "POST",
@@ -711,6 +901,34 @@
 									"value": "2025-12-31",
 									"disabled": true
 								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Prescription",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"record_id\": \"{{prescription_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.prescription.delete_prescription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"method",
+								"mob_clinic.mob_clinic.api.prescription.delete_prescription"
 							]
 						}
 					},

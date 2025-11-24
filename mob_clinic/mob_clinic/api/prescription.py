@@ -4,6 +4,13 @@ from frappe.utils import nowdate, now_datetime, getdate
 import json
 
 
+def _format_status_for_api(status_value):
+    """Normalize internal Patient Encounter status to mobile-friendly representation"""
+    if not status_value or status_value == "Open":
+        return "Active"
+    return status_value
+
+
 @frappe.whitelist(methods=['GET'])
 def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc"):
     """
@@ -180,9 +187,24 @@ def get_prescription(record_id):
             "encounter_date": record.encounter_date,
             "encounter_time": record.encounter_time,
             "department": record.medical_department,
+            
+            # Clinical fields (custom fields for mobile app)
+            "chief_complaint": getattr(record, "chief_complaint", None),
+            "symptoms": getattr(record, "symptoms_text", None),
+            "diagnosis": getattr(record, "diagnosis_text", None),
+            "treatment_plan": getattr(record, "treatment_plan_text", None),
+            "status": _format_status_for_api(getattr(record, "status", None)),
+            
+            # Additional clinical fields
+            "medical_code": getattr(record, "medical_code", None),
+            "medical_code_description": getattr(record, "medical_code_description", None),
+            
+            # Prescription data
             "medications": medications,
             "investigations": investigations,
             "attachments": attachments,
+            
+            # Document metadata
             "invoiced": record.invoiced,
             "docstatus": record.docstatus,
             "creation": record.creation,
@@ -242,17 +264,44 @@ def create_prescription(patient_id, **kwargs):
         # Get patient details
         patient = frappe.get_doc("Patient", patient_id)
         
-        # Create patient encounter (prescription/medical record)
-        record = frappe.get_doc({
+        # Get practitioner name and department
+        practitioner_name = practitioner.get("name") if isinstance(practitioner, dict) else practitioner.name
+        practitioner_department = practitioner.get("department") if isinstance(practitioner, dict) else getattr(practitioner, "department", None)
+        
+        # Build document data, excluding None values to avoid field type conflicts
+        doc_data = {
             "doctype": "Patient Encounter",
             "patient": patient_id,
             "patient_name": patient.patient_name,
-            "practitioner": practitioner.name,
-            "medical_department": kwargs.get("department") or practitioner.get("department"),
+            "practitioner": practitioner_name,
             "encounter_date": kwargs.get("date") or nowdate(),
-            "encounter_time": kwargs.get("time") or now_datetime().time(),
-            "company": kwargs.get("company") or frappe.defaults.get_user_default("Company")
-        })
+            "encounter_time": kwargs.get("time") or now_datetime().strftime("%H:%M:%S"),
+        }
+        
+        # Add optional fields only if they have values
+        if kwargs.get("department") or practitioner_department:
+            doc_data["medical_department"] = kwargs.get("department") or practitioner_department
+            
+        if kwargs.get("company") or frappe.defaults.get_user_default("Company"):
+            doc_data["company"] = kwargs.get("company") or frappe.defaults.get_user_default("Company")
+        
+        # Add clinical fields only if provided (using custom field names for mobile app)
+        if kwargs.get("chief_complaint"):
+            doc_data["chief_complaint"] = kwargs.get("chief_complaint")
+        if kwargs.get("symptoms"):
+            doc_data["symptoms_text"] = kwargs.get("symptoms")
+        if kwargs.get("diagnosis"):
+            doc_data["diagnosis_text"] = kwargs.get("diagnosis")
+        if kwargs.get("treatment_plan"):
+            doc_data["treatment_plan_text"] = kwargs.get("treatment_plan")
+        if kwargs.get("medical_code"):
+            doc_data["medical_code"] = kwargs.get("medical_code")
+        if kwargs.get("medical_code_description"):
+            doc_data["medical_code_description"] = kwargs.get("medical_code_description")
+        
+        # Create patient encounter (prescription/medical record)
+        # Note: 'status' is read-only and auto-set by the system
+        record = frappe.get_doc(doc_data)
         
         # Add medications if provided
         medications = kwargs.get("medications")
@@ -314,9 +363,20 @@ def create_prescription(patient_id, **kwargs):
                 "practitioner_id": record.practitioner,
                 "encounter_date": record.encounter_date,
                 "encounter_time": str(record.encounter_time),
-                "docstatus": record.docstatus,
+                
+                # Clinical fields (using custom field names)
+                "chief_complaint": getattr(record, "chief_complaint", None),
+                "symptoms": getattr(record, "symptoms_text", None),
+                "diagnosis": getattr(record, "diagnosis_text", None),
+                "treatment_plan": getattr(record, "treatment_plan_text", None),
+                "status": _format_status_for_api(record.status),
+                
+                # Counts
                 "medications_count": len(record.drug_prescription),
                 "investigations_count": len(record.lab_test_prescription),
+                
+                # Document status
+                "docstatus": record.docstatus,
                 "invoiced": record.invoiced
             }
         }
@@ -331,6 +391,11 @@ def create_prescription(patient_id, **kwargs):
         import traceback
         error_trace = traceback.format_exc()
         frappe.log_error(error_trace, "Create Prescription Error")
+        
+        # Print detailed error for debugging
+        print(f"ERROR: {str(e)}")
+        print(f"TRACEBACK:\n{error_trace}")
+        
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
@@ -353,20 +418,39 @@ def update_prescription(record_id, **kwargs):
     try:
         record = frappe.get_doc("Patient Encounter", record_id)
         
-        # Update allowed fields
-        updatable_fields = [
-            "chief_complaint", "symptoms", "signs", "diagnosis",
-            "medical_code", "medical_code_description", "treatment_plan",
-            "medication", "lab_test_prescription", "status",
-            "shared_with_patient", "follow_up_required", "follow_up_date",
-            "follow_up_notes", "lifestyle_recommendations", "diet_recommendations"
-        ]
+        # Map API payload fields to underlying DocType fieldnames
+        field_mapping = {
+            "chief_complaint": "chief_complaint",
+            "symptoms": "symptoms_text",
+            "diagnosis": "diagnosis_text",
+            "treatment_plan": "treatment_plan_text",
+            "medical_code": "medical_code",
+            "medical_code_description": "medical_code_description",
+            "status": "status",
+            "signs": "signs",
+            "shared_with_patient": "shared_with_patient",
+            "follow_up_required": "follow_up_required",
+            "follow_up_date": "follow_up_date",
+            "follow_up_notes": "follow_up_notes",
+            "lifestyle_recommendations": "lifestyle_recommendations",
+            "diet_recommendations": "diet_recommendations"
+        }
         
         updated_fields = []
-        for field in updatable_fields:
-            if field in kwargs and kwargs[field] is not None:
-                setattr(record, field, kwargs[field])
-                updated_fields.append(field)
+        status_aliases = {"Active": "Open"}
+        allowed_statuses = {"", "Open", "Ordered", "Completed", "Cancelled"}
+        
+        for payload_field, doc_field in field_mapping.items():
+            if payload_field in kwargs and kwargs[payload_field] is not None:
+                value = kwargs[payload_field]
+                
+                if payload_field == "status":
+                    value = status_aliases.get(value, value)
+                    if value not in allowed_statuses:
+                        frappe.throw(_(f"Invalid status '{kwargs[payload_field]}'. Allowed values: {', '.join(sorted(allowed_statuses))}"))
+                
+                setattr(record, doc_field, value)
+                updated_fields.append(payload_field)
         
         # Update medications if provided
         if "medications" in kwargs:
@@ -430,7 +514,7 @@ def update_prescription(record_id, **kwargs):
             "data": {
                 "record_id": record.name,
                 "updated_fields": updated_fields,
-                "status": record.status,
+                "status": _format_status_for_api(record.status),
                 "medications_count": len(record.drug_prescription),
                 "investigations_count": len(record.lab_test_prescription)
             }
@@ -448,6 +532,76 @@ def update_prescription(record_id, **kwargs):
         return {
             "exc_type": "ServerError",
             "message": "Error updating prescription"
+        }
+
+
+@frappe.whitelist(methods=['DELETE', 'POST'])
+def delete_prescription(record_id):
+    """
+    Delete a prescription/medical record
+    
+    Args:
+        record_id (str): Medical Record ID
+        
+    Returns:
+        dict: Deletion status
+    """
+    try:
+        # Check if record exists
+        if not frappe.db.exists("Patient Encounter", record_id):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": f"Medical record {record_id} not found"
+            }
+        
+        # Get the record
+        record = frappe.get_doc("Patient Encounter", record_id)
+        
+        # Check if record can be deleted (not submitted/invoiced)
+        if record.docstatus == 1:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": "Cannot delete submitted prescription. Please cancel it first."
+            }
+        
+        if record.invoiced:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": "Cannot delete invoiced prescription."
+            }
+        
+        # Store info before deletion
+        patient_name = record.patient_name
+        encounter_date = record.encounter_date
+        
+        # Delete the record
+        frappe.delete_doc("Patient Encounter", record_id, ignore_permissions=True)
+        frappe.db.commit()
+        
+        return {
+            "message": "Prescription deleted successfully",
+            "data": {
+                "record_id": record_id,
+                "patient_name": patient_name,
+                "encounter_date": str(encounter_date)
+            }
+        }
+        
+    except frappe.DoesNotExistError:
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "NotFound",
+            "message": f"Medical record {record_id} not found"
+        }
+    except Exception as e:
+        frappe.log_error(str(e)[:500], "Delete Prescription Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error deleting prescription: {str(e)}"
         }
 
 

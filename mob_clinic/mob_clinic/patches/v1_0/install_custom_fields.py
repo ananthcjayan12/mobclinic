@@ -28,6 +28,9 @@ def execute():
         print("Creating Patient Medical Record custom fields...")
         create_patient_medical_record_fields()
         
+        print("Creating Patient Encounter custom fields...")
+        create_patient_encounter_fields()
+        
         print("Creating Sales Invoice custom fields...")
         create_sales_invoice_fields()
         
@@ -457,6 +460,62 @@ def create_patient_medical_record_fields():
         frappe.log_error("Patient Medical Record custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Patient Medical Record custom fields: {str(e)}")
+        raise
+
+def create_patient_encounter_fields():
+    """Add mobile clinic clinical text fields to Patient Encounter"""
+    custom_fields = {
+        "Patient Encounter": [
+            {
+                "fieldname": "mobile_clinical_section",
+                "label": "Clinical Notes (Mobile App)",
+                "fieldtype": "Section Break",
+                "insert_after": "encounter_comment",
+                "collapsible": 1
+            },
+            {
+                "fieldname": "chief_complaint",
+                "label": "Chief Complaint",
+                "fieldtype": "Text",
+                "insert_after": "mobile_clinical_section",
+                "description": "Main reason for patient visit"
+            },
+            {
+                "fieldname": "symptoms_text",
+                "label": "Symptoms (Text)",
+                "fieldtype": "Text",
+                "insert_after": "chief_complaint",
+                "description": "Patient symptoms in text format for mobile app"
+            },
+            {
+                "fieldname": "diagnosis_text",
+                "label": "Diagnosis (Text)",
+                "fieldtype": "Text",
+                "insert_after": "symptoms_text",
+                "description": "Diagnosis in text format for mobile app"
+            },
+            {
+                "fieldname": "treatment_plan_text",
+                "label": "Treatment Plan",
+                "fieldtype": "Text",
+                "insert_after": "diagnosis_text",
+                "description": "Detailed treatment plan for mobile app"
+            },
+            {
+                "fieldname": "medical_code",
+                "label": "Medical Code",
+                "fieldtype": "Data",
+                "insert_after": "treatment_plan_text",
+                "description": "Medical/diagnostic code reference"
+            }
+        ]
+    }
+    
+    try:
+        create_custom_fields(custom_fields, update=True)
+        frappe.log_error("Patient Encounter custom fields created successfully")
+    except Exception as e:
+        frappe.log_error(f"Error creating Patient Encounter custom fields: {str(e)}")
         raise
 
 def create_sales_invoice_fields():

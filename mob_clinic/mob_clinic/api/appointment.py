@@ -392,6 +392,270 @@ def cancel_appointment(appointment_id, cancellation_reason=None):
             "message": "Error cancelling appointment"
         }
 
+
+@frappe.whitelist(methods=['DELETE', 'POST'])
+def delete_appointment(appointment_id):
+    """
+    Delete an appointment permanently
+    
+    Args:
+        appointment_id (str): Appointment ID
+        
+    Returns:
+        dict: Deletion status
+    """
+    try:
+        # Check if appointment exists
+        if not frappe.db.exists("Patient Appointment", appointment_id):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": f"Appointment {appointment_id} not found"
+            }
+        
+        # Get the appointment
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        # Check if appointment can be deleted
+        if appointment.docstatus == 1:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": "Cannot delete submitted appointment. Please cancel it first."
+            }
+        
+        if appointment.invoiced:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": "Cannot delete invoiced appointment."
+            }
+        
+        # Store info before deletion
+        patient_name = appointment.patient_name
+        appointment_date = appointment.appointment_date
+        appointment_time = appointment.appointment_time
+        
+        # Delete the appointment
+        frappe.delete_doc("Patient Appointment", appointment_id, ignore_permissions=True)
+        frappe.db.commit()
+        
+        return {
+            "message": "Appointment deleted successfully",
+            "data": {
+                "appointment_id": appointment_id,
+                "patient_name": patient_name,
+                "appointment_date": str(appointment_date),
+                "appointment_time": str(appointment_time)
+            }
+        }
+        
+    except frappe.DoesNotExistError:
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "NotFound",
+            "message": f"Appointment {appointment_id} not found"
+        }
+    except Exception as e:
+        frappe.log_error(str(e)[:500], "Delete Appointment Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error deleting appointment: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['POST'])
+def add_to_todays_queue(patient_id, duration=30, **kwargs):
+    """
+    Add patient to today's queue by finding the nearest available slot
+    
+    Args:
+        patient_id (str): Patient ID
+        duration (int): Appointment duration in minutes
+        **kwargs: Additional appointment fields
+        
+    Returns:
+        dict: Created appointment information
+    """
+    try:
+        # Validate patient exists
+        if not frappe.db.exists("Patient", patient_id):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": f"Patient {patient_id} not found"
+            }
+        
+        # Get current practitioner
+        practitioner = get_current_practitioner()
+        if not practitioner:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Healthcare Practitioner profile not found"
+            }
+        
+        # Get today's date
+        today = nowdate()
+        
+        # Get available slots for today
+        slots_response = get_available_slots(today, duration)
+        
+        if slots_response.get("exc_type"):
+            return slots_response
+        
+        slots_data = slots_response.get("data", {})
+        available_slots = slots_data.get("available_slots", [])
+        
+        if not available_slots:
+            # No available slots - add to end of day
+            # Get last appointment time
+            last_appointment = frappe.get_all(
+                "Patient Appointment",
+                filters={
+                    "practitioner": practitioner.name,
+                    "appointment_date": today,
+                    "status": ["not in", ["Cancelled"]]
+                },
+                fields=["appointment_time", "duration"],
+                order_by="appointment_time desc",
+                limit=1
+            )
+            
+            if last_appointment and last_appointment[0].appointment_time:
+                # Calculate next slot after last appointment
+                last_time = datetime.strptime(str(last_appointment[0].appointment_time), "%H:%M:%S")
+                last_duration = int(last_appointment[0].duration or 30)
+                next_time = last_time + timedelta(minutes=last_duration)
+                appointment_time = next_time.strftime("%H:%M:%S")
+            else:
+                # No appointments today - use current time or start of working hours
+                working_hours = get_working_hours(practitioner.name, getdate(today).strftime("%A"))
+                if working_hours and working_hours.get("is_working_day"):
+                    # Use start time if before current time, otherwise use current time
+                    current_time = now_datetime().time()
+                    start_time = datetime.strptime(str(working_hours.get("start_time")), "%H:%M:%S").time()
+                    
+                    if current_time < start_time:
+                        appointment_time = str(working_hours.get("start_time"))
+                    else:
+                        appointment_time = current_time.strftime("%H:%M:%S")
+                else:
+                    # Default to current time
+                    appointment_time = now_datetime().strftime("%H:%M:%S")
+        else:
+            # Use the first available slot
+            appointment_time = available_slots[0]
+        
+        # Create the appointment
+        appointment = frappe.get_doc({
+            "doctype": "Patient Appointment",
+            "patient": patient_id,
+            "practitioner": practitioner.name,
+            "appointment_date": today,
+            "appointment_time": appointment_time,
+            "duration": duration,
+            "status": "Open",
+            "appointment_type": kwargs.get("appointment_type", "Walk In"),
+            "notes": kwargs.get("notes", "Added to today's queue"),
+            "chief_complaint": kwargs.get("chief_complaint", ""),
+            "booked_via_app": 1,
+            "app_booking_source": "Mobile App - Quick Queue"
+        })
+        
+        appointment.flags.ignore_permissions = True
+        appointment.flags.ignore_mandatory = True
+        appointment.insert(ignore_permissions=True)
+        frappe.db.commit()
+        
+        # Get the created appointment with enhanced data
+        created_appointment = get_appointment(appointment.name)
+        
+        return {
+            "message": "Patient added to today's queue successfully",
+            "queue_position": get_queue_position(appointment.name, today, practitioner.name),
+            "data": created_appointment.get("data")
+        }
+        
+    except Exception as e:
+        error_msg = str(e)
+        frappe.log_error(error_msg[:500], "Add to Queue Error")
+        
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error adding to queue: {error_msg[:100]}"
+        }
+
+
+@frappe.whitelist(methods=['GET'])
+def get_todays_queue():
+    """
+    Get today's appointment queue for current practitioner
+    
+    Returns:
+        dict: List of today's appointments ordered by time
+    """
+    try:
+        practitioner = get_current_practitioner()
+        if not practitioner:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Healthcare Practitioner profile not found"
+            }
+        
+        today = nowdate()
+        
+        # Get today's appointments
+        appointments = frappe.get_all(
+            "Patient Appointment",
+            filters={
+                "practitioner": practitioner.name,
+                "appointment_date": today,
+                "status": ["not in", ["Cancelled"]]
+            },
+            fields=[
+                "name", "patient", "patient_name", "appointment_time",
+                "duration", "status", "appointment_type", "chief_complaint"
+            ],
+            order_by="appointment_time asc"
+        )
+        
+        # Enhance with queue position and patient info
+        queue = []
+        for idx, appt in enumerate(appointments, 1):
+            patient_data = get_patient_basic_info(appt.get("patient"))
+            
+            queue_item = dict(appt)
+            queue_item.update({
+                "queue_position": idx,
+                "patient_mobile": patient_data.get("mobile"),
+                "patient_image": patient_data.get("image"),
+                "estimated_time": calculate_estimated_time(appointments[:idx], appt.get("appointment_time"))
+            })
+            
+            queue.append(queue_item)
+        
+        return {
+            "message": "success",
+            "data": {
+                "date": today,
+                "total_queue": len(queue),
+                "queue": queue
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e)[:500], "Get Queue Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": "Error retrieving today's queue"
+        }
+
+
 @frappe.whitelist(methods=['GET'])
 def get_available_slots(date, duration=30):
     """
@@ -637,3 +901,66 @@ def is_slot_booked(slot, booked_appointments, duration):
         return False
     except:
         return False
+
+
+def get_queue_position(appointment_id, date, practitioner_id):
+    """
+    Get the position of an appointment in today's queue
+    
+    Args:
+        appointment_id (str): Appointment ID
+        date (str): Appointment date
+        practitioner_id (str): Practitioner ID
+        
+    Returns:
+        int: Queue position (1-based)
+    """
+    try:
+        # Get all appointments for the day ordered by time
+        appointments = frappe.get_all(
+            "Patient Appointment",
+            filters={
+                "practitioner": practitioner_id,
+                "appointment_date": date,
+                "status": ["not in", ["Cancelled", "Closed"]]
+            },
+            fields=["name", "appointment_time"],
+            order_by="appointment_time asc"
+        )
+        
+        # Find position
+        for idx, appt in enumerate(appointments, 1):
+            if appt.name == appointment_id:
+                return idx
+        
+        return len(appointments)
+    except:
+        return None
+
+
+def calculate_estimated_time(previous_appointments, current_time):
+    """
+    Calculate estimated time for appointment based on queue
+    
+    Args:
+        previous_appointments (list): List of appointments before current
+        current_time (str): Scheduled appointment time
+        
+    Returns:
+        str: Estimated time
+    """
+    try:
+        if not previous_appointments:
+            return current_time
+        
+        # Start with first appointment time
+        estimated = datetime.strptime(str(previous_appointments[0].get("appointment_time")), "%H:%M:%S")
+        
+        # Add duration of all previous appointments
+        for appt in previous_appointments:
+            duration = int(appt.get("duration") or 30)
+            estimated += timedelta(minutes=duration)
+        
+        return estimated.strftime("%H:%M:%S")
+    except:
+        return current_time

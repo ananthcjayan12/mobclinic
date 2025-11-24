@@ -448,6 +448,85 @@ def update_patient(patient_id, **kwargs):
             "message": "Error updating patient"
         }
 
+
+@frappe.whitelist(methods=['DELETE', 'POST'])
+def delete_patient(patient_id):
+    """
+    Delete a patient record
+    
+    Args:
+        patient_id (str): Patient ID
+        
+    Returns:
+        dict: Deletion status
+    """
+    try:
+        # Check if patient exists
+        if not frappe.db.exists("Patient", patient_id):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": f"Patient {patient_id} not found"
+            }
+        
+        # Get the patient
+        patient = frappe.get_doc("Patient", patient_id)
+        
+        # Check if patient has any appointments
+        appointment_count = frappe.db.count("Patient Appointment", {
+            "patient": patient_id,
+            "status": ["not in", ["Cancelled"]]
+        })
+        
+        if appointment_count > 0:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": f"Cannot delete patient with {appointment_count} active appointments. Please cancel appointments first."
+            }
+        
+        # Check if patient has any medical records
+        medical_record_count = frappe.db.count("Patient Encounter", {"patient": patient_id})
+        
+        if medical_record_count > 0:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": f"Cannot delete patient with {medical_record_count} medical records."
+            }
+        
+        # Store info before deletion
+        patient_name = patient.patient_name
+        mobile = patient.mobile
+        
+        # Delete the patient
+        frappe.delete_doc("Patient", patient_id, ignore_permissions=True)
+        frappe.db.commit()
+        
+        return {
+            "message": "Patient deleted successfully",
+            "data": {
+                "patient_id": patient_id,
+                "patient_name": patient_name,
+                "mobile": mobile
+            }
+        }
+        
+    except frappe.DoesNotExistError:
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "NotFound",
+            "message": f"Patient {patient_id} not found"
+        }
+    except Exception as e:
+        frappe.log_error(str(e)[:500], "Delete Patient Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error deleting patient: {str(e)}"
+        }
+
+
 @frappe.whitelist(methods=['GET'])
 def search_patients(search_term, limit=10):
     """
