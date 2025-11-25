@@ -5,31 +5,44 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "tooth_number",
-  "status",
-  "notes"
+  "type",
+  "severity",
+  "notes",
+  "timestamp",
+  "updated_by"
  ],
  "fields": [
   {
-   "fieldname": "tooth_number",
-   "fieldtype": "Int",
+   "fieldname": "type",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Tooth Number",
+   "label": "Type",
    "reqd": 1
   },
   {
-   "default": "healthy",
-   "fieldname": "status",
-   "fieldtype": "Select",
+   "fieldname": "severity",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Status",
-   "options": "healthy\nhas-condition\nin-treatment\ntreated",
-   "reqd": 1
+   "label": "Severity"
   },
   {
    "fieldname": "notes",
    "fieldtype": "Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Timestamp",
+   "reqd": 1
+  },
+  {
+   "fieldname": "updated_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Updated By",
+   "options": "User"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -38,7 +51,7 @@
  "modified": "2024-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mob Clinic",
- "name": "Dental Chart Tooth",
+ "name": "Dental Chart Condition History",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

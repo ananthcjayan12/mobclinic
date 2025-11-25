@@ -1418,6 +1418,24 @@
 					"response": []
 				},
 				{
+					"name": "Get Condition History",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/method/mob_clinic.mob_clinic.api.dental_chart.get_condition_history?patient_id={{patient_id}}&tooth_number=11&condition_id=COND-11-001",
+							"host": ["{{base_url}}"],
+							"path": ["api", "method", "mob_clinic.mob_clinic.api.dental_chart.get_condition_history"],
+							"query": [
+								{"key": "patient_id", "value": "{{patient_id}}"},
+								{"key": "tooth_number", "value": "11"},
+								{"key": "condition_id", "value": "COND-11-001"}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Get Condition Types",
 					"request": {
 						"method": "GET",

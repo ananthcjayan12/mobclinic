@@ -5,7 +5,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "procedure_id",
+  "tooth_number",
   "name_of_procedure",
   "status",
   "notes",
@@ -23,11 +23,11 @@
  ],
  "fields": [
   {
-   "fieldname": "procedure_id",
-   "fieldtype": "Data",
+   "fieldname": "tooth_number",
+   "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Procedure ID",
-   "unique": 1
+   "label": "Tooth Number",
+   "reqd": 1
   },
   {
    "fieldname": "name_of_procedure",

@@ -5,12 +5,14 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "condition_id",
+  "tooth_number",
   "type",
   "severity",
   "notes",
   "date",
   "created_by",
+  "section_break_history",
+  "history",
   "section_break_soft_delete",
   "is_deleted",
   "deleted_at",
@@ -19,11 +21,11 @@
  ],
  "fields": [
   {
-   "fieldname": "condition_id",
-   "fieldtype": "Data",
+   "fieldname": "tooth_number",
+   "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Condition ID",
-   "unique": 1
+   "label": "Tooth Number",
+   "reqd": 1
   },
   {
    "fieldname": "type",
@@ -56,6 +58,17 @@
    "fieldtype": "Link",
    "label": "Created By",
    "options": "User"
+  },
+  {
+   "fieldname": "section_break_history",
+   "fieldtype": "Section Break",
+   "label": "History"
+  },
+  {
+   "fieldname": "history",
+   "fieldtype": "Table",
+   "label": "History",
+   "options": "Dental Chart Condition History"
   },
   {
    "fieldname": "section_break_soft_delete",

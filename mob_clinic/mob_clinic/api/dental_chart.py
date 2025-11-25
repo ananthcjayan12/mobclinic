@@ -1,62 +1,567 @@
+"""
+Dental Chart API - Redesigned from First Principles
+Uses Frappe's built-in `name` field as unique identifier
+No custom ID generation - relies on database auto-increment
+"""
+
 import frappe
-from frappe import _
-from frappe.utils import nowdate, now_datetime, cstr, getdate
 import json
-from datetime import datetime
+from frappe import _
+from frappe.utils import nowdate, now_datetime, cstr
 
 
 # ============================================================================
-# CORE DENTAL CHART MANAGEMENT
+# CONDITION MANAGEMENT
+# ============================================================================
+
+@frappe.whitelist(methods=['POST'])
+def add_condition(patient_id, tooth_numbers, condition):
+    """
+    Add dental condition to specified teeth
+    
+    Args:
+        patient_id: Patient identifier
+        tooth_numbers: List of tooth numbers (can include duplicates for multiple conditions)
+        condition: Dict with type, severity, notes, date
+    
+    Returns:
+        Dict with created condition names (Frappe's auto-generated IDs)
+    """
+    try:
+        # Parse parameters
+        if isinstance(tooth_numbers, str):
+            tooth_numbers = json.loads(tooth_numbers)
+        if isinstance(condition, str):
+            condition = json.loads(condition)
+        
+        # Validate
+        if not tooth_numbers or not isinstance(tooth_numbers, list):
+            frappe.throw(_("tooth_numbers must be a non-empty list"))
+        
+        if not condition.get("type"):
+            frappe.throw(_("condition type is required"))
+        
+        # Get or create dental chart
+        chart = get_or_create_chart(patient_id)
+        
+        # Track affected teeth for status update
+        affected_teeth = set()
+        
+        # Add condition for each tooth
+        for tooth_num in tooth_numbers:
+            tooth_num = int(tooth_num)
+            
+            # Validate tooth number
+            if not is_valid_tooth_number(tooth_num):
+                continue
+            
+            # Create condition entry - Frappe will auto-generate unique name
+            chart.append("conditions", {
+                "tooth_number": tooth_num,
+                "type": condition.get("type"),
+                "severity": condition.get("severity", ""),
+                "notes": condition.get("notes", ""),
+                "date": condition.get("date", nowdate()),
+                "created_by": frappe.session.user,
+                "is_deleted": 0
+            })
+            
+            affected_teeth.add(tooth_num)
+        
+        # Save chart once - this generates names for all new conditions
+        chart.save(ignore_permissions=True)
+        frappe.db.commit()
+        
+        # Collect the newly created condition names
+        created_conditions = []
+        new_condition_docs = []
+        
+        # Get the conditions we just added (they'll be the last ones without history)
+        for cond in reversed(chart.conditions):
+            if not cond.is_deleted and cond.tooth_number in affected_teeth:
+                # Get as full document to add history
+                cond_doc = frappe.get_doc("Dental Chart Condition", cond.name)
+                
+                # Check if it already has history (means it's not new)
+                if len(cond_doc.history) == 0:
+                    new_condition_docs.append(cond_doc)
+                    created_conditions.append({
+                        "name": cond.name,
+                        "tooth_number": cond.tooth_number,
+                        "type": cond.type
+                    })
+                    
+                    # Stop when we've found all new conditions
+                    if len(created_conditions) == len(tooth_numbers):
+                        break
+        
+        # Add initial history for each new condition
+        for cond_doc in new_condition_docs:
+            cond_doc.append("history", {
+                "type": cond_doc.type,
+                "severity": cond_doc.severity,
+                "notes": cond_doc.notes or "",
+                "timestamp": now_datetime(),
+                "updated_by": frappe.session.user
+            })
+            cond_doc.save(ignore_permissions=True)
+        
+        frappe.db.commit()
+        
+        # Update tooth status
+        update_tooth_status(chart, list(affected_teeth))
+        
+        return {
+            "message": "Condition added successfully",
+            "data": {
+                "conditions": created_conditions,
+                "affected_teeth": list(affected_teeth)
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Add Condition Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error adding condition: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['POST'])
+def update_condition(patient_id, condition_name, updates):
+    """
+    Update a dental condition using Frappe's name field
+    
+    Args:
+        patient_id: Patient identifier
+        condition_name: Frappe's auto-generated name (e.g., "abc123xyz")
+        updates: Dict with fields to update
+    """
+    try:
+        if isinstance(updates, str):
+            updates = json.loads(updates)
+        
+        # Get condition document directly
+        if not frappe.db.exists("Dental Chart Condition", condition_name):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFoundError",
+                "message": f"Condition {condition_name} not found"
+            }
+        
+        cond_doc = frappe.get_doc("Dental Chart Condition", condition_name)
+        
+        # Verify it belongs to the correct patient
+        chart = frappe.get_doc("Dental Chart", cond_doc.parent)
+        if chart.patient != patient_id:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Condition does not belong to specified patient"
+            }
+        
+        # Track changes
+        has_changes = False
+        
+        # Update fields if provided
+        if "type" in updates and updates["type"] != cond_doc.type:
+            cond_doc.type = updates["type"]
+            has_changes = True
+        
+        if "severity" in updates and updates["severity"] != cond_doc.severity:
+            cond_doc.severity = updates["severity"]
+            has_changes = True
+        
+        if "notes" in updates and updates["notes"] != cond_doc.notes:
+            cond_doc.notes = updates["notes"]
+            has_changes = True
+        
+        if "date" in updates:
+            cond_doc.date = updates["date"]
+            has_changes = True
+        
+        # Only add history if something changed
+        if has_changes:
+            cond_doc.append("history", {
+                "type": cond_doc.type,
+                "severity": cond_doc.severity,
+                "notes": cond_doc.notes or "",
+                "timestamp": now_datetime(),
+                "updated_by": frappe.session.user
+            })
+            cond_doc.save(ignore_permissions=True)
+            
+            # Update parent chart timestamp
+            chart.save(ignore_permissions=True)
+            frappe.db.commit()
+            
+            # Update tooth status
+            update_tooth_status(chart, [cond_doc.tooth_number])
+        
+        return {
+            "message": "Condition updated successfully",
+            "data": {
+                "condition_name": condition_name,
+                "tooth_number": cond_doc.tooth_number,
+                "updated_at": now_datetime(),
+                "changes_made": has_changes
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Update Condition Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error updating condition: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['POST', 'DELETE'])
+def remove_condition(patient_id, condition_name, reason=None):
+    """
+    Soft delete a condition using Frappe's name field
+    """
+    try:
+        if not frappe.db.exists("Dental Chart Condition", condition_name):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFoundError",
+                "message": f"Condition {condition_name} not found"
+            }
+        
+        cond_doc = frappe.get_doc("Dental Chart Condition", condition_name)
+        chart = frappe.get_doc("Dental Chart", cond_doc.parent)
+        
+        if chart.patient != patient_id:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Condition does not belong to specified patient"
+            }
+        
+        # Soft delete
+        cond_doc.is_deleted = 1
+        cond_doc.deleted_at = now_datetime()
+        cond_doc.deleted_by = frappe.session.user
+        cond_doc.deletion_reason = reason
+        cond_doc.db_update()
+        
+        # Commit immediately
+        frappe.db.commit()
+        
+        # Reload parent chart to reflect changes
+        chart.reload()
+        
+        # Update tooth status
+        update_tooth_status(chart, [cond_doc.tooth_number])
+        
+        return {
+            "message": "Condition removed successfully",
+            "data": {
+                "condition_name": condition_name,
+                "tooth_number": cond_doc.tooth_number
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Remove Condition Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error removing condition: {str(e)}"
+        }
+
+
+# ============================================================================
+# PROCEDURE MANAGEMENT
+# ============================================================================
+
+@frappe.whitelist(methods=['POST'])
+def add_procedure(patient_id, tooth_numbers, procedure):
+    """
+    Add dental procedure to specified teeth
+    """
+    try:
+        # Parse parameters
+        if isinstance(tooth_numbers, str):
+            tooth_numbers = json.loads(tooth_numbers)
+        if isinstance(procedure, str):
+            procedure = json.loads(procedure)
+        
+        # Validate
+        if not tooth_numbers or not isinstance(tooth_numbers, list):
+            frappe.throw(_("tooth_numbers must be a non-empty list"))
+        
+        if not procedure.get("name"):
+            frappe.throw(_("procedure name is required"))
+        
+        # Get or create chart
+        chart = get_or_create_chart(patient_id)
+        
+        affected_teeth = set()
+        
+        # Add procedure for each tooth
+        for tooth_num in tooth_numbers:
+            tooth_num = int(tooth_num)
+            
+            if not is_valid_tooth_number(tooth_num):
+                continue
+            
+            chart.append("procedures", {
+                "tooth_number": tooth_num,
+                "name_of_procedure": procedure.get("name"),
+                "status": procedure.get("status", "planned"),
+                "notes": procedure.get("notes", ""),
+                "date": procedure.get("date", nowdate()),
+                "cost": procedure.get("cost", 0),
+                "duration_minutes": procedure.get("duration_minutes", 0),
+                "created_by": frappe.session.user,
+                "is_deleted": 0
+            })
+            
+            affected_teeth.add(tooth_num)
+        
+        # Save chart
+        chart.save(ignore_permissions=True)
+        frappe.db.commit()
+        
+        # Collect newly created procedures
+        created_procedures = []
+        new_procedure_docs = []
+        
+        for proc in reversed(chart.procedures):
+            if not proc.is_deleted and proc.tooth_number in affected_teeth:
+                proc_doc = frappe.get_doc("Dental Chart Procedure", proc.name)
+                
+                if len(proc_doc.timeline) == 0:
+                    new_procedure_docs.append(proc_doc)
+                    created_procedures.append({
+                        "name": proc.name,
+                        "tooth_number": proc.tooth_number,
+                        "procedure_name": proc.name_of_procedure
+                    })
+                    
+                    if len(created_procedures) == len(tooth_numbers):
+                        break
+        
+        # Add initial timeline for each new procedure
+        for proc_doc in new_procedure_docs:
+            proc_doc.append("timeline", {
+                "status": proc_doc.status,
+                "timestamp": now_datetime(),
+                "notes": proc_doc.notes or "",
+                "changed_by": frappe.session.user
+            })
+            proc_doc.save(ignore_permissions=True)
+        
+        frappe.db.commit()
+        
+        # Update tooth status
+        update_tooth_status(chart, list(affected_teeth))
+        
+        return {
+            "message": "Procedure added successfully",
+            "data": {
+                "procedures": created_procedures,
+                "affected_teeth": list(affected_teeth)
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Add Procedure Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error adding procedure: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['POST'])
+def update_procedure(patient_id, procedure_name, updates):
+    """
+    Update a dental procedure using Frappe's name field
+    """
+    try:
+        if isinstance(updates, str):
+            updates = json.loads(updates)
+        
+        if not frappe.db.exists("Dental Chart Procedure", procedure_name):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFoundError",
+                "message": f"Procedure {procedure_name} not found"
+            }
+        
+        proc_doc = frappe.get_doc("Dental Chart Procedure", procedure_name)
+        chart = frappe.get_doc("Dental Chart", proc_doc.parent)
+        
+        if chart.patient != patient_id:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Procedure does not belong to specified patient"
+            }
+        
+        # Track changes
+        has_changes = False
+        old_status = proc_doc.status
+        
+        # Update fields
+        if "name" in updates and updates["name"] != proc_doc.name_of_procedure:
+            proc_doc.name_of_procedure = updates["name"]
+            has_changes = True
+        
+        if "status" in updates and updates["status"] != proc_doc.status:
+            proc_doc.status = updates["status"]
+            has_changes = True
+        
+        if "notes" in updates and updates["notes"] != proc_doc.notes:
+            proc_doc.notes = updates["notes"]
+            has_changes = True
+        
+        if "cost" in updates:
+            proc_doc.cost = updates["cost"]
+            has_changes = True
+        
+        if "duration_minutes" in updates:
+            proc_doc.duration_minutes = updates["duration_minutes"]
+            has_changes = True
+        
+        if "date" in updates:
+            proc_doc.date = updates["date"]
+            has_changes = True
+        
+        # Add timeline entry if something changed
+        if has_changes:
+            proc_doc.append("timeline", {
+                "status": proc_doc.status,
+                "timestamp": now_datetime(),
+                "notes": proc_doc.notes or "",
+                "changed_by": frappe.session.user
+            })
+            
+            # Use db_update() for immediate persistence of procedure fields
+            proc_doc.db_update()
+            
+            # Save the timeline entry separately (it's a child table)
+            if proc_doc.timeline:
+                timeline_entry = proc_doc.timeline[-1]
+                frappe.get_doc({
+                    "doctype": "Dental Chart Procedure Timeline",
+                    "parent": proc_doc.name,
+                    "parenttype": "Dental Chart Procedure",
+                    "parentfield": "timeline",
+                    "status": timeline_entry.status,
+                    "timestamp": timeline_entry.timestamp,
+                    "notes": timeline_entry.notes,
+                    "changed_by": timeline_entry.changed_by
+                }).db_insert()
+            
+            frappe.db.commit()
+            chart.reload()
+            
+            # Update tooth status if status changed
+            if old_status != proc_doc.status:
+                update_tooth_status(chart, [proc_doc.tooth_number])
+        
+        return {
+            "message": "Procedure updated successfully",
+            "data": {
+                "procedure_name": procedure_name,
+                "tooth_number": proc_doc.tooth_number,
+                "updated_at": now_datetime(),
+                "changes_made": has_changes
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Update Procedure Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error updating procedure: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['POST', 'DELETE'])
+def remove_procedure(patient_id, procedure_name, reason=None):
+    """
+    Soft delete a procedure
+    """
+    try:
+        if not frappe.db.exists("Dental Chart Procedure", procedure_name):
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFoundError",
+                "message": f"Procedure {procedure_name} not found"
+            }
+        
+        proc_doc = frappe.get_doc("Dental Chart Procedure", procedure_name)
+        chart = frappe.get_doc("Dental Chart", proc_doc.parent)
+        
+        if chart.patient != patient_id:
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Procedure does not belong to specified patient"
+            }
+        
+        # Soft delete
+        proc_doc.is_deleted = 1
+        proc_doc.deleted_at = now_datetime()
+        proc_doc.deleted_by = frappe.session.user
+        proc_doc.deletion_reason = reason
+        proc_doc.db_update()
+        
+        # Commit immediately
+        frappe.db.commit()
+        
+        # Reload parent chart to reflect changes
+        chart.reload()
+        
+        # Update tooth status
+        update_tooth_status(chart, [proc_doc.tooth_number])
+        
+        return {
+            "message": "Procedure removed successfully",
+            "data": {
+                "procedure_name": procedure_name,
+                "tooth_number": proc_doc.tooth_number
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Remove Procedure Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error removing procedure: {str(e)}"
+        }
+
+
+# ============================================================================
+# GET DENTAL CHART
 # ============================================================================
 
 @frappe.whitelist(methods=['GET'])
-def get_dental_chart(patient_id, chart_type=None):
+def get_dental_chart(patient_id):
     """
-    Retrieves complete dental chart for a patient
-    
-    Args:
-        patient_id (str): Patient ID
-        chart_type (str): Optional chart type filter
-        
-    Returns:
-        dict: Complete dental chart with teeth, conditions, and procedures
+    Get complete dental chart with conditions, procedures, history, and timeline
     """
     try:
-        # Validate patient
-        if not frappe.db.exists("Patient", patient_id):
-            frappe.local.response["http_status_code"] = 404
+        # Get chart
+        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+        if not chart_name:
             return {
-                "exc_type": "NotFound",
-                "message": f"Patient {patient_id} not found"
+                "message": "No dental chart found",
+                "data": None
             }
         
-        # Get or create dental chart
-        chart = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+        chart_doc = frappe.get_doc("Dental Chart", chart_name)
         
-        if not chart:
-            # Return empty chart structure
-            return {
-                "message": "Dental chart retrieved successfully",
-                "data": {
-                    "patient_id": patient_id,
-                    "chart_type": chart_type or "adult",
-                    "last_updated": None,
-                    "teeth": {},
-                    "summary": {
-                        "total_teeth_affected": 0,
-                        "total_conditions": 0,
-                        "total_procedures": 0,
-                        "completed_procedures": 0,
-                        "planned_procedures": 0,
-                        "in_progress_procedures": 0
-                    }
-                }
-            }
-        
-        # Get chart document
-        chart_doc = frappe.get_doc("Dental Chart", chart)
-        
-        # Build teeth data structure
+        # Build response grouped by tooth
         teeth_data = {}
         summary_stats = {
             "total_teeth_affected": 0,
@@ -67,70 +572,136 @@ def get_dental_chart(patient_id, chart_type=None):
             "in_progress_procedures": 0
         }
         
-        for tooth in chart_doc.teeth:
-            tooth_number = str(tooth.tooth_number)
+        # Process conditions
+        for cond in chart_doc.conditions:
+            # Skip deleted conditions (check both truthy and explicit 1)
+            if cond.is_deleted or cond.get('is_deleted') == 1:
+                continue
             
-            # Get non-deleted conditions
-            conditions = []
-            for cond in tooth.conditions:
-                if not cond.is_deleted:
-                    conditions.append({
-                        "id": cond.condition_id,
-                        "type": cond.type,
-                        "severity": cond.severity,
-                        "notes": cond.notes,
-                        "date": cstr(cond.date),
-                        "created_at": cstr(cond.creation),
-                        "updated_at": cstr(cond.modified),
-                        "created_by": cond.created_by
-                    })
-                    summary_stats["total_conditions"] += 1
-            
-            # Get non-deleted procedures
-            procedures = []
-            for proc in tooth.procedures:
-                if not proc.is_deleted:
-                    # Get timeline
-                    timeline = []
-                    for tl in proc.timeline:
-                        timeline.append({
-                            "status": tl.status,
-                            "timestamp": cstr(tl.timestamp),
-                            "notes": tl.notes,
-                            "changed_by": tl.changed_by
-                        })
-                    
-                    procedures.append({
-                        "id": proc.procedure_id,
-                        "name": proc.name_of_procedure,
-                        "status": proc.status,
-                        "notes": proc.notes,
-                        "date": cstr(proc.date),
-                        "cost": proc.cost,
-                        "duration_minutes": proc.duration_minutes,
-                        "created_at": cstr(proc.creation),
-                        "updated_at": cstr(proc.modified),
-                        "created_by": proc.created_by,
-                        "timeline": timeline
-                    })
-                    
-                    summary_stats["total_procedures"] += 1
-                    if proc.status == "completed":
-                        summary_stats["completed_procedures"] += 1
-                    elif proc.status == "planned":
-                        summary_stats["planned_procedures"] += 1
-                    elif proc.status == "in-progress":
-                        summary_stats["in_progress_procedures"] += 1
-            
-            # Only include teeth with conditions or procedures
-            if conditions or procedures:
-                teeth_data[tooth_number] = {
-                    "tooth_number": tooth.tooth_number,
-                    "status": tooth.status,
-                    "conditions": sorted(conditions, key=lambda x: x["created_at"], reverse=True),
-                    "procedures": sorted(procedures, key=lambda x: x["created_at"], reverse=True)
+            tooth_num = str(cond.tooth_number)
+            if tooth_num not in teeth_data:
+                teeth_data[tooth_num] = {
+                    "tooth_number": cond.tooth_number,
+                    "status": "healthy",  # Default, will be recalculated later
+                    "conditions": [],
+                    "procedures": []
                 }
-                summary_stats["total_teeth_affected"] += 1
+            
+            # Get history from database
+            history_records = frappe.get_all(
+                "Dental Chart Condition History",
+                filters={"parent": cond.name},
+                fields=["type", "severity", "notes", "timestamp", "updated_by"],
+                order_by="timestamp asc"
+            )
+            
+            history = [
+                {
+                    "type": h.type,
+                    "severity": h.severity,
+                    "notes": h.notes,
+                    "timestamp": cstr(h.timestamp),
+                    "updated_by": h.updated_by
+                }
+                for h in history_records
+            ]
+            
+            teeth_data[tooth_num]["conditions"].append({
+                "name": cond.name,  # Frappe's unique ID
+                "type": cond.type,
+                "severity": cond.severity,
+                "notes": cond.notes,
+                "date": cstr(cond.date),
+                "created_at": cstr(cond.creation),
+                "updated_at": cstr(cond.modified),
+                "created_by": cond.created_by,
+                "history": history
+            })
+            
+            summary_stats["total_conditions"] += 1
+        
+        # Process procedures
+        for proc in chart_doc.procedures:
+            # Skip deleted procedures (check both truthy and explicit 1)
+            if proc.is_deleted or proc.get('is_deleted') == 1:
+                continue
+            
+            tooth_num = str(proc.tooth_number)
+            if tooth_num not in teeth_data:
+                teeth_data[tooth_num] = {
+                    "tooth_number": proc.tooth_number,
+                    "status": "healthy",  # Default, will be recalculated later
+                    "conditions": [],
+                    "procedures": []
+                }
+            
+            # Get timeline from database
+            timeline_records = frappe.get_all(
+                "Dental Chart Procedure Timeline",
+                filters={"parent": proc.name},
+                fields=["status", "timestamp", "notes", "changed_by"],
+                order_by="timestamp asc"
+            )
+            
+            timeline = [
+                {
+                    "status": t.status,
+                    "timestamp": cstr(t.timestamp),
+                    "notes": t.notes,
+                    "changed_by": t.changed_by
+                }
+                for t in timeline_records
+            ]
+            
+            teeth_data[tooth_num]["procedures"].append({
+                "name": proc.name,  # Frappe's unique ID
+                "procedure_name": proc.name_of_procedure,
+                "status": proc.status,
+                "notes": proc.notes,
+                "date": cstr(proc.date),
+                "cost": proc.cost,
+                "duration_minutes": proc.duration_minutes,
+                "created_at": cstr(proc.creation),
+                "updated_at": cstr(proc.modified),
+                "created_by": proc.created_by,
+                "timeline": timeline
+            })
+            
+            summary_stats["total_procedures"] += 1
+            if proc.status == "completed":
+                summary_stats["completed_procedures"] += 1
+            elif proc.status == "planned":
+                summary_stats["planned_procedures"] += 1
+            elif proc.status == "in-progress":
+                summary_stats["in_progress_procedures"] += 1
+        
+        # Calculate tooth status based on procedures and conditions
+        for tooth_num, tooth_data in teeth_data.items():
+            status = "healthy"
+            
+            # Check procedures first (higher priority)
+            if tooth_data["procedures"]:
+                for proc in tooth_data["procedures"]:
+                    if proc["status"] == "in-progress":
+                        status = "in-treatment"
+                        break
+                    elif proc["status"] == "planned":
+                        status = "in-treatment"
+                        break
+                    elif proc["status"] == "completed":
+                        # If procedure completed but still has conditions, mark as has-condition
+                        if tooth_data["conditions"]:
+                            status = "has-condition"
+                        else:
+                            status = "treated"
+            
+            # If no active procedures but has conditions
+            if status == "healthy" and tooth_data["conditions"]:
+                status = "has-condition"
+            
+            tooth_data["status"] = status
+        
+        summary_stats["total_teeth_affected"] = len(teeth_data)
         
         return {
             "message": "Dental chart retrieved successfully",
@@ -152,867 +723,6 @@ def get_dental_chart(patient_id, chart_type=None):
         }
 
 
-@frappe.whitelist(methods=['POST'])
-def save_dental_chart(patient_id, chart_type="adult", teeth_data=None):
-    """
-    Saves complete dental chart data
-    
-    Args:
-        patient_id (str): Patient ID
-        chart_type (str): Chart type
-        teeth_data (dict): Teeth data to save
-        
-    Returns:
-        dict: Save status with statistics
-    """
-    try:
-        # Validate patient
-        if not frappe.db.exists("Patient", patient_id):
-            frappe.local.response["http_status_code"] = 404
-            return {
-                "exc_type": "NotFound",
-                "message": f"Patient {patient_id} not found"
-            }
-        
-        # Parse teeth_data if string
-        if isinstance(teeth_data, str):
-            teeth_data = json.loads(teeth_data)
-        
-        if not teeth_data:
-            teeth_data = {}
-        
-        # Get or create dental chart
-        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
-        
-        if chart_name:
-            chart = frappe.get_doc("Dental Chart", chart_name)
-        else:
-            chart = frappe.new_doc("Dental Chart")
-            chart.patient = patient_id
-            chart.chart_type = chart_type
-        
-        # Track changes
-        updated_teeth = []
-        new_conditions = 0
-        new_procedures = 0
-        updated_procedures = 0
-        
-        # Process each tooth
-        for tooth_number, tooth_data in teeth_data.items():
-            tooth_number = int(tooth_number)
-            
-            # Find or create tooth record
-            tooth_doc = None
-            for t in chart.teeth:
-                if t.tooth_number == tooth_number:
-                    tooth_doc = t
-                    break
-            
-            if not tooth_doc:
-                tooth_doc = chart.append("teeth", {})
-                tooth_doc.tooth_number = tooth_number
-            
-            # Update tooth status
-            tooth_doc.status = tooth_data.get("status", "healthy")
-            
-            # Process conditions
-            if "conditions" in tooth_data:
-                for cond_data in tooth_data["conditions"]:
-                    if cond_data.get("id"):
-                        # Update existing condition
-                        for cond in tooth_doc.conditions:
-                            if cond.condition_id == cond_data["id"]:
-                                cond.type = cond_data.get("type", cond.type)
-                                cond.severity = cond_data.get("severity", cond.severity)
-                                cond.notes = cond_data.get("notes", cond.notes)
-                                cond.date = cond_data.get("date", cond.date)
-                                break
-                    else:
-                        # Create new condition
-                        condition_id = generate_condition_id(patient_id, tooth_number)
-                        tooth_doc.append("conditions", {
-                            "condition_id": condition_id,
-                            "type": cond_data["type"],
-                            "severity": cond_data.get("severity"),
-                            "notes": cond_data.get("notes"),
-                            "date": cond_data.get("date", nowdate()),
-                            "created_by": frappe.session.user
-                        })
-                        new_conditions += 1
-            
-            # Process procedures
-            if "procedures" in tooth_data:
-                for proc_data in tooth_data["procedures"]:
-                    if proc_data.get("id"):
-                        # Update existing procedure
-                        for proc in tooth_doc.procedures:
-                            if proc.procedure_id == proc_data["id"]:
-                                old_status = proc.status
-                                proc.name_of_procedure = proc_data.get("name", proc.name_of_procedure)
-                                proc.status = proc_data.get("status", proc.status)
-                                proc.notes = proc_data.get("notes", proc.notes)
-                                proc.date = proc_data.get("date", proc.date)
-                                proc.cost = proc_data.get("cost", proc.cost)
-                                proc.duration_minutes = proc_data.get("duration_minutes", proc.duration_minutes)
-                                
-                                # Add timeline entry if status changed
-                                if old_status != proc.status:
-                                    proc.append("timeline", {
-                                        "status": proc.status,
-                                        "timestamp": now_datetime(),
-                                        "notes": proc_data.get("notes", ""),
-                                        "changed_by": frappe.session.user
-                                    })
-                                
-                                updated_procedures += 1
-                                break
-                    else:
-                        # Create new procedure
-                        procedure_id = generate_procedure_id(patient_id, tooth_number)
-                        new_proc = tooth_doc.append("procedures", {
-                            "procedure_id": procedure_id,
-                            "name_of_procedure": proc_data["name"],
-                            "status": proc_data.get("status", "planned"),
-                            "notes": proc_data.get("notes"),
-                            "date": proc_data.get("date", nowdate()),
-                            "cost": proc_data.get("cost"),
-                            "duration_minutes": proc_data.get("duration_minutes"),
-                            "created_by": frappe.session.user
-                        })
-                        
-                        # Add initial timeline entry
-                        new_proc.append("timeline", {
-                            "status": proc_data.get("status", "planned"),
-                            "timestamp": now_datetime(),
-                            "notes": proc_data.get("notes", ""),
-                            "changed_by": frappe.session.user
-                        })
-                        
-                        new_procedures += 1
-            
-            # Recalculate tooth status
-            tooth_doc.status = calculate_tooth_status(tooth_doc)
-            
-            if tooth_number not in updated_teeth:
-                updated_teeth.append(tooth_number)
-        
-        # Save chart
-        if chart.is_new():
-            chart.insert(ignore_permissions=True)
-        else:
-            chart.save(ignore_permissions=True)
-        
-        frappe.db.commit()
-        
-        return {
-            "message": "Dental chart saved successfully",
-            "data": {
-                "patient_id": patient_id,
-                "updated_teeth": updated_teeth,
-                "new_conditions": new_conditions,
-                "new_procedures": new_procedures,
-                "updated_procedures": updated_procedures
-            }
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Save Dental Chart Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error saving dental chart: {str(e)}"
-        }
-
-
-# ============================================================================
-# CONDITION MANAGEMENT
-# ============================================================================
-
-@frappe.whitelist(methods=['POST'])
-def add_condition(patient_id, tooth_numbers, condition):
-    """
-    Adds a condition to one or multiple teeth
-    
-    Args:
-        patient_id (str): Patient ID
-        tooth_numbers (list): List of tooth numbers
-        condition (dict): Condition data
-        
-    Returns:
-        dict: Created condition IDs
-    """
-    try:
-        # Parse parameters
-        if isinstance(tooth_numbers, str):
-            tooth_numbers = json.loads(tooth_numbers)
-        if isinstance(condition, str):
-            condition = json.loads(condition)
-        
-        # Validate
-        if not tooth_numbers:
-            frappe.local.response["http_status_code"] = 400
-            return {
-                "exc_type": "ValidationError",
-                "message": "Tooth numbers are required"
-            }
-        
-        # Get or create chart
-        chart = get_or_create_chart(patient_id)
-        
-        condition_ids = []
-        
-        for tooth_number in tooth_numbers:
-            tooth_number = int(tooth_number)
-            
-            # Validate tooth number
-            if not is_valid_tooth_number(tooth_number):
-                continue
-            
-            # Find or create tooth
-            tooth_doc = None
-            for t in chart.teeth:
-                if t.tooth_number == tooth_number:
-                    tooth_doc = t
-                    break
-            
-            if not tooth_doc:
-                tooth_doc = chart.append("teeth", {})
-                tooth_doc.tooth_number = tooth_number
-                tooth_doc.status = "healthy"
-            
-            # Generate condition ID
-            condition_id = generate_condition_id(patient_id, tooth_number)
-            
-            # Add condition
-            tooth_doc.append("conditions", {
-                "condition_id": condition_id,
-                "type": condition["type"],
-                "severity": condition.get("severity"),
-                "notes": condition.get("notes"),
-                "date": condition.get("date", nowdate()),
-                "created_by": frappe.session.user
-            })
-            
-            # Update tooth status
-            tooth_doc.status = calculate_tooth_status(tooth_doc)
-            
-            condition_ids.append(condition_id)
-        
-        chart.save(ignore_permissions=True)
-        frappe.db.commit()
-        
-        return {
-            "message": "Condition added successfully",
-            "data": {
-                "condition_ids": condition_ids,
-                "affected_teeth": tooth_numbers
-            }
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Add Condition Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error adding condition: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['POST'])
-def update_condition(patient_id, tooth_number, condition_id, updates):
-    """
-    Updates an existing tooth condition
-    """
-    try:
-        # Parse parameters
-        if isinstance(updates, str):
-            updates = json.loads(updates)
-        
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart = get_or_create_chart(patient_id)
-        
-        # Find tooth and condition
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for cond in tooth.conditions:
-                    if cond.condition_id == condition_id:
-                        # Update fields
-                        if "severity" in updates:
-                            cond.severity = updates["severity"]
-                        if "notes" in updates:
-                            cond.notes = updates["notes"]
-                        if "type" in updates:
-                            cond.type = updates["type"]
-                        if "date" in updates:
-                            cond.date = updates["date"]
-                        
-                        chart.save(ignore_permissions=True)
-                        frappe.db.commit()
-                        
-                        return {
-                            "message": "Condition updated successfully",
-                            "data": {
-                                "condition_id": condition_id,
-                                "tooth_number": tooth_number,
-                                "updated_at": cstr(now_datetime())
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Condition not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Update Condition Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error updating condition: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['POST', 'DELETE'])
-def remove_condition(patient_id, tooth_number, condition_id, reason=None):
-    """
-    Soft deletes a condition
-    """
-    try:
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart = get_or_create_chart(patient_id)
-        
-        # Find tooth and condition
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for cond in tooth.conditions:
-                    if cond.condition_id == condition_id:
-                        # Soft delete
-                        cond.is_deleted = 1
-                        cond.deleted_at = now_datetime()
-                        cond.deleted_by = frappe.session.user
-                        cond.deletion_reason = reason
-                        
-                        # Recalculate tooth status
-                        tooth.status = calculate_tooth_status(tooth)
-                        
-                        chart.save(ignore_permissions=True)
-                        frappe.db.commit()
-                        
-                        return {
-                            "message": "Condition removed successfully",
-                            "data": {
-                                "condition_id": condition_id,
-                                "tooth_number": tooth_number,
-                                "removed_at": cstr(now_datetime()),
-                                "audit_log_created": True
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Condition not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Remove Condition Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error removing condition: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['GET'])
-def get_condition_types():
-    """
-    Returns list of available condition types
-    """
-    try:
-        condition_types = [
-            {
-                "value": "cavity",
-                "label": "Cavity",
-                "description": "Tooth decay or dental caries",
-                "severity_options": ["mild", "moderate", "severe"]
-            },
-            {
-                "value": "crown",
-                "label": "Crown",
-                "description": "Dental crown placement",
-                "severity_options": None
-            },
-            {
-                "value": "bridge",
-                "label": "Bridge",
-                "description": "Dental bridge",
-                "severity_options": None
-            },
-            {
-                "value": "implant",
-                "label": "Implant",
-                "description": "Dental implant",
-                "severity_options": None
-            },
-            {
-                "value": "root-canal",
-                "label": "Root Canal",
-                "description": "Root canal treatment needed",
-                "severity_options": ["mild", "moderate", "severe"]
-            },
-            {
-                "value": "extraction",
-                "label": "Extraction",
-                "description": "Tooth extraction needed",
-                "severity_options": None
-            },
-            {
-                "value": "filling",
-                "label": "Filling",
-                "description": "Dental filling",
-                "severity_options": None
-            },
-            {
-                "value": "fracture",
-                "label": "Fracture",
-                "description": "Tooth fracture",
-                "severity_options": ["mild", "moderate", "severe"]
-            },
-            {
-                "value": "abscess",
-                "label": "Abscess",
-                "description": "Dental abscess",
-                "severity_options": ["mild", "moderate", "severe"]
-            },
-            {
-                "value": "other",
-                "label": "Other",
-                "description": "Other condition",
-                "severity_options": None
-            }
-        ]
-        
-        return {
-            "message": "Condition types retrieved successfully",
-            "data": condition_types
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Get Condition Types Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error retrieving condition types: {str(e)}"
-        }
-
-
-# ============================================================================
-# PROCEDURE MANAGEMENT
-# ============================================================================
-
-@frappe.whitelist(methods=['POST'])
-def add_procedure(patient_id, tooth_numbers, procedure):
-    """
-    Adds a procedure to one or multiple teeth
-    """
-    try:
-        # Parse parameters
-        if isinstance(tooth_numbers, str):
-            tooth_numbers = json.loads(tooth_numbers)
-        if isinstance(procedure, str):
-            procedure = json.loads(procedure)
-        
-        # Get or create chart
-        chart = get_or_create_chart(patient_id)
-        
-        procedure_ids = []
-        
-        for tooth_number in tooth_numbers:
-            tooth_number = int(tooth_number)
-            
-            # Find or create tooth
-            tooth_doc = None
-            for t in chart.teeth:
-                if t.tooth_number == tooth_number:
-                    tooth_doc = t
-                    break
-            
-            if not tooth_doc:
-                tooth_doc = chart.append("teeth", {})
-                tooth_doc.tooth_number = tooth_number
-                tooth_doc.status = "healthy"
-            
-            # Generate procedure ID
-            procedure_id = generate_procedure_id(patient_id, tooth_number)
-            
-            # Add procedure
-            new_proc = tooth_doc.append("procedures", {
-                "procedure_id": procedure_id,
-                "name_of_procedure": procedure["name"],
-                "status": procedure.get("status", "planned"),
-                "notes": procedure.get("notes"),
-                "date": procedure.get("date", nowdate()),
-                "cost": procedure.get("cost"),
-                "duration_minutes": procedure.get("duration_minutes"),
-                "created_by": frappe.session.user
-            })
-            
-            # Add initial timeline entry
-            new_proc.append("timeline", {
-                "status": procedure.get("status", "planned"),
-                "timestamp": now_datetime(),
-                "notes": procedure.get("notes", ""),
-                "changed_by": frappe.session.user
-            })
-            
-            # Update tooth status
-            tooth_doc.status = calculate_tooth_status(tooth_doc)
-            
-            procedure_ids.append(procedure_id)
-        
-        chart.save(ignore_permissions=True)
-        frappe.db.commit()
-        
-        return {
-            "message": "Procedure added successfully",
-            "data": {
-                "procedure_ids": procedure_ids,
-                "affected_teeth": tooth_numbers,
-                "timeline_created": True
-            }
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Add Procedure Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error adding procedure: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['POST'])
-def update_procedure_status(patient_id, tooth_number, procedure_id, status, notes=None, cost=None):
-    """
-    Updates procedure status and adds timeline entry
-    """
-    try:
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart = get_or_create_chart(patient_id)
-        
-        # Find tooth and procedure
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for proc in tooth.procedures:
-                    if proc.procedure_id == procedure_id:
-                        old_status = proc.status
-                        timeline_entry_added = False
-                        
-                        # Update status
-                        proc.status = status
-                        if notes:
-                            proc.notes = notes
-                        if cost:
-                            proc.cost = cost
-                        
-                        # Add timeline entry if status changed
-                        if old_status != status:
-                            proc.append("timeline", {
-                                "status": status,
-                                "timestamp": now_datetime(),
-                                "notes": notes or "",
-                                "changed_by": frappe.session.user
-                            })
-                            timeline_entry_added = True
-                        
-                        # Recalculate tooth status
-                        tooth.status = calculate_tooth_status(tooth)
-                        
-                        chart.save(ignore_permissions=True)
-                        frappe.db.commit()
-                        
-                        return {
-                            "message": "Procedure status updated successfully",
-                            "data": {
-                                "procedure_id": procedure_id,
-                                "tooth_number": tooth_number,
-                                "old_status": old_status,
-                                "new_status": status,
-                                "timeline_entry_added": timeline_entry_added,
-                                "updated_at": cstr(now_datetime()),
-                                "tooth_status_updated": tooth.status
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Procedure not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Update Procedure Status Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error updating procedure status: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['POST'])
-def update_procedure(patient_id, tooth_number, procedure_id, updates):
-    """
-    Updates procedure details without changing status
-    """
-    try:
-        # Parse parameters
-        if isinstance(updates, str):
-            updates = json.loads(updates)
-        
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart = get_or_create_chart(patient_id)
-        
-        # Find tooth and procedure
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for proc in tooth.procedures:
-                    if proc.procedure_id == procedure_id:
-                        # Update fields
-                        if "name" in updates:
-                            proc.name_of_procedure = updates["name"]
-                        if "notes" in updates:
-                            proc.notes = updates["notes"]
-                        if "cost" in updates:
-                            proc.cost = updates["cost"]
-                        if "duration_minutes" in updates:
-                            proc.duration_minutes = updates["duration_minutes"]
-                        if "date" in updates:
-                            proc.date = updates["date"]
-                        
-                        chart.save(ignore_permissions=True)
-                        frappe.db.commit()
-                        
-                        return {
-                            "message": "Procedure updated successfully",
-                            "data": {
-                                "procedure_id": procedure_id,
-                                "tooth_number": tooth_number,
-                                "updated_at": cstr(now_datetime())
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Procedure not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Update Procedure Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error updating procedure: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['POST', 'DELETE'])
-def remove_procedure(patient_id, tooth_number, procedure_id, reason=None):
-    """
-    Soft deletes a procedure
-    """
-    try:
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart = get_or_create_chart(patient_id)
-        
-        # Find tooth and procedure
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for proc in tooth.procedures:
-                    if proc.procedure_id == procedure_id:
-                        # Soft delete
-                        proc.is_deleted = 1
-                        proc.deleted_at = now_datetime()
-                        proc.deleted_by = frappe.session.user
-                        proc.deletion_reason = reason
-                        
-                        # Recalculate tooth status
-                        tooth.status = calculate_tooth_status(tooth)
-                        
-                        chart.save(ignore_permissions=True)
-                        frappe.db.commit()
-                        
-                        return {
-                            "message": "Procedure removed successfully",
-                            "data": {
-                                "procedure_id": procedure_id,
-                                "tooth_number": tooth_number,
-                                "removed_at": cstr(now_datetime()),
-                                "audit_log_created": True
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Procedure not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Remove Procedure Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error removing procedure: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['GET'])
-def get_procedure_timeline(patient_id, tooth_number, procedure_id):
-    """
-    Retrieves complete timeline history for a specific procedure
-    """
-    try:
-        tooth_number = int(tooth_number)
-        
-        # Get chart
-        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
-        if not chart_name:
-            frappe.local.response["http_status_code"] = 404
-            return {
-                "exc_type": "NotFound",
-                "message": "Dental chart not found"
-            }
-        
-        chart = frappe.get_doc("Dental Chart", chart_name)
-        
-        # Find tooth and procedure
-        for tooth in chart.teeth:
-            if tooth.tooth_number == tooth_number:
-                for proc in tooth.procedures:
-                    if proc.procedure_id == procedure_id:
-                        # Build timeline
-                        timeline = []
-                        for tl in proc.timeline:
-                            timeline.append({
-                                "status": tl.status,
-                                "timestamp": cstr(tl.timestamp),
-                                "notes": tl.notes,
-                                "changed_by": tl.changed_by
-                            })
-                        
-                        # Sort by timestamp
-                        timeline.sort(key=lambda x: x["timestamp"])
-                        
-                        return {
-                            "message": "Procedure timeline retrieved successfully",
-                            "data": {
-                                "procedure_id": procedure_id,
-                                "procedure_name": proc.name_of_procedure,
-                                "tooth_number": tooth_number,
-                                "current_status": proc.status,
-                                "timeline": timeline,
-                                "total_sessions": len(timeline)
-                            }
-                        }
-        
-        frappe.local.response["http_status_code"] = 404
-        return {
-            "exc_type": "NotFound",
-            "message": "Procedure not found"
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Get Procedure Timeline Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error retrieving procedure timeline: {str(e)}"
-        }
-
-
-@frappe.whitelist(methods=['GET'])
-def get_procedure_types():
-    """
-    Returns list of common dental procedures
-    """
-    try:
-        procedure_types = [
-            {
-                "name": "Cleaning",
-                "default_cost": 500,
-                "default_duration": 30,
-                "description": "Regular dental cleaning"
-            },
-            {
-                "name": "Filling",
-                "default_cost": 1500,
-                "default_duration": 45,
-                "description": "Dental filling"
-            },
-            {
-                "name": "Root Canal Treatment",
-                "default_cost": 3000,
-                "default_duration": 90,
-                "description": "Endodontic treatment"
-            },
-            {
-                "name": "Crown",
-                "default_cost": 5000,
-                "default_duration": 60,
-                "description": "Dental crown placement"
-            },
-            {
-                "name": "Extraction",
-                "default_cost": 2000,
-                "default_duration": 30,
-                "description": "Tooth extraction"
-            },
-            {
-                "name": "Bridge",
-                "default_cost": 8000,
-                "default_duration": 90,
-                "description": "Dental bridge"
-            },
-            {
-                "name": "Implant",
-                "default_cost": 15000,
-                "default_duration": 120,
-                "description": "Dental implant"
-            },
-            {
-                "name": "Whitening",
-                "default_cost": 3000,
-                "default_duration": 60,
-                "description": "Teeth whitening"
-            }
-        ]
-        
-        return {
-            "message": "Procedure types retrieved successfully",
-            "data": procedure_types
-        }
-        
-    except Exception as e:
-        frappe.log_error(str(e), "Get Procedure Types Error")
-        frappe.local.response["http_status_code"] = 500
-        return {
-            "exc_type": "ServerError",
-            "message": f"Error retrieving procedure types: {str(e)}"
-        }
-
-
 # ============================================================================
 # REPORTING & ANALYTICS
 # ============================================================================
@@ -1029,6 +739,12 @@ def get_chart_summary(patient_id):
             return chart_response
         
         chart_data = chart_response["data"]
+        if not chart_data:
+             return {
+                "message": "No dental chart found",
+                "data": None
+            }
+
         teeth_data = chart_data["teeth"]
         
         # Get patient info
@@ -1071,9 +787,13 @@ def get_chart_summary(patient_id):
         
         for tooth_num, tooth_data in teeth_data.items():
             for proc in tooth_data["procedures"]:
-                procedures_by_status[proc["status"]].append({
+                status = proc.get("status", "planned")
+                if status not in procedures_by_status:
+                    procedures_by_status[status] = []
+                    
+                procedures_by_status[status].append({
                     "tooth_number": int(tooth_num),
-                    "procedure": proc["name"],
+                    "procedure": proc["procedure_name"],
                     "cost": proc.get("cost", 0),
                     "date": proc["date"]
                 })
@@ -1095,7 +815,7 @@ def get_chart_summary(patient_id):
                     "date": proc["date"],
                     "tooth_number": int(tooth_num),
                     "type": "procedure",
-                    "details": f"{proc['name']} - {proc['status'].replace('-', ' ').title()}",
+                    "details": f"{proc['procedure_name']} - {proc['status'].replace('-', ' ').title()}",
                     "timestamp": proc["created_at"]
                 })
         
@@ -1212,6 +932,12 @@ def get_treatment_progress(patient_id, from_date=None, to_date=None):
             return chart_response
         
         chart_data = chart_response["data"]
+        if not chart_data:
+             return {
+                "message": "No dental chart found",
+                "data": None
+            }
+            
         teeth_data = chart_data["teeth"]
         
         # Calculate completion percentage
@@ -1229,7 +955,7 @@ def get_treatment_progress(patient_id, from_date=None, to_date=None):
                 if proc["status"] in ["planned", "in-progress"]:
                     upcoming_procedures.append({
                         "tooth_number": int(tooth_num),
-                        "procedure": proc["name"],
+                        "procedure": proc["procedure_name"],
                         "scheduled_date": proc["date"],
                         "estimated_cost": proc.get("cost", 0),
                         "status": proc["status"]
@@ -1257,6 +983,137 @@ def get_treatment_progress(patient_id, from_date=None, to_date=None):
         return {
             "exc_type": "ServerError",
             "message": f"Error retrieving treatment progress: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['GET'])
+def get_condition_history(patient_id, condition_name):
+    """
+    Retrieves complete history for a specific condition
+    """
+    try:
+        # Get chart
+        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+        if not chart_name:
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": "Dental chart not found"
+            }
+        
+        chart = frappe.get_doc("Dental Chart", chart_name)
+        
+        # Find condition in chart.conditions
+        for cond in chart.conditions:
+            if cond.name == condition_name:
+                # Build history
+                history = []
+                # Fetch history from DB
+                history_records = frappe.get_all(
+                    "Dental Chart Condition History",
+                    filters={"parent": cond.name},
+                    fields=["type", "severity", "notes", "timestamp", "updated_by"],
+                    order_by="timestamp asc"
+                )
+                
+                for hist in history_records:
+                    history.append({
+                        "type": hist.type,
+                        "severity": hist.severity,
+                        "notes": hist.notes,
+                        "timestamp": cstr(hist.timestamp),
+                        "updated_by": hist.updated_by
+                    })
+                
+                return {
+                    "message": "Condition history retrieved successfully",
+                    "data": {
+                        "condition_name": condition_name,
+                        "tooth_number": cond.tooth_number,
+                        "current_type": cond.type,
+                        "current_severity": cond.severity,
+                        "history": history,
+                        "total_updates": len(history)
+                    }
+                }
+        
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "NotFound",
+            "message": "Condition not found"
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Get Condition History Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error retrieving condition history: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['GET'])
+def get_procedure_timeline(patient_id, procedure_name):
+    """
+    Retrieves complete timeline history for a specific procedure
+    """
+    try:
+        # Get chart
+        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+        if not chart_name:
+            frappe.local.response["http_status_code"] = 404
+            return {
+                "exc_type": "NotFound",
+                "message": "Dental chart not found"
+            }
+        
+        chart = frappe.get_doc("Dental Chart", chart_name)
+        
+        # Find procedure in chart.procedures
+        for proc in chart.procedures:
+            if proc.name == procedure_name:
+                # Build timeline
+                timeline = []
+                # Fetch timeline from DB
+                timeline_records = frappe.get_all(
+                    "Dental Chart Procedure Timeline",
+                    filters={"parent": proc.name},
+                    fields=["status", "timestamp", "notes", "changed_by"],
+                    order_by="timestamp asc"
+                )
+                
+                for tl in timeline_records:
+                    timeline.append({
+                        "status": tl.status,
+                        "timestamp": cstr(tl.timestamp),
+                        "notes": tl.notes,
+                        "changed_by": tl.changed_by
+                    })
+                
+                return {
+                    "message": "Procedure timeline retrieved successfully",
+                    "data": {
+                        "procedure_name": procedure_name,
+                        "procedure_label": proc.name_of_procedure,
+                        "tooth_number": proc.tooth_number,
+                        "current_status": proc.status,
+                        "timeline": timeline,
+                        "total_sessions": len(timeline)
+                    }
+                }
+        
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "NotFound",
+            "message": "Procedure not found"
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Get Procedure Timeline Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error retrieving procedure timeline: {str(e)}"
         }
 
 
@@ -1359,99 +1216,248 @@ def get_tooth_status_options():
         }
 
 
+@frappe.whitelist(methods=['GET'])
+def get_condition_types():
+    """
+    Returns list of available condition types
+    """
+    try:
+        condition_types = [
+            {
+                "value": "cavity",
+                "label": "Cavity",
+                "description": "Tooth decay or dental caries",
+                "severity_options": ["mild", "moderate", "severe"]
+            },
+            {
+                "value": "crown",
+                "label": "Crown",
+                "description": "Dental crown placement",
+                "severity_options": None
+            },
+            {
+                "value": "bridge",
+                "label": "Bridge",
+                "description": "Dental bridge",
+                "severity_options": None
+            },
+            {
+                "value": "implant",
+                "label": "Implant",
+                "description": "Dental implant",
+                "severity_options": None
+            },
+            {
+                "value": "root-canal",
+                "label": "Root Canal",
+                "description": "Root canal treatment needed",
+                "severity_options": ["mild", "moderate", "severe"]
+            },
+            {
+                "value": "extraction",
+                "label": "Extraction",
+                "description": "Tooth extraction needed",
+                "severity_options": None
+            },
+            {
+                "value": "filling",
+                "label": "Filling",
+                "description": "Dental filling",
+                "severity_options": None
+            },
+            {
+                "value": "fracture",
+                "label": "Fracture",
+                "description": "Tooth fracture",
+                "severity_options": ["mild", "moderate", "severe"]
+            },
+            {
+                "value": "abscess",
+                "label": "Abscess",
+                "description": "Dental abscess",
+                "severity_options": ["mild", "moderate", "severe"]
+            },
+            {
+                "value": "other",
+                "label": "Other",
+                "description": "Other condition",
+                "severity_options": None
+            }
+        ]
+        
+        return {
+            "message": "Condition types retrieved successfully",
+            "data": condition_types
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Get Condition Types Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error retrieving condition types: {str(e)}"
+        }
+
+
+@frappe.whitelist(methods=['GET'])
+def get_procedure_types():
+    """
+    Returns list of common dental procedures
+    """
+    try:
+        procedure_types = [
+            {
+                "name": "Cleaning",
+                "default_cost": 500,
+                "default_duration": 30,
+                "description": "Regular dental cleaning"
+            },
+            {
+                "name": "Filling",
+                "default_cost": 1500,
+                "default_duration": 45,
+                "description": "Dental filling"
+            },
+            {
+                "name": "Root Canal Treatment",
+                "default_cost": 3000,
+                "default_duration": 90,
+                "description": "Endodontic treatment"
+            },
+            {
+                "name": "Crown",
+                "default_cost": 5000,
+                "default_duration": 60,
+                "description": "Dental crown placement"
+            },
+            {
+                "name": "Extraction",
+                "default_cost": 2000,
+                "default_duration": 30,
+                "description": "Tooth extraction"
+            },
+            {
+                "name": "Bridge",
+                "default_cost": 8000,
+                "default_duration": 90,
+                "description": "Dental bridge"
+            },
+            {
+                "name": "Implant",
+                "default_cost": 15000,
+                "default_duration": 120,
+                "description": "Dental implant"
+            },
+            {
+                "name": "Whitening",
+                "default_cost": 3000,
+                "default_duration": 60,
+                "description": "Teeth whitening"
+            }
+        ]
+        
+        return {
+            "message": "Procedure types retrieved successfully",
+            "data": procedure_types
+        }
+        
+    except Exception as e:
+        frappe.log_error(str(e), "Get Procedure Types Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": f"Error retrieving procedure types: {str(e)}"
+        }
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
-def get_or_create_chart(patient_id, chart_type="adult"):
-    """Get existing or create new dental chart"""
+def get_or_create_chart(patient_id):
+    """Get existing chart or create new one"""
     chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
     
     if chart_name:
         return frappe.get_doc("Dental Chart", chart_name)
-    else:
-        chart = frappe.new_doc("Dental Chart")
-        chart.patient = patient_id
-        chart.chart_type = chart_type
-        chart.insert(ignore_permissions=True)
-        return chart
-
-
-def generate_condition_id(patient_id, tooth_number):
-    """Generate unique condition ID"""
-    # Count existing conditions for this tooth
-    chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
-    if not chart_name:
-        return f"COND-{tooth_number}-001"
     
-    chart = frappe.get_doc("Dental Chart", chart_name)
-    count = 0
+    # Create new chart
+    chart = frappe.get_doc({
+        "doctype": "Dental Chart",
+        "patient": patient_id,
+        "chart_type": "adult"
+    })
+    chart.insert(ignore_permissions=True)
+    frappe.db.commit()
     
-    for tooth in chart.teeth:
-        if tooth.tooth_number == tooth_number:
-            count = len([c for c in tooth.conditions if not c.is_deleted])
-            break
-    
-    sequence = count + 1
-    return f"COND-{tooth_number}-{sequence:03d}"
-
-
-def generate_procedure_id(patient_id, tooth_number):
-    """Generate unique procedure ID"""
-    # Count existing procedures for this tooth
-    chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
-    if not chart_name:
-        return f"PROC-{tooth_number}-001"
-    
-    chart = frappe.get_doc("Dental Chart", chart_name)
-    count = 0
-    
-    for tooth in chart.teeth:
-        if tooth.tooth_number == tooth_number:
-            count = len([p for p in tooth.procedures if not p.is_deleted])
-            break
-    
-    sequence = count + 1
-    return f"PROC-{tooth_number}-{sequence:03d}"
-
-
-def calculate_tooth_status(tooth_doc):
-    """
-    Calculate tooth status based on conditions and procedures
-    
-    Priority order:
-    1. Any completed procedure → "treated"
-    2. Any in-progress or planned procedure → "in-treatment"
-    3. Any condition exists → "has-condition"
-    4. Otherwise → "healthy"
-    """
-    # Get non-deleted procedures
-    procedures = [p for p in tooth_doc.procedures if not p.is_deleted]
-    
-    # Check procedures first
-    if any(p.status == "completed" for p in procedures):
-        return "treated"
-    
-    if any(p.status in ["in-progress", "planned"] for p in procedures):
-        return "in-treatment"
-    
-    # Check conditions
-    conditions = [c for c in tooth_doc.conditions if not c.is_deleted]
-    if len(conditions) > 0:
-        return "has-condition"
-    
-    return "healthy"
+    return chart
 
 
 def is_valid_tooth_number(tooth_number):
-    """Validate tooth number"""
-    # Adult teeth: 11-48
-    adult_teeth = list(range(11, 49))
+    """Validate tooth number (1-32 for adult, 51-85 for child)"""
+    return (1 <= tooth_number <= 32) or (51 <= tooth_number <= 85)
+
+
+def update_tooth_status(chart, tooth_numbers):
+    """Update status for specified teeth based on conditions and procedures"""
+    for tooth_num in tooth_numbers:
+        # Check if tooth has active conditions
+        has_condition = any(
+            c.tooth_number == tooth_num and not c.is_deleted
+            for c in chart.conditions
+        )
+        
+        # Check if tooth has active procedures
+        has_procedure = any(
+            p.tooth_number == tooth_num and not p.is_deleted
+            for p in chart.procedures
+        )
+        
+        # Determine status
+        if has_condition and has_procedure:
+            status = "in-treatment"
+        elif has_condition:
+            status = "has-condition"
+        elif has_procedure:
+            status = "in-treatment"
+        else:
+            status = "healthy"
+        
+        # Update or create tooth record
+        tooth_found = False
+        for tooth in chart.teeth:
+            if tooth.tooth_number == tooth_num:
+                tooth.status = status
+                tooth_found = True
+                break
+        
+        if not tooth_found:
+            chart.append("teeth", {
+                "tooth_number": tooth_num,
+                "status": status
+            })
     
-    # Pediatric teeth
-    pediatric_teeth = [51, 52, 53, 54, 55, 61, 62, 63, 64, 65,
-                      71, 72, 73, 74, 75, 81, 82, 83, 84, 85]
+    chart.save(ignore_permissions=True)
+    frappe.db.commit()
+
+
+def calculate_tooth_status(chart, tooth_number):
+    """Calculate tooth status (kept for backwards compatibility)"""
+    has_condition = any(
+        c.tooth_number == tooth_number and not c.is_deleted
+        for c in chart.conditions
+    )
     
-    valid_teeth = adult_teeth + pediatric_teeth
+    has_procedure = any(
+        p.tooth_number == tooth_number and not p.is_deleted
+        for p in chart.procedures
+    )
     
-    return tooth_number in valid_teeth
+    if has_condition and has_procedure:
+        return "in-treatment"
+    elif has_condition:
+        return "has-condition"
+    elif has_procedure:
+        return "in-treatment"
+    else:
+        return "healthy"

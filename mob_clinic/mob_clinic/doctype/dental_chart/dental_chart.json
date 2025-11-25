@@ -8,7 +8,9 @@
  "field_order": [
   "patient",
   "chart_type",
-  "teeth"
+  "teeth",
+  "conditions",
+  "procedures"
  ],
  "fields": [
   {
@@ -33,6 +35,18 @@
    "fieldtype": "Table",
    "label": "Teeth",
    "options": "Dental Chart Tooth"
+  },
+  {
+   "fieldname": "conditions",
+   "fieldtype": "Table",
+   "label": "Conditions",
+   "options": "Dental Chart Condition"
+  },
+  {
+   "fieldname": "procedures",
+   "fieldtype": "Table",
+   "label": "Procedures",
+   "options": "Dental Chart Procedure"
   }
  ],
  "index_web_pages_for_search": 1,
