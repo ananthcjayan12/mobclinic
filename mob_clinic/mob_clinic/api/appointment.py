@@ -53,7 +53,10 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
             fields=[
                 "name", "patient", "patient_name", "appointment_date", 
                 "appointment_time", "duration", "status", "appointment_type",
-                "chief_complaint", "notes", "invoiced", "paid_amount"
+                "chief_complaint", "notes", "invoiced", "paid_amount",
+                "check_in_time", "start_time", "end_time", "payment_time",
+                "review_requested", "review_requested_time", "invoice_id", "invoice_status",
+                "practitioner", "practitioner_name"
             ],
             filters=query_filters,
             limit_start=limit_start,
@@ -186,40 +189,69 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
                 "message": "Missing required fields: patient_id, appointment_date, appointment_time"
             }
         
-        # Get current practitioner
-        practitioner = get_current_practitioner()
-        if not practitioner:
-            frappe.local.response["http_status_code"] = 403
+        # Get practitioner (either from kwargs or current user)
+        practitioner_id = kwargs.get("practitioner")
+        if practitioner_id:
+            practitioner_name = practitioner_id
+        else:
+            practitioner = get_current_practitioner()
+            if not practitioner:
+                frappe.local.response["http_status_code"] = 403
+                return {
+                    "exc_type": "PermissionError",
+                    "message": "Healthcare Practitioner profile not found"
+                }
+            practitioner_name = practitioner.name
+        
+        # CHECK FOR DUPLICATE APPOINTMENT
+        existing_appointments = frappe.get_all(
+            "Patient Appointment",
+            filters={
+                "patient": patient_id,
+                "appointment_date": appointment_date,
+                "status": ["not in", ["Cancelled", "Closed"]]
+            },
+            fields=["name", "appointment_time", "status", "practitioner"]
+        )
+        
+        if existing_appointments:
+            # Patient already has an appointment on this date
+            existing = existing_appointments[0]
+            frappe.local.response["http_status_code"] = 400
             return {
-                "exc_type": "PermissionError",
-                "message": "Healthcare Practitioner profile not found"
+                "message": "Patient already has an appointment scheduled for this date",
+                "error": "DuplicateAppointment",
+                "status_code": 400,
+                "existing_appointment": {
+                    "name": existing.name,
+                    "appointment_time": str(existing.appointment_time),
+                    "status": existing.status
+                }
             }
         
-        # Check for appointment conflicts
-        conflict = check_appointment_conflict(
-            practitioner.name,
+        # Count overlapping appointments for this slot (allow overbooking but inform caller)
+        overlap_count = count_overlapping_appointments(
+            practitioner_name,
             appointment_date,
             appointment_time,
             kwargs.get("duration", 30)
         )
-        
-        if conflict:
-            frappe.local.response["http_status_code"] = 409
-            return {
-                "exc_type": "ValidationError",
-                "message": f"Appointment slot conflict: {conflict}"
-            }
+        if overlap_count:
+            warning_msg = f"{overlap_count} existing appointment(s) in this time slot for the practitioner"
+        else:
+            warning_msg = None
         
         # Create appointment
         appointment = frappe.get_doc({
             "doctype": "Patient Appointment",
             "patient": patient_id,
-            "practitioner": practitioner.name,
+            "practitioner": practitioner_name,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
             "duration": kwargs.get("duration", 30),
             "status": "Open",
             "appointment_type": kwargs.get("appointment_type", ""),
+            "appointment_for": "Practitioner",
             "notes": kwargs.get("notes", ""),
             "chief_complaint": kwargs.get("chief_complaint", ""),
             "booked_via_app": 1,
@@ -228,15 +260,30 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
         
         appointment.flags.ignore_permissions = True
         appointment.flags.ignore_mandatory = True
+        # Bypass upstream overlap validation in the healthcare app for app-driven bookings
+        # (healthcare.PatientAppointment.validate_overlaps checks this flag).
+        appointment.flags.ignore_overlap_validation = True
         appointment.insert(ignore_permissions=True)
         frappe.db.commit()
         
         # Get the created appointment with enhanced data
         created_appointment = get_appointment(appointment.name)
-        
+        data = created_appointment.get("data") if created_appointment else {}
+
+        # Add slot occupancy/warning info for frontend heads-up
+        try:
+            data = data or {}
+            data["slot_existing_appointments"] = overlap_count
+            data["slot_occupancy"] = (overlap_count or 0) + 1
+            if warning_msg:
+                data["warning"] = warning_msg
+        except Exception:
+            # Defensive: if anything fails here, ignore and return main data
+            pass
+
         return {
             "message": "Appointment created successfully",
-            "data": created_appointment.get("data")
+            "data": data
         }
         
     except Exception as e:
@@ -306,15 +353,18 @@ def update_appointment(appointment_id, **kwargs):
             'appointment_type', 'notes', 'chief_complaint'
         ]
         
-        updated_fields = []
+        updates = {}
         for field, value in kwargs.items():
-            if field in allowed_fields and hasattr(appointment, field):
-                setattr(appointment, field, value)
-                updated_fields.append(field)
+            if field in allowed_fields:
+                updates[field] = value
         
-        if updated_fields:
-            appointment.flags.ignore_permissions = True
-            appointment.save(ignore_permissions=True)
+        # If rescheduling, check for conflicts
+        if kwargs.get("appointment_date") or kwargs.get("appointment_time"):
+            updates['rescheduled_from'] = appointment_id
+
+        if updates:
+            # Use db_set to bypass framework restrictions like set_only_once
+            appointment.db_set(updates)
             frappe.db.commit()
         
         # Return updated appointment
@@ -322,7 +372,7 @@ def update_appointment(appointment_id, **kwargs):
         
         return {
             "message": "Appointment updated successfully",
-            "updated_fields": updated_fields,
+            "updated_fields": list(updates.keys()),
             "data": updated_appointment.get("data")
         }
         
@@ -363,14 +413,14 @@ def cancel_appointment(appointment_id, cancellation_reason=None):
                 "message": f"Appointment is already {appointment.status}"
             }
         
-        # Update status
-        appointment.status = "Cancelled"
+        # Update status using db_set to bypass mandatory validation
+        updates = {
+            "status": "Cancelled"
+        }
         if cancellation_reason:
-            appointment.cancellation_reason = cancellation_reason
-        
-        appointment.flags.ignore_permissions = True
-        appointment.save(ignore_permissions=True)
-        frappe.db.commit()
+            updates["cancellation_reason"] = cancellation_reason
+            
+        appointment.db_set(updates)
         
         return {
             "message": "Appointment cancelled successfully",
@@ -566,6 +616,8 @@ def add_to_todays_queue(patient_id, duration=30, **kwargs):
         
         appointment.flags.ignore_permissions = True
         appointment.flags.ignore_mandatory = True
+        # Bypass upstream overlap validation when adding quick-queue bookings
+        appointment.flags.ignore_overlap_validation = True
         appointment.insert(ignore_permissions=True)
         frappe.db.commit()
         
@@ -657,29 +709,32 @@ def get_todays_queue():
 
 
 @frappe.whitelist(methods=['GET'])
-def get_available_slots(date, duration=30):
+def get_available_slots(date, duration=30, practitioner=None):
     """
-    Get available time slots for a specific date
+    Get available time slots for a specific date and optionally filter by practitioner
     
     Args:
         date (str): Date to check (YYYY-MM-DD)
         duration (int): Appointment duration in minutes
+        practitioner (str): Optional practitioner ID to filter slots
         
     Returns:
         dict: Available time slots
     """
     try:
-        practitioner = get_current_practitioner()
         if not practitioner:
-            frappe.local.response["http_status_code"] = 403
-            return {
-                "exc_type": "PermissionError",
-                "message": "Healthcare Practitioner profile not found"
-            }
+            practitioner_doc = get_current_practitioner()
+            if not practitioner_doc:
+                frappe.local.response["http_status_code"] = 403
+                return {
+                    "exc_type": "PermissionError",
+                    "message": "Healthcare Practitioner profile not found"
+                }
+            practitioner = practitioner_doc.name
         
         # Get working hours for the day
         day_of_week = getdate(date).strftime("%A")
-        working_hours = get_working_hours(practitioner.name, day_of_week)
+        working_hours = get_working_hours(practitioner, day_of_week)
         
         if not working_hours or not working_hours.get("is_working_day"):
             return {
@@ -700,18 +755,45 @@ def get_available_slots(date, duration=30):
         booked_appointments = frappe.get_all(
             "Patient Appointment",
             filters={
-                "practitioner": practitioner.name,
+                "practitioner": practitioner,
                 "appointment_date": date,
                 "status": ["not in", ["Cancelled"]]
             },
-            fields=["appointment_time", "duration"]
+            fields=["name", "appointment_time", "duration", "patient_name", "status"]
         )
         
-        # Filter out booked slots
-        available_slots = []
+        # Filter out booked slots and format response
+        slots_data = []
         for slot in all_slots:
-            if not is_slot_booked(slot, booked_appointments, duration):
-                available_slots.append(slot)
+            is_booked = is_slot_booked(slot, booked_appointments, duration)
+            slot_info = {
+                "time": slot,
+                "available": not is_booked
+            }
+
+            # Count existing overlapping appointments for this slot (for frontend occupancy display)
+            try:
+                existing_count = count_overlapping_appointments(practitioner, date, slot, duration)
+            except Exception:
+                existing_count = 0
+
+            slot_info["existing_appointments"] = existing_count
+            slot_info["occupancy"] = existing_count
+            
+            if is_booked:
+                # Find the appointment booking this slot
+                booking = get_booking_for_slot(slot, booked_appointments, duration)
+                if booking:
+                    slot_info["appointment"] = {
+                        "name": booking.name,
+                        "patient_name": booking.patient_name,
+                        "status": booking.status
+                    }
+            
+            slots_data.append(slot_info)
+            
+        # For backward compatibility, also return simple list of available slots
+        available_slots_simple = [s["time"] for s in slots_data if s["available"]]
         
         return {
             "message": "success",
@@ -724,8 +806,9 @@ def get_available_slots(date, duration=30):
                 },
                 "slot_duration": duration,
                 "total_slots": len(all_slots),
-                "available_slots": available_slots,
-                "booked_count": len(all_slots) - len(available_slots)
+                "available_slots": available_slots_simple, # Backward compatibility
+                "slots": slots_data, # New detailed format
+                "booked_count": len(all_slots) - len(available_slots_simple)
             }
         }
         
@@ -736,6 +819,26 @@ def get_available_slots(date, duration=30):
             "exc_type": "ServerError",
             "message": "Error retrieving available slots"
         }
+
+def get_booking_for_slot(slot, booked_appointments, duration):
+    """Find the appointment that books a specific slot"""
+    try:
+        slot_time = datetime.strptime(slot, "%H:%M:%S")
+        slot_end = slot_time + timedelta(minutes=int(duration))
+        
+        for appt in booked_appointments:
+            if not appt.get("appointment_time"):
+                continue
+                
+            appt_start = datetime.strptime(str(appt.appointment_time), "%H:%M:%S")
+            appt_end = appt_start + timedelta(minutes=int(appt.duration or 30))
+            
+            # Check if times overlap
+            if (slot_time < appt_end and slot_end > appt_start):
+                return appt
+        return None
+    except:
+        return None
 
 # Helper Functions
 
@@ -813,6 +916,42 @@ def check_appointment_conflict(practitioner, date, time, duration, exclude_appoi
     except Exception as e:
         frappe.log_error(f"Conflict check error: {str(e)}", "Appointment Conflict")
         return None
+
+def count_overlapping_appointments(practitioner, date, time, duration, exclude_appointment=None):
+    """Return count of appointments that overlap the given slot for a practitioner"""
+    try:
+        appointment_datetime = datetime.combine(getdate(date), datetime.strptime(str(time), "%H:%M:%S").time())
+        end_datetime = appointment_datetime + timedelta(minutes=int(duration))
+
+        filters = {
+            "practitioner": practitioner,
+            "appointment_date": date,
+            "status": ["not in", ["Cancelled"]]
+        }
+
+        if exclude_appointment:
+            filters["name"] = ["!=", exclude_appointment]
+
+        existing_appointments = frappe.get_all(
+            "Patient Appointment",
+            filters=filters,
+            fields=["name", "appointment_time", "duration"]
+        )
+
+        count = 0
+        for appt in existing_appointments:
+            if not appt.get("appointment_time"):
+                continue
+            existing_start = datetime.combine(getdate(date), datetime.strptime(str(appt.appointment_time), "%H:%M:%S").time())
+            existing_end = existing_start + timedelta(minutes=int(appt.duration or 30))
+
+            if (appointment_datetime < existing_end and end_datetime > existing_start):
+                count += 1
+
+        return count
+    except Exception as e:
+        frappe.log_error(f"Count overlap error: {str(e)}", "Appointment Overlap Count")
+        return 0
 
 def can_reschedule_appointment(appointment_id):
     """Check if appointment can be rescheduled"""
@@ -964,3 +1103,273 @@ def calculate_estimated_time(previous_appointments, current_time):
         return estimated.strftime("%H:%M:%S")
     except:
         return current_time
+
+@frappe.whitelist(allow_guest=False)
+def check_in_appointment(appointment_id):
+    """
+    Check-in patient for appointment (Status: Scheduled/Confirmed → Waiting)
+    
+    Args:
+        appointment_id (str): Appointment ID
+        
+    Returns:
+        dict: Updated appointment details
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        # Update status and check-in time using db_set to bypass controller logic
+        check_in_time = now_datetime()
+        appointment.db_set({
+            "status": "Waiting",
+            "check_in_time": check_in_time
+        })
+        
+        return {
+            "message": "Patient checked in successfully",
+            "data": {
+                "name": appointment.name,
+                "status": appointment.status,
+                "check_in_time": appointment.check_in_time
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error checking in appointment: {str(e)}")
+        frappe.throw(_("Failed to check in appointment: {0}").format(str(e)))
+
+
+@frappe.whitelist(allow_guest=False)
+def start_visit(appointment_id):
+    """
+    Start patient visit (Status: Waiting → In Progress)
+    
+    Args:
+        appointment_id (str): Appointment ID
+        
+    Returns:
+        dict: Updated appointment details
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        # Update status and start time
+        start_time = now_datetime()
+        appointment.db_set({
+            "status": "In Progress",
+            "start_time": start_time
+        })
+        
+        return {
+            "message": "Visit started successfully",
+            "data": {
+                "name": appointment.name,
+                "status": appointment.status,
+                "start_time": appointment.start_time
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error starting visit: {str(e)}")
+        frappe.throw(_("Failed to start visit: {0}").format(str(e)))
+
+
+@frappe.whitelist(allow_guest=False)
+def complete_visit(appointment_id):
+    """
+    Complete patient visit (Status: In Progress → Pending Payment)
+    
+    Args:
+        appointment_id (str): Appointment ID
+        
+    Returns:
+        dict: Updated appointment details
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        # Update status and end time
+        end_time = now_datetime()
+        appointment.db_set({
+            "status": "Pending Payment",
+            "end_time": end_time
+        })
+        
+        return {
+            "message": "Visit completed successfully",
+            "data": {
+                "name": appointment.name,
+                "status": appointment.status,
+                "end_time": appointment.end_time
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error completing visit: {str(e)}")
+        frappe.throw(_("Failed to complete visit: {0}").format(str(e)))
+
+
+@frappe.whitelist(allow_guest=False)
+def mark_payment_complete(appointment_id, invoice_id=None):
+    """
+    Mark appointment payment as complete (Status: Pending Payment → Completed)
+    
+    Args:
+        appointment_id (str): Appointment ID
+        invoice_id (str): Optional invoice ID
+        
+    Returns:
+        dict: Updated appointment details
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        # Update status and payment time
+        updates = {
+            "status": "Completed",
+            "payment_time": now_datetime()
+        }
+        
+        if invoice_id:
+            updates["invoice_id"] = invoice_id
+            updates["invoice_status"] = "Paid"
+            
+        appointment.db_set(updates)
+        
+        return {
+            "message": "Payment marked as complete",
+            "data": {
+                "name": appointment.name,
+                "status": appointment.status,
+                "invoice_id": invoice_id,
+                "payment_time": appointment.payment_time
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error marking payment complete: {str(e)}")
+        frappe.throw(_("Failed to mark payment complete: {0}").format(str(e)))
+
+
+@frappe.whitelist(allow_guest=False)
+def update_review_status(appointment_id, review_requested):
+    """
+    Update Google review request status
+    
+    Args:
+        appointment_id (str): Appointment ID
+        review_requested (int/bool): Review requested flag (1 or 0)
+        
+    Returns:
+        dict: Success message
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        updates = {
+            "review_requested": 1 if review_requested else 0
+        }
+        
+        if review_requested:
+            updates["review_requested_time"] = now_datetime()
+            
+        appointment.db_set(updates)
+        
+        return {
+            "message": "Review status updated successfully",
+            "data": {
+                "name": appointment.name,
+                "review_requested": appointment.review_requested,
+                "review_requested_time": appointment.review_requested_time
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error updating review status: {str(e)}")
+        frappe.throw(_("Failed to update review status: {0}").format(str(e)))
+
+
+@frappe.whitelist(allow_guest=False)
+def get_invoice_status(appointment_id):
+    """
+    Check if invoice exists for an appointment
+    
+    Args:
+        appointment_id (str): Appointment ID
+        
+    Returns:
+        dict: Invoice status details
+    """
+    try:
+        if not appointment_id:
+            frappe.throw(_("Appointment ID is required"))
+            
+        appointment = frappe.get_doc("Patient Appointment", appointment_id)
+        
+        has_invoice = False
+        invoice_data = {}
+        
+        # Check linked invoice field
+        if appointment.invoice_id:
+            has_invoice = True
+            invoice = frappe.get_doc("Sales Invoice", appointment.invoice_id)
+            invoice_data = {
+                "invoice_id": invoice.name,
+                "invoice_status": invoice.status,
+                "total_amount": invoice.grand_total,
+                "paid_amount": invoice.paid_amount
+            }
+        else:
+            # Check if any invoice references this appointment
+            invoices = frappe.get_all(
+                "Sales Invoice Item",
+                filters={"reference_dt": "Patient Appointment", "reference_dn": appointment_id},
+                fields=["parent"]
+            )
+            
+            if invoices:
+                has_invoice = True
+                invoice_id = invoices[0].parent
+                invoice = frappe.get_doc("Sales Invoice", invoice_id)
+                
+                # Update appointment with invoice link if missing
+                if not appointment.invoice_id:
+                    appointment.invoice_id = invoice_id
+                    appointment.invoice_status = invoice.status
+                    appointment.flags.ignore_permissions = True
+                    appointment.save(ignore_permissions=True)
+                    frappe.db.commit()
+                
+                invoice_data = {
+                    "invoice_id": invoice.name,
+                    "invoice_status": invoice.status,
+                    "total_amount": invoice.grand_total,
+                    "paid_amount": invoice.paid_amount
+                }
+        
+        return {
+            "message": "Success",
+            "data": {
+                "has_invoice": has_invoice,
+                **invoice_data
+            }
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting invoice status: {str(e)}")
+        frappe.throw(_("Failed to get invoice status: {0}").format(str(e)))

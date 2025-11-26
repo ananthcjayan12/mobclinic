@@ -34,6 +34,9 @@ def execute():
         print("Creating Sales Invoice custom fields...")
         create_sales_invoice_fields()
         
+        print("Updating Patient Appointment status options...")
+        update_patient_appointment_status_options()
+        
         # Commit the changes
         frappe.db.commit()
         
@@ -328,6 +331,63 @@ def create_patient_appointment_fields():
                 "fieldtype": "Link",
                 "options": "Patient Appointment",
                 "insert_after": "cancellation_reason"
+            },
+            {
+                "fieldname": "check_in_time",
+                "label": "Check-in Time",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "insert_after": "rescheduled_from"
+            },
+            {
+                "fieldname": "start_time",
+                "label": "Visit Start Time",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "insert_after": "check_in_time"
+            },
+            {
+                "fieldname": "end_time",
+                "label": "Visit End Time",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "insert_after": "start_time"
+            },
+            {
+                "fieldname": "payment_time",
+                "label": "Payment Time",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "insert_after": "end_time"
+            },
+            {
+                "fieldname": "review_requested",
+                "label": "Google Review Requested",
+                "fieldtype": "Check",
+                "default": 0,
+                "insert_after": "payment_time"
+            },
+            {
+                "fieldname": "review_requested_time",
+                "label": "Review Requested Time",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "insert_after": "review_requested"
+            },
+            {
+                "fieldname": "invoice_id",
+                "label": "Invoice",
+                "fieldtype": "Link",
+                "options": "Sales Invoice",
+                "read_only": 1,
+                "insert_after": "review_requested_time"
+            },
+            {
+                "fieldname": "invoice_status",
+                "label": "Invoice Status",
+                "fieldtype": "Select",
+                "options": "Unpaid\nPaid\nPartially Paid",
+                "insert_after": "invoice_id"
             }
         ]
     }
@@ -621,3 +681,48 @@ def create_sales_invoice_fields():
     except Exception as e:
         frappe.log_error(f"Error creating Sales Invoice custom fields: {str(e)}")
         raise
+
+def update_patient_appointment_status_options():
+    """Update status options for Patient Appointment to include mobile clinic statuses"""
+    try:
+        # Get current options
+        meta = frappe.get_meta("Patient Appointment")
+        status_field = meta.get_field("status")
+        current_options = status_field.options or ""
+        
+        # New statuses to ensure
+        new_statuses = ["Waiting", "In Progress", "Pending Payment", "Completed"]
+        
+        # Check if update needed
+        options_list = [opt.strip() for opt in current_options.split("\n") if opt.strip()]
+        needs_update = False
+        
+        for status in new_statuses:
+            if status not in options_list:
+                options_list.append(status)
+                needs_update = True
+        
+        if needs_update:
+            updated_options = "\n".join(options_list)
+            
+            # Use Property Setter to update
+            if not frappe.db.exists("Property Setter", {"doc_type": "Patient Appointment", "field_name": "status", "property": "options"}):
+                frappe.get_doc({
+                    "doctype": "Property Setter",
+                    "doctype_or_field": "DocField",
+                    "doc_type": "Patient Appointment",
+                    "field_name": "status",
+                    "property": "options",
+                    "value": updated_options
+                }).insert(ignore_permissions=True)
+            else:
+                ps = frappe.get_doc("Property Setter", {"doc_type": "Patient Appointment", "field_name": "status", "property": "options"})
+                ps.value = updated_options
+                ps.save(ignore_permissions=True)
+                
+            frappe.clear_cache(doctype="Patient Appointment")
+            frappe.log_error("Patient Appointment status options updated successfully")
+            
+    except Exception as e:
+        frappe.log_error(f"Error updating Patient Appointment status options: {str(e)}")
+        # Don't raise here to avoid blocking other fields
