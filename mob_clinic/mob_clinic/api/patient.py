@@ -273,15 +273,21 @@ def create_patient(**kwargs):
                     "message": f"Missing required field: {field}"
                 }
         
-        # Check for duplicate mobile number
+        # Allow duplicate mobile numbers: real-world scenarios may have
+        # multiple patients sharing the same contact number. Do not block
+        # creation for duplicate mobile entries. Log a warning for audit.
         if kwargs.get("mobile"):
-            existing_patient = frappe.db.exists("Patient", {"mobile": kwargs["mobile"]})
-            if existing_patient:
-                frappe.local.response["http_status_code"] = 409
-                return {
-                    "exc_type": "ValidationError", 
-                    "message": "Patient with this mobile number already exists"
-                }
+            try:
+                existing_patient = frappe.db.exists("Patient", {"mobile": kwargs["mobile"]})
+                if existing_patient:
+                    # Lightweight audit log — not a blocking validation
+                    frappe.log_error(
+                        f"Creating patient with duplicate mobile: {kwargs['mobile']}",
+                        "Duplicate Mobile Warning"
+                    )
+            except Exception:
+                # If logging fails for any reason, continue with creation
+                pass
         
         # Handle age to dob conversion if age is provided but dob is not
         if kwargs.get("age") and not kwargs.get("dob"):
@@ -403,17 +409,80 @@ def update_patient(patient_id, **kwargs):
         if hasattr(patient, 'invite_user'):
             patient.invite_user = 0
         
-        # Update allowed fields
+        # Handle age -> dob conversion if age provided but dob not
+        if kwargs.get("age") and not kwargs.get("dob"):
+            try:
+                from frappe.utils import add_years, today, getdate
+                age = int(kwargs.get("age"))
+                dob = add_years(getdate(today()), -age)
+                kwargs["dob"] = dob
+            except Exception:
+                # ignore conversion errors
+                pass
+
+        # Update allowed fields (include name parts and dob)
         allowed_fields = [
+            'first_name', 'middle_name', 'last_name', 'patient_name',
             'mobile', 'phone', 'email', 'occupation', 'marital_status',
-            'profile_image', 'preferred_language', 'insurance_details'
+            'profile_image', 'preferred_language', 'insurance_details', 'dob', 'address'
         ]
-        
+
         updated_fields = []
+        # Apply simple field updates
         for field, value in kwargs.items():
             if field in allowed_fields and hasattr(patient, field):
                 setattr(patient, field, value)
                 updated_fields.append(field)
+
+        # medical_history may be a dict/object or JSON string; persist appropriately
+        if 'medical_history' in kwargs:
+            mh = kwargs.get('medical_history')
+            try:
+                import json as _json
+                if isinstance(mh, dict):
+                    mh_val = _json.dumps(mh)
+                else:
+                    # if it's a string, keep as-is
+                    mh_val = mh
+                if hasattr(patient, 'medical_history'):
+                    patient.medical_history = mh_val
+                else:
+                    # fallback to DB set if field not present on Doc
+                    frappe.db.set_value('Patient', patient_id, 'medical_history', mh_val, update_modified=False)
+                if 'medical_history' not in updated_fields:
+                    updated_fields.append('medical_history')
+            except Exception:
+                # ignore errors and continue
+                pass
+
+        # address handling: try to set field if exists, else fallback to db.set_value
+        if 'address' in kwargs:
+            addr_val = kwargs.get('address')
+            try:
+                if hasattr(patient, 'address'):
+                    patient.address = addr_val
+                else:
+                    frappe.db.set_value('Patient', patient_id, 'address', addr_val, update_modified=False)
+                if 'address' not in updated_fields:
+                    updated_fields.append('address')
+            except Exception:
+                pass
+
+        # If first_name/last_name provided but patient_name not, compose it
+        if (('first_name' in kwargs or 'last_name' in kwargs) and 'patient_name' not in kwargs):
+            first = kwargs.get('first_name', getattr(patient, 'first_name', '') or '')
+            last = kwargs.get('last_name', getattr(patient, 'last_name', '') or '')
+            composed = (first + ' ' + last).strip()
+            if composed:
+                patient.patient_name = composed
+                if 'patient_name' not in updated_fields:
+                    updated_fields.append('patient_name')
+
+        # If patient_name provided explicitly, ensure it's set
+        if 'patient_name' in kwargs and hasattr(patient, 'patient_name'):
+            patient.patient_name = kwargs.get('patient_name')
+            if 'patient_name' not in updated_fields:
+                updated_fields.append('patient_name')
         
         if updated_fields:
             patient.flags.ignore_permissions = True
@@ -423,6 +492,15 @@ def update_patient(patient_id, **kwargs):
             patient.save(ignore_permissions=True)
             frappe.db.commit()
             
+        # Persist changes if any fields were updated
+        if updated_fields:
+            patient.flags.ignore_permissions = True
+            patient.flags.ignore_links = True
+            # Prevent on_update hooks that try to create website user
+            patient.flags.ignore_validate_update_after_submit = True
+            patient.save(ignore_permissions=True)
+            frappe.db.commit()
+
         # Return updated patient data
         updated_patient = get_patient(patient_id)
         
@@ -471,6 +549,59 @@ def delete_patient(patient_id):
         
         # Get the patient
         patient = frappe.get_doc("Patient", patient_id)
+        # --- Best-effort: unlink Dynamic Link entries that reference this Patient
+        # Some setups add a Contact/Address linked to Patient via Dynamic Link which
+        # prevents deletion. Remove those links (do not delete the Contact/Address).
+        try:
+            # Unlink Contacts that have a Dynamic Link to this patient
+            contacts = frappe.get_all(
+                "Dynamic Link",
+                filters={
+                    "link_doctype": "Patient",
+                    "link_name": patient_id,
+                    "parenttype": "Contact",
+                },
+                fields=["parent"],
+            )
+            for c in contacts:
+                contact_name = c.get("parent")
+                try:
+                    contact = frappe.get_doc("Contact", contact_name)
+                    if hasattr(contact, "links") and contact.links:
+                        new_links = [ln for ln in contact.links if not (ln.link_doctype == "Patient" and ln.link_name == patient_id)]
+                        if len(new_links) != len(contact.links):
+                            contact.links = new_links
+                            contact.flags.ignore_permissions = True
+                            contact.save()
+                except Exception:
+                    # Continue even if unlinking a contact fails
+                    continue
+
+            # Unlink Addresses that have a Dynamic Link to this patient
+            addresses = frappe.get_all(
+                "Dynamic Link",
+                filters={
+                    "link_doctype": "Patient",
+                    "link_name": patient_id,
+                    "parenttype": "Address",
+                },
+                fields=["parent"],
+            )
+            for a in addresses:
+                addr_name = a.get("parent")
+                try:
+                    addr = frappe.get_doc("Address", addr_name)
+                    if hasattr(addr, "links") and addr.links:
+                        new_links = [ln for ln in addr.links if not (ln.link_doctype == "Patient" and ln.link_name == patient_id)]
+                        if len(new_links) != len(addr.links):
+                            addr.links = new_links
+                            addr.flags.ignore_permissions = True
+                            addr.save()
+                except Exception:
+                    continue
+        except Exception:
+            # If anything goes wrong, don't block deletion flow — we'll surface the error later
+            pass
         
         # Check if patient has any appointments
         appointment_count = frappe.db.count("Patient Appointment", {

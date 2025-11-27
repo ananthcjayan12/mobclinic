@@ -205,13 +205,30 @@ class TestPatientAPI(FrappeTestCase):
         # Login as practitioner
         frappe.set_user(self.practitioner_email)
         
-        # Try to create patient with same mobile
-        result = create_patient(**self.test_patient_data)
-        
-        # Verify duplicate is handled
-        self.assertEqual(result.get("exc_type"), "ValidationError")
-        self.assertIn("already exists", result.get("message").lower())
-        
+        # Try to create a SECOND patient with the same mobile (duplicate allowed)
+        dup_data = dict(self.test_patient_data)
+        dup_data["first_name"] = "Duplicate"
+        dup_data["last_name"] = "Patient"
+
+        result = create_patient(**dup_data)
+
+        # Verify creation succeeds (we allow duplicate mobiles)
+        self.assertEqual(result.get("message"), "Patient created successfully")
+        self.assertIsNotNone(result.get("data"))
+
+        # Ensure there are at least two patient records with the same mobile
+        patients = frappe.get_all("Patient", filters={"mobile": self.test_patient_data["mobile"]})
+        self.assertTrue(len(patients) >= 2, "Expected at least two patients with same mobile")
+
+        # Clean up the duplicate we just created
+        try:
+            created_id = result["data"].get("patient_id") or result["data"].get("name")
+            if created_id:
+                frappe.delete_doc("Patient", created_id, force=True, ignore_permissions=True)
+                frappe.db.commit()
+        except Exception:
+            pass
+
         # Reset user
         frappe.set_user("Administrator")
         
