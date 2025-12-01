@@ -4,6 +4,8 @@ from frappe.auth import LoginManager
 from frappe.utils import cstr, get_fullname
 import json
 
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
+
 @frappe.whitelist(allow_guest=True, methods=['POST'])
 def mobile_login(usr, pwd):
     """
@@ -93,6 +95,21 @@ def mobile_login(usr, pwd):
                 
                 clinic_data["working_hours"] = working_hours
                 response_data["user"]["clinic"] = clinic_data
+
+                # Provide list of accessible clinics and resolved active clinic
+                try:
+                    clinics = clinic_helper.get_accessible_companies_for_practitioner(practitioner.name)
+                    active_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
+                except Exception:
+                    clinics = []
+                    active_clinic = None
+
+                response_data["user"]["clinics"] = clinics
+                response_data["user"]["active_clinic"] = active_clinic
+
+                # Persist active clinic to session if resolved
+                if active_clinic:
+                    clinic_helper.set_active_clinic_session(active_clinic)
                 
                 # Update app_user_id and last login
                 if not getattr(practitioner, 'app_user_id', None):
@@ -187,6 +204,8 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "mobile_app_enabled": 1,
             "app_user_id": user.name,
             "clinic_description": clinic_name,
+            # If admin passed a clinic/company name treat it as primary_company when valid
+            **({"primary_company": clinic_name} if clinic_name else {}),
             **kwargs  # Additional fields like specialization, qualification, etc.
         })
         practitioner.flags.ignore_permissions = True
@@ -222,6 +241,36 @@ def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
             "exc_type": "ServerError",
             "message": f"Internal server error during registration: {error_msg[:100]}"
         }
+
+
+@frappe.whitelist(methods=['POST'])
+def switch_clinic(clinic: str = None):
+    """Switch the active clinic for the current session after validating access.
+
+    Request body: { "clinic": "Clinic Name" }
+    """
+    try:
+        user = frappe.session.user
+        # find linked practitioner
+        try:
+            practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": user})
+            practitioner_name = practitioner.name
+        except Exception:
+            practitioner_name = None
+
+        # Validate access
+        if clinic and not clinic_helper.validate_practitioner_access(practitioner_name, clinic):
+            frappe.local.response["http_status_code"] = 403
+            return {"exc_type": "PermissionError", "message": "Practitioner does not have access to the requested clinic"}
+
+        # set session
+        clinic_helper.set_active_clinic_session(clinic)
+        return {"message": "active_clinic_set", "active_clinic": clinic}
+
+    except Exception as e:
+        frappe.log_error(f"Switch clinic error: {str(e)}")
+        frappe.local.response["http_status_code"] = 500
+        return {"exc_type": "ServerError", "message": "Error switching clinic"}
 
 @frappe.whitelist(methods=['POST'])
 def mobile_logout():

@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import nowdate, now_datetime, getdate
 import json
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
 def _format_status_for_api(status_value):
@@ -12,7 +13,7 @@ def _format_status_for_api(status_value):
 
 
 @frappe.whitelist(methods=['GET'])
-def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc"):
+def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc", clinic=None):
     """
     Get list of prescriptions/medical records with filtering
     
@@ -22,6 +23,7 @@ def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_l
         limit_start (int): Pagination start
         limit_page_length (int): Records per page
         order_by (str): Sort order
+        clinic (str): Optional clinic name to filter by
         
     Returns:
         dict: List of medical records with pagination info
@@ -40,6 +42,12 @@ def get_prescriptions(patient_id=None, filters=None, limit_start=0, limit_page_l
         
         # Get current practitioner
         practitioner = get_current_practitioner()
+        
+        # Resolve clinic and apply filter
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
+        if resolved_clinic:
+            filters["company"] = resolved_clinic
+            
         if practitioner and not patient_id:
             # If no specific patient, show practitioner's records
             filters["practitioner"] = practitioner.get("name")
@@ -268,6 +276,13 @@ def create_prescription(patient_id, **kwargs):
         practitioner_name = practitioner.get("name") if isinstance(practitioner, dict) else practitioner.name
         practitioner_department = practitioner.get("department") if isinstance(practitioner, dict) else getattr(practitioner, "department", None)
         
+        # Resolve clinic
+        clinic = kwargs.get("clinic")
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner_name, clinic)
+        
+        if clinic and not clinic_helper.validate_practitioner_access(practitioner_name, resolved_clinic):
+             frappe.throw(_("Practitioner does not have access to the requested clinic"), frappe.PermissionError)
+
         # Build document data, excluding None values to avoid field type conflicts
         doc_data = {
             "doctype": "Patient Encounter",
@@ -282,7 +297,9 @@ def create_prescription(patient_id, **kwargs):
         if kwargs.get("department") or practitioner_department:
             doc_data["medical_department"] = kwargs.get("department") or practitioner_department
             
-        if kwargs.get("company") or frappe.defaults.get_user_default("Company"):
+        if resolved_clinic:
+            doc_data["company"] = resolved_clinic
+        elif kwargs.get("company") or frappe.defaults.get_user_default("Company"):
             doc_data["company"] = kwargs.get("company") or frappe.defaults.get_user_default("Company")
         
         # Add clinical fields only if provided (using custom field names for mobile app)

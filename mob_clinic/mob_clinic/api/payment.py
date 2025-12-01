@@ -6,6 +6,7 @@ Uses ERPNext Sales Invoice DocType with Healthcare extensions
 import frappe
 from frappe import _
 from frappe.utils import today, add_days, getdate, flt, nowdate
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
 def get_or_create_default_service_item():
@@ -63,7 +64,7 @@ def get_current_practitioner():
 
 @frappe.whitelist(methods=['GET'])
 def get_invoices(patient_id=None, status=None, start_date=None, end_date=None, 
-                 limit_start=0, limit_page_length=20):
+                 limit_start=0, limit_page_length=20, clinic=None):
     """
     Get list of invoices with filters
     
@@ -81,11 +82,16 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
     try:
         practitioner = get_current_practitioner()
         
-        # Build filters
+        # Resolve active clinic and build filters
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
+
         filters = {
-            "docstatus": ["!=", 2],  # Exclude cancelled
+            "docstatus": ["!=" , 2],  # Exclude cancelled
             "healthcare_practitioner": practitioner.name
         }
+
+        if resolved_clinic:
+            filters["company"] = resolved_clinic
         
         if patient_id:
             filters["patient"] = patient_id
@@ -153,6 +159,8 @@ def get_invoice(invoice_id):
     """
     try:
         practitioner = get_current_practitioner()
+        # enforce clinic scoping if session/practitioner has one
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
@@ -160,6 +168,10 @@ def get_invoice(invoice_id):
         # Check permissions
         if invoice.healthcare_practitioner != practitioner.name:
             frappe.throw(_("You don't have permission to view this invoice"))
+
+        # Enforce clinic/company scope if resolved
+        if resolved_clinic and getattr(invoice, "company", None) and invoice.company != resolved_clinic:
+            frappe.throw(_("You don't have permission to view this invoice in the current clinic"))
         
         # Get patient details
         patient_info = {}
@@ -241,7 +253,7 @@ def get_invoice(invoice_id):
 @frappe.whitelist(methods=['POST'])
 def create_invoice(patient_id, items, posting_date=None, due_date=None, 
                    treatment_type=None, treatment_description=None,
-                   appointment_reference=None, remarks=None):
+                   appointment_reference=None, remarks=None, clinic=None):
     """
     Create a new Sales Invoice
     
@@ -260,6 +272,11 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
     """
     try:
         practitioner = get_current_practitioner()
+
+        # Resolve clinic and validate access
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
+        if clinic and not clinic_helper.validate_practitioner_access(practitioner.name, resolved_clinic):
+            frappe.throw(_("Practitioner does not have access to the requested clinic"), frappe.PermissionError)
         
         # Validate patient
         if not frappe.db.exists("Patient", patient_id):
@@ -307,6 +324,10 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "remarks": remarks,
             "items": []
         })
+
+        # Assign company if clinic/company resolved
+        if resolved_clinic:
+            invoice.company = resolved_clinic
         
         # Add items
         for item in items:
@@ -406,13 +427,13 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         if paid_amount > flt(invoice.outstanding_amount):
             frappe.throw(_("Payment amount cannot exceed outstanding amount"))
         
-        # Get company and default accounts
-        company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
-        
-        # Get default debit account (Debtors/Receivable) for the customer
+        # Use the invoice's company for accounting context
+        company = invoice.company or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+
+        # Get default debit account (Debtors/Receivable) for the company
         debit_account = frappe.db.get_value("Company", company, "default_receivable_account")
-        
-        # Get credit account based on mode of payment
+
+        # Get credit account based on mode of payment (company-specific)
         mode_of_payment_account = frappe.db.get_value(
             "Mode of Payment Account",
             {"parent": mode_of_payment, "company": company},
