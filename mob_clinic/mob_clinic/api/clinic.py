@@ -32,24 +32,40 @@ def get_accessible_companies_for_practitioner(practitioner_name: Optional[str]) 
     return companies
 
 
-def resolve_active_clinic(practitioner_name: Optional[str] = None, clinic_param: Optional[str] = None) -> Optional[str]:
+def resolve_active_clinic(practitioner_name: Optional[str] = None, clinic_param: Optional[str] = None, ignore_session: bool = False) -> Optional[str]:
     """Resolve the active clinic (Company name) in this order:
 
     1. Explicit `clinic_param` passed by caller
-    2. `frappe.local.session['active_clinic']` if set
+    2. `frappe.local.session['active_clinic']` if set (unless ignore_session=True)
     3. Practitioner `primary_company` (if practitioner provided)
     4. None
+    
+    Args:
+        practitioner_name: Healthcare Practitioner name
+        clinic_param: Explicitly passed clinic/company name
+        ignore_session: If True, skip reading from session (useful during login)
     """
     # 1) explicit param takes precedence
     if clinic_param:
         return clinic_param
 
-    # 2) session-scoped active clinic
-    sess = getattr(frappe.local, "session", None) or getattr(frappe, "session", None)
-    if sess:
-        ac = sess.get("active_clinic")
-        if ac:
-            return ac
+    # 2) session-scoped active clinic (skip if ignore_session=True)
+    if not ignore_session:
+        sess = getattr(frappe.local, "session", None) or getattr(frappe, "session", None)
+        if sess:
+            # Handle both dict and object access patterns
+            ac = None
+            if isinstance(sess, dict):
+                ac = sess.get("data", {}).get("active_clinic") or sess.get("active_clinic")
+            else:
+                session_data = getattr(sess, "data", {})
+                if isinstance(session_data, dict):
+                    ac = session_data.get("active_clinic")
+                else:
+                    ac = getattr(sess, "active_clinic", None)
+            
+            if ac:
+                return ac
 
     # 3) fallback to practitioner's primary_company
     if practitioner_name:
@@ -109,19 +125,33 @@ def set_active_clinic_session(clinic: Optional[str]):
     """Set the active clinic in the current session.
 
     This function attempts to set `frappe.local.session['active_clinic']` where available.
+    Also persists to database for session continuity.
     """
     if not clinic:
         return
 
-    # Prefer frappe.local.session
-    if hasattr(frappe, "local") and getattr(frappe.local, "session", None) is not None:
-        frappe.local.session["active_clinic"] = clinic
-        # Also set in session.data for persistent storage
-        if hasattr(frappe.session, "data"):
-            frappe.session.data["active_clinic"] = clinic
-        return
-
-    # Fallback to frappe.session dict if available
-    sess = getattr(frappe, "session", None)
-    if sess is not None:
-        sess["active_clinic"] = clinic
+    # Set in frappe.local.session.data (in-memory session data)
+    if hasattr(frappe, "local") and hasattr(frappe.local, "session"):
+        if isinstance(frappe.local.session, dict):
+            if "data" not in frappe.local.session:
+                frappe.local.session["data"] = {}
+            frappe.local.session["data"]["active_clinic"] = clinic
+        else:
+            if not hasattr(frappe.local.session, "data") or frappe.local.session.data is None:
+                frappe.local.session.data = {}
+            frappe.local.session.data["active_clinic"] = clinic
+    
+    # Also persist to Sessions table in database
+    try:
+        if hasattr(frappe, "session") and hasattr(frappe.session, "sid"):
+            sid = frappe.session.sid
+            if sid and frappe.db.exists("Sessions", sid):
+                session_data = frappe.db.get_value("Sessions", sid, "data")
+                if session_data:
+                    import json
+                    data_dict = json.loads(session_data) if isinstance(session_data, str) else session_data
+                    data_dict["active_clinic"] = clinic
+                    frappe.db.set_value("Sessions", sid, "data", json.dumps(data_dict), update_modified=False)
+                    frappe.db.commit()
+    except Exception as e:
+        frappe.log_error(f"Error persisting active_clinic to session: {str(e)}")

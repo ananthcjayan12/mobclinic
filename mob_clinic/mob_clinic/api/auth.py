@@ -99,7 +99,12 @@ def mobile_login(usr, pwd):
                 # Provide list of accessible clinics and resolved active clinic
                 try:
                     clinics = clinic_helper.get_accessible_companies_for_practitioner(practitioner.name)
-                    active_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
+                    # IMPORTANT: Ignore old session value during login to get fresh clinic for this practitioner
+                    active_clinic = clinic_helper.resolve_active_clinic(
+                        practitioner_name=practitioner.name, 
+                        clinic_param=None,
+                        ignore_session=True  # Don't use old session's active_clinic during login
+                    )
                 except Exception:
                     clinics = []
                     active_clinic = None
@@ -107,7 +112,7 @@ def mobile_login(usr, pwd):
                 response_data["user"]["clinics"] = clinics
                 response_data["user"]["active_clinic"] = active_clinic
 
-                # Persist active clinic to session if resolved
+                # Persist active clinic to session if resolved (force reset for new login)
                 if active_clinic:
                     clinic_helper.set_active_clinic_session(active_clinic)
                 
