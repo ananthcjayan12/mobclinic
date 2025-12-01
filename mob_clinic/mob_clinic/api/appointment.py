@@ -3,9 +3,10 @@ from frappe import _
 from frappe.utils import cstr, get_datetime, nowdate, add_days, getdate, now_datetime
 import json
 from datetime import datetime, timedelta
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 @frappe.whitelist(methods=['GET'])
-def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by="appointment_date desc"):
+def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by="appointment_date desc", clinic=None):
     """
     Get list of appointments with pagination and filtering
     
@@ -30,6 +31,11 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         practitioner = get_current_practitioner()
         if practitioner:
             filters["practitioner"] = practitioner.name
+        
+        # Resolve clinic and apply company filter if present
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
+        if resolved_clinic:
+            filters["company"] = resolved_clinic
         elif frappe.session.user != "Administrator":
             # Only return empty if not Administrator (who can see all)
             return {
@@ -229,6 +235,15 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
                 }
             }
         
+        # Resolve clinic and validate practitioner access
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner_name, kwargs.get("clinic"))
+        if kwargs.get("clinic") and not clinic_helper.validate_practitioner_access(practitioner_name, resolved_clinic):
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Practitioner does not have access to the requested clinic"
+            }
+
         # Count overlapping appointments for this slot (allow overbooking but inform caller)
         overlap_count = count_overlapping_appointments(
             practitioner_name,
@@ -257,6 +272,10 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
             "booked_via_app": 1,
             "app_booking_source": "Mobile App"
         })
+
+        # Assign company if clinic resolved
+        if resolved_clinic:
+            appointment.company = resolved_clinic
         
         appointment.flags.ignore_permissions = True
         appointment.flags.ignore_mandatory = True
@@ -598,6 +617,15 @@ def add_to_todays_queue(patient_id, duration=30, **kwargs):
             # Use the first available slot
             appointment_time = available_slots[0]
         
+        # Resolve clinic and set company on quick-queue appointment
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, kwargs.get("clinic"))
+        if kwargs.get("clinic") and not clinic_helper.validate_practitioner_access(practitioner.name, resolved_clinic):
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "exc_type": "PermissionError",
+                "message": "Practitioner does not have access to the requested clinic"
+            }
+
         # Create the appointment
         appointment = frappe.get_doc({
             "doctype": "Patient Appointment",
@@ -613,6 +641,9 @@ def add_to_todays_queue(patient_id, duration=30, **kwargs):
             "booked_via_app": 1,
             "app_booking_source": "Mobile App - Quick Queue"
         })
+
+        if resolved_clinic:
+            appointment.company = resolved_clinic
         
         appointment.flags.ignore_permissions = True
         appointment.flags.ignore_mandatory = True

@@ -19,6 +19,7 @@ import re
 from frappe import _
 from frappe.utils import get_files_path, get_url, cstr, now_datetime
 from frappe.core.api.file import create_new_folder
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
 def secure_filename(filename):
@@ -75,13 +76,21 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
         # Validate reference document if provided
         if reference_doctype and reference_name:
             if not frappe.db.exists(reference_doctype, reference_name):
+                frappe.local.response["http_status_code"] = 404
                 return {
-                    "exc_type": "ValidationError",
-                    "message": f"{reference_doctype} {reference_name} does not exist"
+                    "exc_type": "NotFoundError",
+                    "message": f"Reference document {reference_doctype} {reference_name} not found"
                 }
                 
+        # Resolve clinic for folder structure
+        practitioner_doc = get_current_practitioner()
+        practitioner = practitioner_doc.name if practitioner_doc else None
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner, None)
+        
         # Create folder structure using Frappe's pattern
         clinic_folder_name = "Clinic Files"
+        if resolved_clinic:
+             clinic_folder_name = f"Clinic Files/{resolved_clinic}"
         
         # Create main clinic folder if it doesn't exist
         if not frappe.db.exists("File", {"file_name": clinic_folder_name, "is_folder": 1, "folder": "Home"}):

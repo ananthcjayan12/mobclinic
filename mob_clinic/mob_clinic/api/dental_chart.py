@@ -8,6 +8,7 @@ import frappe
 import json
 from frappe import _
 from frappe.utils import nowdate, now_datetime, cstr
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
 # ============================================================================
@@ -28,6 +29,8 @@ def add_condition(patient_id, tooth_numbers, condition):
         Dict with created condition names (Frappe's auto-generated IDs)
     """
     try:
+        validate_patient_access(patient_id)
+        
         # Parse parameters
         if isinstance(tooth_numbers, str):
             tooth_numbers = json.loads(tooth_numbers)
@@ -139,6 +142,8 @@ def update_condition(patient_id, condition_name, updates):
         updates: Dict with fields to update
     """
     try:
+        validate_patient_access(patient_id)
+        
         if isinstance(updates, str):
             updates = json.loads(updates)
         
@@ -224,6 +229,8 @@ def remove_condition(patient_id, condition_name, reason=None):
     Soft delete a condition using Frappe's name field
     """
     try:
+        validate_patient_access(patient_id)
+        
         if not frappe.db.exists("Dental Chart Condition", condition_name):
             frappe.local.response["http_status_code"] = 404
             return {
@@ -284,6 +291,8 @@ def add_procedure(patient_id, tooth_numbers, procedure):
     Add dental procedure to specified teeth
     """
     try:
+        validate_patient_access(patient_id)
+        
         # Parse parameters
         if isinstance(tooth_numbers, str):
             tooth_numbers = json.loads(tooth_numbers)
@@ -384,6 +393,8 @@ def update_procedure(patient_id, procedure_name, updates):
     Update a dental procedure using Frappe's name field
     """
     try:
+        validate_patient_access(patient_id)
+        
         if isinstance(updates, str):
             updates = json.loads(updates)
         
@@ -491,6 +502,8 @@ def remove_procedure(patient_id, procedure_name, reason=None):
     Soft delete a procedure
     """
     try:
+        validate_patient_access(patient_id)
+        
         if not frappe.db.exists("Dental Chart Procedure", procedure_name):
             frappe.local.response["http_status_code"] = 404
             return {
@@ -551,6 +564,8 @@ def get_dental_chart(patient_id):
     Get complete dental chart with conditions, procedures, history, and timeline
     """
     try:
+        validate_patient_access(patient_id)
+        
         # Get chart
         chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
         if not chart_name:
@@ -1373,6 +1388,23 @@ def get_procedure_types():
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def validate_patient_access(patient_id):
+    """Validate if current practitioner has access to patient's clinic"""
+    user = frappe.session.user
+    if user == "Guest":
+        frappe.throw(_("Please login to access dental chart"), frappe.PermissionError)
+        
+    practitioner = frappe.db.get_value("Healthcare Practitioner", {"user_id": user}, "name")
+    if practitioner:
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner, None)
+        if resolved_clinic:
+            # Check if patient belongs to a different clinic
+            # Only enforce if patient has a primary clinic assigned
+            patient_clinic = frappe.db.get_value("Patient", patient_id, "primary_clinic")
+            if patient_clinic and patient_clinic != resolved_clinic:
+                 frappe.throw(_("Access denied: Patient belongs to a different clinic"), frappe.PermissionError)
+
 
 def get_or_create_chart(patient_id):
     """Get existing chart or create new one"""

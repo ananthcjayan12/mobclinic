@@ -2,9 +2,10 @@ import frappe
 from frappe import _
 from frappe.utils import cstr, get_datetime, nowdate
 import json
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 @frappe.whitelist(methods=['GET'])
-def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc"):
+def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc", clinic=None):
     """
     Get list of patients with pagination and filtering
     
@@ -33,8 +34,13 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
         else:
             filters = {}
             
-                # Get current practitioner for context but don't filter by it in search
+        # Get current practitioner for context but don't filter by it in search
         practitioner = get_current_practitioner()
+        
+        # Resolve clinic and apply filter
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
+        if resolved_clinic:
+            filters["primary_clinic"] = resolved_clinic
         
         # Note: Search should include all patients, not filter by practitioner
         # This allows practitioners to find and add new patients to their practice
@@ -319,6 +325,21 @@ def create_patient(**kwargs):
         # Handle address field - Patient DocType doesn't have a direct address field
         # Remove it to prevent field not found error
         address_data = kwargs.pop("address", None)
+        
+        # Resolve clinic
+        practitioner = get_current_practitioner()
+        clinic = kwargs.get("clinic")
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
+        
+        if clinic and practitioner and not clinic_helper.validate_practitioner_access(practitioner.name, resolved_clinic):
+             frappe.throw(_("Practitioner does not have access to the requested clinic"), frappe.PermissionError)
+             
+        if resolved_clinic:
+            kwargs["primary_clinic"] = resolved_clinic
+            
+        # Remove clinic from kwargs if it was passed
+        if "clinic" in kwargs:
+            del kwargs["clinic"]
         
         # Create patient document
         patient = frappe.get_doc({

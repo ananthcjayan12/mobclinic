@@ -78,9 +78,16 @@ def create_healthcare_practitioner_fields():
                 "insert_after": "mobile_app_enabled"
             },
             {
+                "fieldname": "primary_company",
+                "label": "Primary Company",
+                "fieldtype": "Link",
+                "options": "Company",
+                "insert_after": "app_user_id"
+            },
+            {
                 "fieldname": "column_break_mobile1",
                 "fieldtype": "Column Break",
-                "insert_after": "app_user_id"
+                "insert_after": "primary_company"
             },
             {
                 "fieldname": "clinic_logo",
@@ -142,6 +149,14 @@ def create_patient_fields():
     """Add mobile clinic specific fields to Patient"""
     custom_fields = {
         "Patient": [
+            {
+                "fieldname": "primary_clinic",
+                "label": "Primary Clinic",
+                "fieldtype": "Link",
+                "options": "Company",
+                "insert_after": "naming_series",
+                "description": "The primary clinic (Company) this patient belongs to."
+            },
             {
                 "fieldname": "mobile_app_section",
                 "label": "Mobile App Profile",
