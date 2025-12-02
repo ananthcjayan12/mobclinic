@@ -624,45 +624,177 @@ def delete_patient(patient_id):
             # If anything goes wrong, don't block deletion flow — we'll surface the error later
             pass
         
-        # Check if patient has any appointments
-        appointment_count = frappe.db.count("Patient Appointment", {
-            "patient": patient_id,
-            "status": ["not in", ["Cancelled"]]
-        })
+        # Validate patient belongs to user's clinic (if not Administrator)
+        current_user = frappe.session.user
+        if current_user != "Administrator":
+            from mob_clinic.mob_clinic.api.clinic import resolve_active_clinic
+            
+            practitioner_name = frappe.db.get_value(
+                "Healthcare Practitioner",
+                {"user_id": current_user},
+                "name"
+            )
+            
+            if practitioner_name:
+                active_clinic = resolve_active_clinic(practitioner_name)
+                if patient.primary_clinic and patient.primary_clinic != active_clinic:
+                    frappe.throw(_("You don't have permission to delete patients from other clinics"))
         
-        if appointment_count > 0:
-            frappe.local.response["http_status_code"] = 400
-            return {
-                "exc_type": "ValidationError",
-                "message": f"Cannot delete patient with {appointment_count} active appointments. Please cancel appointments first."
-            }
-        
-        # Check if patient has any medical records
-        medical_record_count = frappe.db.count("Patient Encounter", {"patient": patient_id})
-        
-        if medical_record_count > 0:
-            frappe.local.response["http_status_code"] = 400
-            return {
-                "exc_type": "ValidationError",
-                "message": f"Cannot delete patient with {medical_record_count} medical records."
-            }
-        
-        # Store info before deletion
-        patient_name = patient.patient_name
-        mobile = patient.mobile
-        
-        # Delete the patient
-        frappe.delete_doc("Patient", patient_id, ignore_permissions=True)
-        frappe.db.commit()
-        
-        return {
-            "message": "Patient deleted successfully",
-            "data": {
-                "patient_id": patient_id,
-                "patient_name": patient_name,
-                "mobile": mobile
-            }
+        deleted_docs = {
+            "invoices": 0,
+            "payments": 0,
+            "appointments": 0,
+            "medical_records": 0,
+            "encounters": 0,
+            "events": 0
         }
+        
+        # Store current user and switch to Administrator for deletion operations
+        original_user = frappe.session.user
+        frappe.set_user("Administrator")
+        
+        try:
+            # Step 1: Delete all Sales Invoices and their payments
+            invoices = frappe.get_all(
+                "Sales Invoice",
+                filters={"patient": patient_id},
+                fields=["name", "docstatus"]
+            )
+            
+            for inv in invoices:
+                try:
+                    invoice = frappe.get_doc("Sales Invoice", inv.name)
+                    
+                    # Cancel invoice first
+                    if invoice.docstatus == 1:
+                        invoice.cancel()
+                    
+                    # Delete payment entries
+                    payment_refs = frappe.db.sql("""
+                        SELECT DISTINCT parent 
+                        FROM `tabPayment Entry Reference` 
+                        WHERE reference_name = %s AND reference_doctype = 'Sales Invoice'
+                    """, inv.name, as_dict=True)
+                    
+                    for pr in payment_refs:
+                        try:
+                            pe = frappe.get_doc("Payment Entry", pr.parent)
+                            if pe.docstatus == 1:
+                                pe.cancel()
+                            frappe.delete_doc("Payment Entry", pr.parent, force=True, ignore_permissions=True)
+                            deleted_docs["payments"] += 1
+                        except Exception:
+                            # Force delete if standard delete fails
+                            frappe.db.sql("DELETE FROM `tabPayment Ledger Entry` WHERE voucher_no = %s", pr.parent)
+                            frappe.db.sql("DELETE FROM `tabGL Entry` WHERE voucher_no = %s", pr.parent)
+                            frappe.db.sql("DELETE FROM `tabPayment Entry Reference` WHERE parent = %s", pr.parent)
+                            frappe.db.sql("DELETE FROM `tabPayment Entry` WHERE name = %s", pr.parent)
+                            deleted_docs["payments"] += 1
+                    
+                    # Delete invoice ledger entries
+                    frappe.db.sql("DELETE FROM `tabPayment Ledger Entry` WHERE voucher_no = %s", inv.name)
+                    frappe.db.sql("DELETE FROM `tabGL Entry` WHERE voucher_no = %s", inv.name)
+                    
+                    frappe.delete_doc("Sales Invoice", inv.name, force=True, ignore_permissions=True)
+                    deleted_docs["invoices"] += 1
+                    
+                except Exception as inv_error:
+                    frappe.logger().error(f"Error deleting invoice {inv.name}: {str(inv_error)}")
+            
+            # Step 2: Delete Patient Appointments
+            appointments = frappe.get_all(
+                "Patient Appointment",
+                filters={"patient": patient_id},
+                fields=["name", "docstatus"]
+            )
+            
+            for appt in appointments:
+                try:
+                    appt_doc = frappe.get_doc("Patient Appointment", appt.name)
+                    if appt_doc.docstatus == 1:
+                        appt_doc.cancel()
+                    frappe.delete_doc("Patient Appointment", appt.name, force=True, ignore_permissions=True)
+                    deleted_docs["appointments"] += 1
+                except Exception as appt_error:
+                    frappe.logger().error(f"Error deleting appointment {appt.name}: {str(appt_error)}")
+            
+            # Step 3: Delete Patient Encounters
+            encounters = frappe.get_all(
+                "Patient Encounter",
+                filters={"patient": patient_id},
+                fields=["name", "docstatus"]
+            )
+            
+            for enc in encounters:
+                try:
+                    enc_doc = frappe.get_doc("Patient Encounter", enc.name)
+                    if enc_doc.docstatus == 1:
+                        enc_doc.cancel()
+                    frappe.delete_doc("Patient Encounter", enc.name, force=True, ignore_permissions=True)
+                    deleted_docs["encounters"] += 1
+                except Exception as enc_error:
+                    frappe.logger().error(f"Error deleting encounter {enc.name}: {str(enc_error)}")
+            
+            # Step 4: Delete Patient Medical Records
+            medical_records = frappe.get_all(
+                "Patient Medical Record",
+                filters={"patient": patient_id},
+                fields=["name"]
+            )
+            
+            for record in medical_records:
+                try:
+                    frappe.delete_doc("Patient Medical Record", record.name, force=True, ignore_permissions=True)
+                    deleted_docs["medical_records"] += 1
+                except Exception as rec_error:
+                    frappe.logger().error(f"Error deleting medical record {record.name}: {str(rec_error)}")
+            
+            # Step 5: Delete Events (Calendar events) linked to patient
+            events = frappe.db.sql("""
+                SELECT DISTINCT parent
+                FROM `tabDynamic Link`
+                WHERE link_doctype = 'Patient' 
+                AND link_name = %s
+                AND parenttype = 'Event'
+            """, patient_id, as_dict=True)
+            
+            for evt in events:
+                try:
+                    frappe.delete_doc("Event", evt.parent, force=True, ignore_permissions=True)
+                    deleted_docs["events"] += 1
+                except Exception:
+                    # Force delete from DB if needed
+                    frappe.db.sql("DELETE FROM `tabDynamic Link` WHERE parent = %s AND parenttype = 'Event'", evt.parent)
+                    frappe.db.sql("DELETE FROM `tabEvent` WHERE name = %s", evt.parent)
+                    deleted_docs["events"] += 1
+            
+            # Step 6: Delete any remaining dynamic links to this patient
+            frappe.db.sql("""
+                DELETE FROM `tabDynamic Link` 
+                WHERE link_doctype = 'Patient' AND link_name = %s
+            """, patient_id)
+            
+            # Store info before deletion
+            patient_name = patient.patient_name
+            mobile = patient.mobile
+            
+            # Step 7: Finally, delete the patient
+            frappe.delete_doc("Patient", patient_id, force=True, ignore_permissions=True)
+            frappe.db.commit()
+            
+            return {
+                "message": "Patient deleted successfully",
+                "data": {
+                    "patient_id": patient_id,
+                    "patient_name": patient_name,
+                    "mobile": mobile,
+                    "deleted_items": deleted_docs
+                }
+            }
+            
+        finally:
+            # Always restore original user
+            frappe.set_user(original_user)
         
     except frappe.DoesNotExistError:
         frappe.local.response["http_status_code"] = 404

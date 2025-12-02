@@ -694,3 +694,90 @@ Thank you!
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Send Payment Reminder Error")
         frappe.throw(_("Error sending payment reminder: {0}").format(str(e)))
+
+
+@frappe.whitelist(methods=['POST'])
+def delete_invoice(invoice_id):
+    """
+    Delete an invoice and all linked payment/ledger entries
+    
+    Args:
+        invoice_id: Sales Invoice name
+    
+    Returns:
+        Deletion status
+    """
+    try:
+        practitioner = get_current_practitioner()
+        
+        # Get invoice
+        invoice = frappe.get_doc("Sales Invoice", invoice_id)
+        
+        # Check permissions
+        if invoice.healthcare_practitioner != practitioner.name:
+            frappe.throw(_("You don't have permission to delete this invoice"))
+        
+        # Store current user and switch to Administrator for deletion operations
+        original_user = frappe.session.user
+        frappe.set_user("Administrator")
+        
+        try:
+            # Step 1: Cancel the invoice FIRST (if submitted)
+            # This is crucial - must cancel invoice before cancelling payments
+            if invoice.docstatus == 1:
+                invoice.cancel()
+                frappe.logger().info(f"Cancelled invoice: {invoice_id}")
+            
+            # Step 2: Get and delete all payment entries (now that invoice is cancelled)
+            payment_refs = frappe.db.sql("""
+                SELECT DISTINCT parent 
+                FROM `tabPayment Entry Reference` 
+                WHERE reference_name = %s AND reference_doctype = 'Sales Invoice'
+            """, invoice_id, as_dict=True)
+            
+            for pr in payment_refs:
+                try:
+                    pe = frappe.get_doc("Payment Entry", pr.parent)
+                    
+                    # Cancel if submitted
+                    if pe.docstatus == 1:
+                        pe.cancel()
+                        frappe.logger().info(f"Cancelled payment entry: {pr.parent}")
+                    
+                    # Delete (cascades to Payment Ledger Entry and GL Entry)
+                    frappe.delete_doc("Payment Entry", pr.parent, force=True, ignore_permissions=True)
+                    frappe.logger().info(f"Deleted payment entry: {pr.parent}")
+                    
+                except Exception as pe_error:
+                    frappe.logger().error(f"Standard delete failed for PE {pr.parent}, forcing DB delete: {str(pe_error)}")
+                    # Force delete from DB if standard delete fails
+                    frappe.db.sql("DELETE FROM `tabPayment Ledger Entry` WHERE voucher_no = %s", pr.parent)
+                    frappe.db.sql("DELETE FROM `tabGL Entry` WHERE voucher_no = %s", pr.parent)
+                    frappe.db.sql("DELETE FROM `tabPayment Entry Reference` WHERE parent = %s", pr.parent)
+                    frappe.db.sql("DELETE FROM `tabPayment Entry` WHERE name = %s", pr.parent)
+            
+            # Step 3: Delete invoice's own ledger entries (if any remain)
+            frappe.db.sql("DELETE FROM `tabPayment Ledger Entry` WHERE voucher_no = %s", invoice_id)
+            frappe.db.sql("DELETE FROM `tabGL Entry` WHERE voucher_no = %s", invoice_id)
+            
+            # Step 4: Delete the cancelled invoice
+            frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
+            frappe.logger().info(f"Deleted invoice: {invoice_id}")
+            
+            frappe.db.commit()
+            
+            return {
+                "message": "Invoice and all related documents deleted successfully",
+                "invoice_id": invoice_id,
+                "deleted_payments": len(payment_refs)
+            }
+        
+        finally:
+            # Always restore original user
+            frappe.set_user(original_user)
+        
+    except frappe.DoesNotExistError:
+        frappe.throw(_("Invoice not found"))
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Delete Invoice Error")
+        frappe.throw(_("Error deleting invoice: {0}").format(str(e)))
