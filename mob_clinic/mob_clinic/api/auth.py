@@ -121,6 +121,25 @@ def mobile_login(usr, pwd):
                     frappe.db.set_value("Healthcare Practitioner", practitioner.name, 
                                       "app_user_id", user.name, update_modified=False)
                     
+            # --- Ensure persistent helper cookies ---
+            try:
+                # Read cookie_max_age from site config (seconds). Default to 7 days.
+                cookie_max_age = frappe.conf.get("cookie_max_age", 604800)
+                try:
+                    cookie_max_age = int(cookie_max_age)
+                except Exception:
+                    cookie_max_age = 604800
+
+                cm = frappe.local.cookie_manager
+                cm.set_cookie("full_name", cstr(get_fullname(user.name) or ""), max_age=cookie_max_age, samesite='Lax')
+                cm.set_cookie("user_id", user.name, max_age=cookie_max_age, samesite='Lax')
+                cm.set_cookie("system_user", "yes", max_age=cookie_max_age, samesite='Lax')
+                cm.set_cookie("user_image", getattr(user, 'user_image', '') or "", max_age=cookie_max_age, samesite='Lax')
+            except Exception:
+                print(frappe.get_traceback())
+                # Do not break login flow if cookie setting fails
+                frappe.log_error(frappe.get_traceback(), "mobile_login_cookie_set")
+
             return response_data
             
         else:
@@ -292,7 +311,18 @@ def mobile_logout():
         else:
             # For tests: just clear the user
             frappe.set_user("Guest")
-        
+        # Clear helper cookies on logout so clients don't keep stale values
+        try:
+            cm = frappe.local.cookie_manager
+            for _c in ("full_name", "user_id", "system_user", "user_image", "sid"):
+                try:
+                    cm.set_cookie(_c, "", max_age=0, samesite='Lax')
+                except Exception:
+                    # ignore per-cookie failures
+                    pass
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "mobile_logout_cookie_clear")
+
         return {
             "message": "Logged Out"
         }

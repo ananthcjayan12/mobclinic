@@ -1,11 +1,11 @@
 import frappe
 from frappe import _
-from frappe.utils import cstr, get_datetime, nowdate
+from frappe.utils import cstr, get_datetime, nowdate, today, getdate
 import json
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 @frappe.whitelist(methods=['GET'])
-def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="creation desc", clinic=None):
+def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="registration_date desc, creation desc", clinic=None):
     """
     Get list of patients with pagination and filtering
     
@@ -25,7 +25,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             if isinstance(fields, str):
                 fields = [f.strip() for f in fields.split(',')]
         else:
-            fields = ["name", "patient_name", "mobile", "email", "sex", "dob", "status", "image"]
+            fields = ["name", "patient_name", "mobile", "email", "sex", "dob", "status", "image", "registration_date"]
             
         # Parse filters
         if filters:
@@ -74,6 +74,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             enhanced_patient.update({
                 "age": age_years,
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient_doc.get("image"),
+                "registration_date": cstr(getattr(patient_doc, 'registration_date', None)),
                 "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None),
                 "total_visits": get_total_appointments(patient_name, practitioner.name if practitioner else None),
                 "pending_amount": get_pending_amount(patient_name),
@@ -340,7 +341,16 @@ def create_patient(**kwargs):
         # Remove clinic from kwargs if it was passed
         if "clinic" in kwargs:
             del kwargs["clinic"]
-        
+
+        # Ensure registration_date is set (use provided value or today's date)
+        if not kwargs.get("registration_date"):
+            kwargs["registration_date"] = today()
+        else:
+            try:
+                kwargs["registration_date"] = getdate(kwargs["registration_date"])
+            except Exception:
+                kwargs["registration_date"] = today()
+
         # Create patient document
         patient = frappe.get_doc({
             "doctype": "Patient",
@@ -357,12 +367,34 @@ def create_patient(**kwargs):
         patient.flags.ignore_permissions = True
         patient.flags.ignore_mandatory = True
         
-        # Use a different approach: set the name manually to avoid naming series issues
+        # Use a company-prefixed sequential ID where possible
+        custom_name = None
         try:
-            # Try normal insert first
-            patient.insert(ignore_permissions=True)
+            if not kwargs.get("naming_series") and not kwargs.get("name"):
+                # Prefer resolved clinic/company abbreviation when available
+                if resolved_clinic:
+                    try:
+                        company = frappe.get_doc("Company", resolved_clinic)
+                        prefix = getattr(company, "abbr", None) or getattr(company, "short_name", None) or company.name
+                        # sanitize and uppercase prefix
+                        prefix = ''.join(ch for ch in prefix if ch.isalnum()).upper()
+                        from frappe.model.naming import make_autoname
+                        # produce format PREFIX-000001 (6 digits)
+                        custom_name = make_autoname(f"{prefix}-.######")
+                    except Exception:
+                        custom_name = None
+
+            # Insert using custom name if generated
+            if custom_name:
+                patient.name = custom_name
+                patient.flags.name_set = True
+                patient.insert(ignore_permissions=True, set_name=patient.name)
+            else:
+                # Try normal insert first
+                patient.insert(ignore_permissions=True)
+
         except frappe.exceptions.NameError:
-            # If naming fails, generate name manually
+            # If naming fails, fallback to deterministic autoname
             from frappe.model.naming import make_autoname
             patient.name = make_autoname("HLC-PAT-.YYYY.-.#####")
             patient.flags.name_set = True
@@ -976,3 +1008,39 @@ def get_last_treatment(patient_id, practitioner_id=None):
         return None
     except:
         return None
+
+
+def set_patient_name_on_insert(doc, method=None):
+    """Doc event handler to set a company-prefixed patient.name before insert.
+
+    Uses `primary_clinic` on the Patient (if present) to pick company abbreviation
+    and generates a name like `DPSDC-000453` using `make_autoname`.
+    """
+    try:
+        # Do nothing if name already set or doc is not a new insert
+        if getattr(doc, "name", None):
+            return
+
+        prefix = None
+        if getattr(doc, "primary_clinic", None):
+            try:
+                company = frappe.get_doc("Company", doc.primary_clinic)
+                prefix = getattr(company, "abbr", None) or getattr(company, "short_name", None) or company.name
+            except Exception:
+                prefix = None
+
+        if prefix:
+            # sanitize and uppercase
+            prefix = ''.join(ch for ch in str(prefix) if ch.isalnum()).upper()
+            from frappe.model.naming import make_autoname
+            try:
+                new_name = make_autoname(f"{prefix}-.######")
+                doc.name = new_name
+                doc.flags.name_set = True
+            except Exception:
+                # fallback: leave naming to standard mechanism
+                pass
+
+    except Exception:
+        # don't block document creation for any failure here
+        frappe.log_error(frappe.get_traceback(), "set_patient_name_on_insert")

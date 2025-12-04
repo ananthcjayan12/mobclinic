@@ -158,6 +158,15 @@ def create_patient_fields():
                 "description": "The primary clinic (Company) this patient belongs to."
             },
             {
+                "fieldname": "registration_date",
+                "label": "Registration Date",
+                "fieldtype": "Date",
+                "insert_after": "dob",
+                "read_only": 0,
+                "no_copy": 0,
+                "description": "Date the patient was registered (set automatically)."
+            },
+            {
                 "fieldname": "mobile_app_section",
                 "label": "Mobile App Profile",
                 "fieldtype": "Section Break", 

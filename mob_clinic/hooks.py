@@ -145,6 +145,13 @@ after_uninstall = "mob_clinic.mob_clinic.install.after_uninstall"
 # 	}
 # }
 
+# Ensure patients created via UI or other apps get company-prefixed IDs
+doc_events = {
+	"Patient": {
+		"before_insert": "mob_clinic.mob_clinic.api.patient.set_patient_name_on_insert"
+	}
+}
+
 # Scheduled Tasks
 # ---------------
 
