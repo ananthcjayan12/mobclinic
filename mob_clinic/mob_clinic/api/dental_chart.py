@@ -1407,27 +1407,85 @@ def validate_patient_access(patient_id):
 
 
 def get_or_create_chart(patient_id):
-    """Get existing chart or create new one"""
+    """Get existing chart or create new one - handles race conditions"""
+    # Try to get existing chart first
     chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
     
     if chart_name:
         return frappe.get_doc("Dental Chart", chart_name)
     
-    # Create new chart
-    chart = frappe.get_doc({
-        "doctype": "Dental Chart",
-        "patient": patient_id,
-        "chart_type": "adult"
-    })
-    chart.insert(ignore_permissions=True)
-    frappe.db.commit()
+    # Check again in case another request created it (race condition handling)
+    existing = frappe.db.exists("Dental Chart", {"patient": patient_id})
+    if existing:
+        return frappe.get_doc("Dental Chart", existing)
     
-    return chart
+    # Create new chart only if it doesn't exist
+    try:
+        chart = frappe.get_doc({
+            "doctype": "Dental Chart",
+            "patient": patient_id,
+            "chart_type": "adult"
+        })
+        chart.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return chart
+    except frappe.exceptions.DuplicateEntryError:
+        # Another request created it between our checks - fetch and return it
+        frappe.db.rollback()
+        chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+        if chart_name:
+            return frappe.get_doc("Dental Chart", chart_name)
+        else:
+            frappe.throw(_("Failed to create or retrieve dental chart"))
+    except Exception as e:
+        frappe.db.rollback()
+        # If it's an integrity error about duplicate patient, try fetching once more
+        if "Duplicate entry" in str(e) and patient_id in str(e):
+            frappe.db.commit()  # Clear any transaction
+            chart_name = frappe.db.get_value("Dental Chart", {"patient": patient_id}, "name")
+            if chart_name:
+                return frappe.get_doc("Dental Chart", chart_name)
+        raise
 
 
 def is_valid_tooth_number(tooth_number):
-    """Validate tooth number (1-32 for adult, 51-85 for child)"""
-    return (1 <= tooth_number <= 32) or (51 <= tooth_number <= 85)
+    """Validate tooth number using FDI World Dental Federation notation
+    
+    Adult teeth (permanent dentition):
+    - Quadrant 1 (upper right): 11-18
+    - Quadrant 2 (upper left): 21-28
+    - Quadrant 3 (lower left): 31-38
+    - Quadrant 4 (lower right): 41-48
+    
+    Primary teeth (deciduous dentition):
+    - Quadrant 5 (upper right): 51-55
+    - Quadrant 6 (upper left): 61-65
+    - Quadrant 7 (lower left): 71-75
+    - Quadrant 8 (lower right): 81-85
+    """
+    tooth_number = int(tooth_number)
+    
+    # Adult teeth (permanent dentition)
+    if 11 <= tooth_number <= 18:  # Upper right
+        return True
+    if 21 <= tooth_number <= 28:  # Upper left
+        return True
+    if 31 <= tooth_number <= 38:  # Lower left
+        return True
+    if 41 <= tooth_number <= 48:  # Lower right
+        return True
+    
+    # Primary teeth (deciduous dentition)
+    if 51 <= tooth_number <= 55:  # Upper right
+        return True
+    if 61 <= tooth_number <= 65:  # Upper left
+        return True
+    if 71 <= tooth_number <= 75:  # Lower left
+        return True
+    if 81 <= tooth_number <= 85:  # Lower right
+        return True
+    
+    return False
 
 
 def update_tooth_status(chart, tooth_numbers):

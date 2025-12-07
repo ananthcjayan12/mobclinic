@@ -330,7 +330,25 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         if resolved_clinic:
             invoice.company = resolved_clinic
         
+        # Resolve appointment id from function arg or request (frontend may send `appointment_id`)
+        appointment_id = appointment_reference
+        try:
+            if not appointment_id:
+                appointment_id = frappe.local.form_dict.get("appointment_id") or frappe.form_dict.get("appointment_id")
+        except Exception:
+            # defensive: if form_dict access not available, ignore
+            appointment_id = appointment_id
+
+        # If appointment provided, validate it exists and is not already invoiced
+        if appointment_id:
+            if not frappe.db.exists("Patient Appointment", appointment_id):
+                frappe.throw(_("Appointment not found: {0}").format(appointment_id))
+            invoiced_flag = frappe.db.get_value("Patient Appointment", appointment_id, "invoiced")
+            if invoiced_flag:
+                frappe.throw(_("Appointment {0} is already invoiced").format(appointment_id))
+
         # Add items
+        first_item = True
         for item in items:
             item_code = item.get("item_code")
             
@@ -360,12 +378,24 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
                 # No item_code provided, use default service item
                 item_code = get_or_create_default_service_item()
             
-            invoice.append("items", {
+            # build item row
+            item_row = {
                 "item_code": item_code,
                 "qty": item.get("qty", 1),
                 "rate": item.get("rate"),
                 "description": item.get("description") or item.get("item_name") or item_code
-            })
+            }
+
+            # If an appointment reference was provided, attach it to the first invoice item
+            # so downstream hooks can link invoices to Patient Appointment documents.
+            if appointment_id and first_item:
+                item_row.update({
+                    "reference_dt": "Patient Appointment",
+                    "reference_dn": appointment_id,
+                })
+                first_item = False
+
+            invoice.append("items", item_row)
         
         # Insert invoice
         invoice.insert(ignore_permissions=True)
@@ -589,6 +619,157 @@ def get_payment_summary(patient_id):
             "next_due_date": next_due_date,
             "pending_invoices": pending_invoices
         }
+
+
+        @frappe.whitelist(methods=['POST'])
+        def pay_patient_pending_invoices(patient_id, amount, mode_of_payment, payment_date=None, reference_no=None, reference_date=None):
+            """
+            Pay pending invoices for a patient using the provided amount (FIFO).
+
+            Args:
+                patient_id: Patient ID
+                amount: Total amount available to pay (will be allocated FIFO to oldest outstanding invoices)
+                mode_of_payment: Mode of payment (Cash, Card, UPI, etc.)
+                payment_date: Optional payment posting date (default: today)
+                reference_no: Optional transaction/reference number
+                reference_date: Optional transaction date
+
+            Returns:
+                dict: { payments: [{payment_id, company, paid_amount}], remaining_amount }
+            """
+            try:
+                practitioner = get_current_practitioner()
+
+                # Validate patient
+                if not frappe.db.exists("Patient", patient_id):
+                    frappe.throw(_("Patient not found"))
+
+                remaining = flt(amount)
+                if remaining <= 0:
+                    frappe.throw(_("Amount must be greater than zero"))
+
+                # Fetch outstanding submitted invoices for the patient ordered FIFO by posting_date
+                invoices = frappe.get_all(
+                    "Sales Invoice",
+                    filters={"patient": patient_id, "docstatus": 1},
+                    fields=["name", "outstanding_amount", "grand_total", "company", "customer", "posting_date"],
+                    order_by="posting_date asc"
+                )
+
+                # Filter those with outstanding > 0
+                invoices = [inv for inv in invoices if flt(inv.get("outstanding_amount") or 0) > 0]
+
+                if not invoices:
+                    return {"message": "No outstanding invoices for patient", "payments": [], "remaining_amount": remaining}
+
+                payments_created = []
+
+                # We'll allocate in invoice FIFO order. Since Payment Entry cannot span companies,
+                # we collect allocations per company and create a Payment Entry per company when needed.
+                allocations_by_company = {}
+                company_order = []
+
+                for inv in invoices:
+                    if remaining <= 0:
+                        break
+
+                    company = inv.get("company") or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+                    alloc = min(remaining, flt(inv.get("outstanding_amount") or 0))
+                    if alloc <= 0:
+                        continue
+
+                    if company not in allocations_by_company:
+                        allocations_by_company[company] = {"total": 0.0, "refs": [], "customer": inv.get("customer")}
+                        company_order.append(company)
+
+                    allocations_by_company[company]["refs"].append({
+                        "reference_doctype": "Sales Invoice",
+                        "reference_name": inv.get("name"),
+                        "allocated_amount": alloc,
+                    })
+                    allocations_by_company[company]["total"] = flt(allocations_by_company[company]["total"]) + alloc
+
+                    # Use the invoice's customer as party
+                    allocations_by_company[company]["customer"] = inv.get("customer") or allocations_by_company[company].get("customer")
+
+                    remaining = flt(remaining) - alloc
+
+                # Create Payment Entry per company for gathered allocations
+                for company in company_order:
+                    group = allocations_by_company[company]
+                    paid_amt = flt(group.get("total"))
+                    if paid_amt <= 0:
+                        continue
+
+                    customer = group.get("customer")
+                    if not customer:
+                        # attempt to derive customer from patient
+                        customer = frappe.db.get_value("Patient", patient_id, "customer")
+                        if not customer:
+                            # create temp customer similar to create_invoice flow
+                            customer_name = f"CUST-{patient_id}"
+                            if not frappe.db.exists("Customer", customer_name):
+                                cust = frappe.get_doc({
+                                    "doctype": "Customer",
+                                    "customer_name": frappe.db.get_value("Patient", patient_id, "patient_name") or customer_name,
+                                    "customer_type": "Individual",
+                                    "customer_group": "Individual",
+                                    "territory": "All Territories",
+                                })
+                                cust.insert(ignore_permissions=True)
+                            customer = customer_name
+
+                    # Determine accounts
+                    debit_account = frappe.db.get_value("Company", company, "default_receivable_account")
+                    mode_of_payment_account = frappe.db.get_value(
+                        "Mode of Payment Account",
+                        {"parent": mode_of_payment, "company": company},
+                        "default_account",
+                    )
+                    if not mode_of_payment_account:
+                        mode_of_payment_account = frappe.db.get_value("Company", company, "default_cash_account")
+
+                    company_currency = frappe.db.get_value("Company", company, "default_currency") or "INR"
+
+                    payment_entry = frappe.get_doc({
+                        "doctype": "Payment Entry",
+                        "payment_type": "Receive",
+                        "company": company,
+                        "posting_date": payment_date or today(),
+                        "mode_of_payment": mode_of_payment,
+                        "party_type": "Customer",
+                        "party": customer,
+                        "paid_from": debit_account,
+                        "paid_to": mode_of_payment_account,
+                        "paid_from_account_currency": company_currency,
+                        "paid_to_account_currency": company_currency,
+                        "paid_amount": paid_amt,
+                        "received_amount": paid_amt,
+                        "source_exchange_rate": 1,
+                        "target_exchange_rate": 1,
+                        "reference_no": reference_no,
+                        "reference_date": reference_date or payment_date or today(),
+                        "references": group.get("refs")
+                    })
+
+                    payment_entry.flags.ignore_permissions = True
+                    payment_entry.flags.ignore_mandatory = True
+
+                    current_user = frappe.session.user
+                    frappe.set_user("Administrator")
+                    try:
+                        payment_entry.insert(ignore_permissions=True)
+                        payment_entry.submit()
+                    finally:
+                        frappe.set_user(current_user)
+
+                    payments_created.append({"payment_id": payment_entry.name, "company": company, "paid_amount": paid_amt})
+
+                return {"message": "Payments processed", "payments": payments_created, "remaining_amount": remaining}
+
+            except Exception as e:
+                frappe.log_error(frappe.get_traceback(), "PayPatientPendingInvoicesError")
+                frappe.throw(_("Error processing payment: {0}").format(str(e)))
         
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Payment Summary Error")

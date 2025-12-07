@@ -148,9 +148,27 @@ after_uninstall = "mob_clinic.mob_clinic.install.after_uninstall"
 # Ensure patients created via UI or other apps get company-prefixed IDs
 doc_events = {
 	"Patient": {
-		"before_insert": "mob_clinic.mob_clinic.api.patient.set_patient_name_on_insert"
+		"before_insert": "mob_clinic.mob_clinic.api.patient.set_patient_name_on_insert",
+		"validate": "mob_clinic.mob_clinic.overrides.patient.patient_validate"
 	}
 }
+
+# Sync appointments when invoices/payments/files change
+doc_events.update({
+	"Sales Invoice": {
+		"on_submit": "mob_clinic.mob_clinic.api.appointment.on_sales_invoice_event",
+		"on_update": "mob_clinic.mob_clinic.api.appointment.on_sales_invoice_event",
+		"on_cancel": "mob_clinic.mob_clinic.api.appointment.on_sales_invoice_event",
+	},
+	"Payment Entry": {
+		"on_submit": "mob_clinic.mob_clinic.api.appointment.on_payment_entry_submit",
+		"on_cancel": "mob_clinic.mob_clinic.api.appointment.on_payment_entry_submit",
+	},
+	"File": {
+		"after_insert": "mob_clinic.mob_clinic.api.appointment.on_file_insert",
+		"on_trash": "mob_clinic.mob_clinic.api.appointment.on_file_insert",
+	}
+})
 
 # Scheduled Tasks
 # ---------------

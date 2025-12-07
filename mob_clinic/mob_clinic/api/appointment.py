@@ -27,7 +27,7 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         else:
             filters = {}
         
-        # Get current practitioner
+        # Get current practitioner and apply practitioner filter (if any)
         practitioner = get_current_practitioner()
         if practitioner:
             filters["practitioner"] = practitioner.name
@@ -48,6 +48,22 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         
         # Handle date range filters
         query_filters = dict(filters)
+
+        # Support a free-text search_term in filters (search across patient_name, patient id)
+        search_term = None
+        if "search_term" in query_filters:
+            try:
+                search_term = query_filters.pop("search_term")
+            except Exception:
+                search_term = None
+
+        or_filters = None
+        if search_term:
+            or_filters = [
+                ["patient_name", "like", f"%{search_term}%"],
+                ["patient", "like", f"%{search_term}%"],
+                ["name", "like", f"%{search_term}%"]
+            ]
         if "date_from" in query_filters:
             date_from = query_filters.pop("date_from")
             date_to = query_filters.pop("date_to", date_from)
@@ -65,6 +81,7 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
                 "practitioner", "practitioner_name"
             ],
             filters=query_filters,
+            or_filters=or_filters,
             limit_start=limit_start,
             limit_page_length=limit_page_length,
             order_by=order_by
@@ -88,8 +105,20 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
             
             enhanced_appointments.append(enhanced_appt)
         
-        # Get total count using the same query_filters
-        total_count = frappe.db.count("Patient Appointment", query_filters)
+        # Get total count using same filters (including or_filters if present)
+        try:
+            if or_filters:
+                total_count = len(frappe.get_all(
+                    "Patient Appointment",
+                    filters=query_filters,
+                    or_filters=or_filters,
+                    fields=["name"]
+                ))
+            else:
+                total_count = frappe.db.count("Patient Appointment", query_filters)
+        except Exception:
+            # Fallback to 0 on any counting issues
+            total_count = 0
         
         return {
             "message": "success",
@@ -1404,3 +1433,173 @@ def get_invoice_status(appointment_id):
     except Exception as e:
         frappe.log_error(f"Error getting invoice status: {str(e)}")
         frappe.throw(_("Failed to get invoice status: {0}").format(str(e)))
+
+
+# --- Invoice / Payment / File synchronization helpers ---
+def _appointment_has_files(appointment_id):
+    """Return True if any File is attached to the Patient Appointment."""
+    try:
+        files = frappe.get_all(
+            "File",
+            filters={
+                "attached_to_doctype": "Patient Appointment",
+                "attached_to_name": appointment_id,
+            },
+            limit=1,
+        )
+        return bool(files)
+    except Exception:
+        return False
+
+
+def update_appointments_for_invoice(invoice_name):
+    """Sync Patient Appointment(s) with a Sales Invoice.
+
+    Behavior:
+    - For each Sales Invoice Item that references a `Patient Appointment` (reference_dt/reference_dn):
+      - set `invoice_id`, `invoice_status`, `invoiced`, `paid_amount` on that appointment
+      - if invoice is submitted and fully paid:
+          - if files attached -> status = "Completed"
+          - else -> status = "Files To Be Uploaded"
+        elif partially paid -> status = "Pending Payment"
+        else -> status = "To Be Invoiced"
+    - When invoice fully paid, optionally mark other `Pending Payment` appointments for the same patient as `Completed`.
+    """
+    try:
+        invoice = frappe.get_doc("Sales Invoice", invoice_name)
+        print(f"Updating appointments for invoice {invoice.name}")
+
+        items = [
+            i for i in (invoice.items or []) if i.get("reference_dt") == "Patient Appointment" and i.get("reference_dn")
+        ]
+        if not items:
+            return
+
+        paid = float(invoice.paid_amount or 0)
+        grand = float(invoice.grand_total or 0)
+
+        linked_patients = set()
+
+        for item in items:
+            appt_id = item.get("reference_dn")
+            if not appt_id or not frappe.db.exists("Patient Appointment", appt_id):
+                continue
+
+            patient = frappe.db.get_value("Patient Appointment", appt_id, "patient")
+            if patient:
+                linked_patients.add(patient)
+
+            files_exist = _appointment_has_files(appt_id)
+
+            # Only mark appointment as invoiced when the Sales Invoice is submitted (docstatus == 1).
+            # Avoid setting `invoiced` during draft/insert/update which can trigger
+            # validation that the appointment is already invoiced during submit.
+
+            updates = {
+                "invoice_id": invoice.name,
+                "invoice_status": invoice.get("status") or "",
+                "paid_amount": paid,
+            }
+            print(f" invoice.docstatus={invoice.docstatus}, paid={paid}, grand={grand}, files_exist={files_exist}")
+            if invoice.docstatus == 1:  # submitted
+                # Determine if any Payment Entry references this invoice
+                try:
+                    payment_ref = frappe.db.sql(
+                        "SELECT parent FROM `tabPayment Entry Reference` WHERE reference_doctype=%s AND reference_name=%s LIMIT 1",
+                        ("Sales Invoice", invoice.name),
+                        as_dict=True,
+                    )
+                    payment_exists = bool(payment_ref)
+                except Exception:
+                    payment_exists = False
+
+                if not payment_exists:
+                    # Invoice submitted but no payment entry recorded yet
+                    updates.update({"status": "Pending Payment"})
+                else:
+                    # There is at least one payment entry for this invoice
+                    # If files attached -> Completed, else require files upload
+                    if files_exist:
+                        updates.update({"status": "Completed", "payment_time": now_datetime()})
+                    else:
+                        updates.update({"status": "Files To Be Uploaded", "payment_time": now_datetime()})
+            else:
+                updates.update({"status": "To Be Invoiced"})
+
+            frappe.db.set_value("Patient Appointment", appt_id, updates, update_modified=False)
+
+        # If invoice fully paid, mark other pending appointments for same patient(s) as Completed
+        if grand > 0 and paid >= grand and linked_patients:
+            for patient in linked_patients:
+                pending_appts = frappe.get_all(
+                    "Patient Appointment", filters={"patient": patient, "status": "Pending Payment"}, fields=["name"]
+                )
+                for pa in pending_appts:
+                    try:
+                        frappe.db.set_value("Patient Appointment", pa.name, {"status": "Completed", "payment_time": now_datetime()}, update_modified=False)
+                    except Exception:
+                        frappe.log_error(f"Failed to mark appointment {pa.name} Completed after invoice payment", "InvoiceSync")
+
+        frappe.db.commit()
+    except Exception as e:
+        frappe.log_error(str(e), "update_appointments_for_invoice")
+
+
+def on_sales_invoice_event(doc, method=None):
+    """Hook target for Sales Invoice doc_events"""
+    try:
+        update_appointments_for_invoice(doc.name)
+    except Exception as e:
+        frappe.log_error(str(e), "on_sales_invoice_event")
+
+
+def on_payment_entry_submit(doc, method=None):
+    """Hook target for Payment Entry - update invoices referenced by the payment"""
+    try:
+        # Payment Entry may reference invoices via `references` child table
+        for ref in getattr(doc, "references", []) or []:
+            if ref.get("reference_doctype") == "Sales Invoice" and ref.get("reference_name"):
+                update_appointments_for_invoice(ref.get("reference_name"))
+    except Exception as e:
+        frappe.log_error(str(e), "on_payment_entry_submit")
+
+
+def on_file_insert(doc, method=None):
+    """When a File is attached/removed, re-evaluate appointment status.
+
+    Triggered on File `after_insert` and `on_trash` via hooks.
+    If a File is attached to a `Patient Appointment` which currently has status
+    `Files To Be Uploaded`, and the linked invoice is fully paid, mark as Completed.
+    """
+    try:
+        attached_to_doctype = getattr(doc, "attached_to_doctype", None)
+        attached_to_name = getattr(doc, "attached_to_name", None)
+        if attached_to_doctype != "Patient Appointment" or not attached_to_name:
+            return
+
+        appt_id = attached_to_name
+        try:
+            appt = frappe.get_doc("Patient Appointment", appt_id)
+        except Exception:
+            return
+
+        # Only act when appointment is in 'Files To Be Uploaded'
+        if appt.status not in ("Files To Be Uploaded",):
+            return
+
+        # If linked invoice exists and is fully paid -> mark Completed
+        if appt.invoice_id:
+            try:
+                inv = frappe.get_doc("Sales Invoice", appt.invoice_id)
+                paid = float(inv.paid_amount or 0)
+                grand = float(inv.grand_total or 0)
+                if grand > 0 and paid >= grand:
+                    # files now present -> Completed
+                    if _appointment_has_files(appt_id):
+                        frappe.db.set_value("Patient Appointment", appt_id, {"status": "Completed", "payment_time": now_datetime()}, update_modified=False)
+                        frappe.db.commit()
+            except Exception:
+                pass
+
+    except Exception as e:
+        frappe.log_error(str(e), "on_file_insert")

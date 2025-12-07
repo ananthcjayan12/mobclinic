@@ -298,7 +298,7 @@ def create_patient(**kwargs):
         
         # Handle age to dob conversion if age is provided but dob is not
         if kwargs.get("age") and not kwargs.get("dob"):
-            from frappe.utils import add_years, today, getdate
+            from frappe.utils import add_years, getdate
             try:
                 age = int(kwargs.get("age"))
                 # Calculate approximate DOB (first day of birth year)
@@ -465,7 +465,7 @@ def update_patient(patient_id, **kwargs):
         # Handle age -> dob conversion if age provided but dob not
         if kwargs.get("age") and not kwargs.get("dob"):
             try:
-                from frappe.utils import add_years, today, getdate
+                from frappe.utils import add_years, getdate
                 age = int(kwargs.get("age"))
                 dob = add_years(getdate(today()), -age)
                 kwargs["dob"] = dob
