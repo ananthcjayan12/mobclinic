@@ -1,0 +1,3 @@
+mob_clinic.mob_clinic.patches.v1_0.add_company_custom_fields
+mob_clinic.mob_clinic.patches.v1_0.create_dental_templates
+mob_clinic.mob_clinic.patches.v1_0.initialize_clinic_settings

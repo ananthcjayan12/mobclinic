@@ -29,18 +29,16 @@
   },
   {
    "fieldname": "type",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Type",
-   "options": "cavity\ncrown\nbridge\nimplant\nroot-canal\nextraction\nfilling\nfracture\nabscess\nother",
-   "reqd": 1
+    "fieldtype": "Data",
+    "in_list_view": 1,
+    "label": "Type",
+    "reqd": 1
   },
-  {
-   "fieldname": "severity",
-   "fieldtype": "Select",
-   "label": "Severity",
-   "options": "\nmild\nmoderate\nsevere"
-  },
+    {
+     "fieldname": "severity",
+     "fieldtype": "Data",
+     "label": "Severity"
+    },
   {
    "fieldname": "notes",
    "fieldtype": "Text",

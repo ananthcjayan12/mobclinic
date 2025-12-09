@@ -1,0 +1,199 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:CONDOV-{#####}",
+ "creation": "2025-12-07 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "clinic",
+  "condition_template",
+  "column_break_1",
+  "is_custom_condition",
+  "section_break_1",
+  "condition_name",
+  "code",
+  "type",
+  "category",
+  "column_break_2",
+  "icon",
+  "color",
+  "treatment_required",
+  "is_active",
+  "section_break_2",
+  "description",
+  "section_break_3",
+  "severity_levels"
+ ],
+ "fields": [
+  {
+   "fieldname": "clinic",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Clinic",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "condition_template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Condition Template",
+   "options": "Dental Condition Template"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Is this a custom condition created by this clinic (not from template)?",
+   "fieldname": "is_custom_condition",
+   "fieldtype": "Check",
+   "label": "Is Custom Condition"
+  },
+  {
+   "depends_on": "eval:doc.is_custom_condition==1",
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Custom Condition Details"
+  },
+  {
+   "fieldname": "condition_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Condition Name"
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "label": "Code"
+  },
+  {
+   "default": "other",
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "cavity\ncrown\nbridge\nimplant\nroot-canal\nfilling\nextraction\nfracture\nabscess\ngingivitis\nperiodontitis\nother"
+  },
+  {
+   "default": "Other",
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "Category",
+   "options": "Decay\nGum Disease\nStructural\nTrauma\nInfection\nCongenital\nCosmetic\nOther"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Data",
+   "label": "Color"
+  },
+  {
+   "default": "0",
+   "fieldname": "treatment_required",
+   "fieldtype": "Check",
+   "label": "Treatment Required"
+  },
+  {
+   "default": "1",
+   "description": "Is this condition active for this clinic?",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Severity Levels"
+  },
+  {
+   "fieldname": "severity_levels",
+   "fieldtype": "Table",
+   "label": "Severity Levels",
+   "options": "Dental Condition Severity Level"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-12-07 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Dental Condition Clinic Override",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Administrator",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Physician",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Practitioner",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "unique_constraint_fields": "[\"clinic\",\"condition_template\"]"
+}

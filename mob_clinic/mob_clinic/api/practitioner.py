@@ -6,6 +6,7 @@ Handles practitioner-related API endpoints for mobile app
 import frappe
 from frappe import _
 from frappe.utils import cint
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 @frappe.whitelist(allow_guest=False)
 def get_practitioners():
@@ -25,7 +26,19 @@ def get_practitioners():
         }
     """
     try:
-        # Fetch all active practitioners
+        # Determine active clinic for this session/user. Prefer resolving
+        # with practitioner's primary company when available so that
+        # session-scoped active clinic and practitioner fallback are handled.
+        user = frappe.session.user
+        try:
+            session_practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": user})
+            session_practitioner_name = session_practitioner.name
+        except Exception:
+            session_practitioner_name = None
+
+        active_clinic = clinic_helper.resolve_active_clinic(practitioner_name=session_practitioner_name, clinic_param=None)
+
+        # Fetch all active practitioners, then filter by active clinic (if set).
         practitioners = frappe.get_all(
             "Healthcare Practitioner",
             filters={"status": "Active"},
@@ -35,14 +48,26 @@ def get_practitioners():
             ],
             order_by="practitioner_name asc"
         )
-        
-        # Add availability flag (you can add custom logic here)
+
+        filtered = []
         for practitioner in practitioners:
-            practitioner["available"] = True
-        
+            if not active_clinic:
+                include = True
+            else:
+                # Check whether this practitioner has access to the active clinic
+                try:
+                    companies = clinic_helper.get_accessible_companies_for_practitioner(practitioner.get("name"))
+                except Exception:
+                    companies = []
+                include = active_clinic in (companies or [])
+
+            if include:
+                practitioner["available"] = True
+                filtered.append(practitioner)
+
         return {
             "message": "Success",
-            "data": practitioners
+            "data": filtered
         }
         
     except Exception as e:
@@ -66,7 +91,24 @@ def get_practitioner(practitioner_id):
             frappe.throw(_("Practitioner ID is required"))
         
         practitioner = frappe.get_doc("Healthcare Practitioner", practitioner_id)
-        
+
+        # Ensure practitioner belongs to the active clinic (if session has one)
+        user = frappe.session.user
+        try:
+            session_practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": user})
+            session_practitioner_name = session_practitioner.name
+        except Exception:
+            session_practitioner_name = None
+
+        active_clinic = clinic_helper.resolve_active_clinic(practitioner_name=session_practitioner_name, clinic_param=None)
+        if active_clinic:
+            if not clinic_helper.validate_practitioner_access(practitioner.name, active_clinic):
+                frappe.local.response["http_status_code"] = 403
+                return {
+                    "exc_type": "PermissionError",
+                    "message": "Practitioner does not belong to the active clinic"
+                }
+
         return {
             "message": "Success",
             "data": {
