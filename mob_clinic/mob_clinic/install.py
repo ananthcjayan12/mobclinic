@@ -2,12 +2,19 @@ import frappe
 from frappe import _
 
 from mob_clinic.mob_clinic.patches.v1_0.install_custom_fields import execute as install_custom_fields
+from mob_clinic.mob_clinic.patches.v1_0.add_company_custom_fields import execute as add_company_custom_fields
+from mob_clinic.mob_clinic.patches.v1_0.initialize_clinic_settings import execute as initialize_clinic_settings
+from mob_clinic.mob_clinic.patches.v1_0.create_dental_templates import execute as create_dental_templates   
 
 def after_install():
     """Actions to perform after app installation"""
     
     # Install custom fields
     install_custom_fields()
+    add_company_custom_fields()
+    initialize_clinic_settings()
+    create_dental_templates()
+    
 
     # Create default appointment types if they don't exist
     create_default_appointment_types()

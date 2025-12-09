@@ -6,6 +6,19 @@ Manage clinic information, branding, settings, and customization
 import frappe
 from frappe import _
 import json
+from frappe.utils import get_url
+
+
+def _full_url(path):
+	"""Return a full URL for `path`. If `path` is already absolute, return it unchanged."""
+	if not path:
+		return None
+	if path.startswith("http://") or path.startswith("https://"):
+		return path
+	try:
+		return get_url(path)
+	except Exception:
+		return path
 
 @frappe.whitelist()
 def get_clinic_profile(clinic):
@@ -58,7 +71,7 @@ def get_clinic_profile(clinic):
 			"basic_info": {
 				"clinic_name": company.company_name,
 				"abbr": company.abbr,
-				"logo_url": company.company_logo if company.company_logo else None,
+				"logo_url": _full_url(company.company_logo) if company.company_logo else None,
 				"phone": company.phone_no if hasattr(company, 'phone_no') else None,
 				"email": company.email if hasattr(company, 'email') else None,
 				"website": company.website if hasattr(company, 'website') else None,
@@ -87,8 +100,8 @@ def get_clinic_profile(clinic):
 				"header_text": settings.invoice_header_text,
 				"footer_text": settings.invoice_footer_text,
 				"terms_conditions": settings.invoice_terms_conditions,
-				"signature_url": settings.invoice_signature if settings.invoice_signature else None,
-				"seal_url": settings.clinic_seal if settings.clinic_seal else None,
+				"signature_url": _full_url(settings.invoice_signature) if settings.invoice_signature else None,
+				"seal_url": _full_url(settings.clinic_seal) if settings.clinic_seal else None,
 				"show_logo": settings.show_logo_on_invoice,
 				"show_seal": settings.show_seal_on_prescription
 			}
@@ -429,7 +442,7 @@ def upload_logo(clinic):
 		
 		return {
 			"message": "Logo uploaded successfully",
-			"logo_url": ret.file_url
+			"logo_url": _full_url(ret.file_url)
 		}
 	
 	except Exception as e:
@@ -499,7 +512,7 @@ def upload_document(clinic, document_type):
 		
 		return {
 			"message": f"{document_type.capitalize()} uploaded successfully",
-			"file_url": ret.file_url
+			"file_url": _full_url(ret.file_url)
 		}
 	
 	except Exception as e:

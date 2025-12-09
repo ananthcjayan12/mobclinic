@@ -55,7 +55,23 @@ def execute():
 		]
 	}
 	
-	create_custom_fields(custom_fields, update=True)
+	# Create custom fields one by one, catching ValidationError if field already exists
+	for doctype, fields in custom_fields.items():
+		for df in fields:
+			try:
+				# Check if custom field already exists
+				if frappe.db.exists("Custom Field", {"dt": doctype, "fieldname": df.get("fieldname")}):
+					print(f"Custom field {df.get('fieldname')} already exists in {doctype}, skipping")
+					continue
+				
+				# Create single field
+				create_custom_fields({doctype: [df]}, update=True)
+				print(f"Created custom field {df.get('fieldname')} in {doctype}")
+			except frappe.exceptions.ValidationError as e:
+				if "already exists" in str(e):
+					print(f"Custom field {df.get('fieldname')} already exists in {doctype}, skipping")
+				else:
+					raise
 	
 	frappe.db.commit()
-	print("Custom fields added to Company DocType successfully")
+	print("Custom fields processing completed for Company DocType")
