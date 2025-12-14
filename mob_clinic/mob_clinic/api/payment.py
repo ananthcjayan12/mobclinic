@@ -253,7 +253,8 @@ def get_invoice(invoice_id):
 @frappe.whitelist(methods=['POST'])
 def create_invoice(patient_id, items, posting_date=None, due_date=None, 
                    treatment_type=None, treatment_description=None,
-                   appointment_reference=None, remarks=None, clinic=None):
+                   appointment_reference=None, remarks=None, clinic=None,
+                   discount_amount=None, tax_amount=None, discount_percentage=None):
     """
     Create a new Sales Invoice
     
@@ -266,6 +267,10 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         treatment_description: Treatment details
         appointment_reference: Link to Patient Appointment
         remarks: Additional notes
+        clinic: Clinic/Company to create invoice for
+        discount_amount: Fixed discount amount to apply
+        tax_amount: Tax amount (for display purposes, actual tax calculated by tax template)
+        discount_percentage: Percentage discount to apply
     
     Returns:
         Created invoice details
@@ -329,6 +334,14 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         # Assign company if clinic/company resolved
         if resolved_clinic:
             invoice.company = resolved_clinic
+        
+        # Apply discount if provided
+        if discount_amount:
+            invoice.apply_discount_on = "Grand Total"
+            invoice.discount_amount = flt(discount_amount)
+        elif discount_percentage:
+            invoice.apply_discount_on = "Grand Total"
+            invoice.additional_discount_percentage = flt(discount_percentage)
         
         # Resolve appointment id from function arg or request (frontend may send `appointment_id`)
         appointment_id = appointment_reference
@@ -407,6 +420,9 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "message": "Invoice created successfully",
             "invoice_id": invoice.name,
             "grand_total": invoice.grand_total,
+            "net_total": invoice.net_total,
+            "discount_amount": invoice.discount_amount or 0,
+            "total_taxes_and_charges": invoice.total_taxes_and_charges or 0,
             "outstanding_amount": invoice.outstanding_amount,
             "status": invoice.status
         }

@@ -279,7 +279,11 @@ ignore_csrf = [
 # --------
 # Run migration patches to install custom fields and configurations
 patches = [
-    "mob_clinic.mob_clinic.patches.v1_0.install_custom_fields.execute"
+    "mob_clinic.mob_clinic.patches.v1_0.install_custom_fields.execute",
+    "mob_clinic.mob_clinic.patches.v1_0.create_payment_modes.execute",
+    "mob_clinic.mob_clinic.patches.v1_0.initialize_clinic_settings.execute",
+	"mob_clinic.mob_clinic.patches.v1_0.create_dental_templates.execute",
+	"mob_clinic.mob_clinic.patches.v1_0.add_company_custom_fields.execute"
 ]
 
 # Authentication and authorization
