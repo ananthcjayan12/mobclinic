@@ -327,30 +327,49 @@ def create_prescription(patient_id, **kwargs):
                 medications = json.loads(medications)
             
             for med in medications:
-                # Only include absolutely required and safe fields
+                # Skip empty medications
+                if not med.get("drug_name") and not med.get("drug_code"):
+                    continue
+                    
                 drug_data = {}
                 
-                # Required: drug_code (Link to Item)
+                # drug_code is optional - if provided, use it
                 if med.get("drug_code"):
                     drug_data["drug_code"] = med.get("drug_code")
-                    
-                # Optional: drug_name (fetched from drug_code usually)
+                elif med.get("drug_name"):
+                    # Try to find a matching Item by name
+                    item_name = frappe.db.get_value("Item", {"item_name": med.get("drug_name")}, "name")
+                    if item_name:
+                        drug_data["drug_code"] = item_name
+                    else:
+                        # Create the drug_code from drug_name if no Item exists
+                        # Just use drug_name as drug_code - Frappe will handle validation
+                        drug_data["drug_code"] = med.get("drug_name")
+                
+                # drug_name is required for display
                 if med.get("drug_name"):
                     drug_data["drug_name"] = med.get("drug_name")
                 
-                # Optional: interval fields
+                # Optional: dosage, period, dosage_form as text in comment
+                comment_parts = []
+                if med.get("dosage"):
+                    comment_parts.append(f"Dosage: {med.get('dosage')}")
+                if med.get("period"):
+                    comment_parts.append(f"Duration: {med.get('period')}")
                 if med.get("interval"):
-                    drug_data["interval"] = int(med.get("interval"))
-                if med.get("interval_uom"):
-                    drug_data["interval_uom"] = med.get("interval_uom")
-                
-                # Optional: comment (stores dosage/period as text)
+                    comment_parts.append(f"Interval: {med.get('interval')}")
+                if med.get("dosage_form"):
+                    comment_parts.append(f"Form: {med.get('dosage_form')}")
                 if med.get("comment"):
-                    drug_data["comment"] = med.get("comment")
+                    comment_parts.append(med.get("comment"))
                 
-                # Do NOT add: dosage_form, dosage, period - they need master data
-                    
-                record.append("drug_prescription", drug_data)
+                if comment_parts:
+                    drug_data["comment"] = " | ".join(comment_parts)
+                
+                # Only add if we have at least drug_name or drug_code
+                if drug_data.get("drug_name") or drug_data.get("drug_code"):
+                    record.append("drug_prescription", drug_data)
+        
         
         # Add investigations if provided
         investigations = kwargs.get("investigations")
