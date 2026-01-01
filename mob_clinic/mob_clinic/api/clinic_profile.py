@@ -20,7 +20,7 @@ def _full_url(path):
 	except Exception:
 		return path
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_clinic_profile(clinic):
 	"""
 	Get complete clinic profile including basic info, address, branding, and settings

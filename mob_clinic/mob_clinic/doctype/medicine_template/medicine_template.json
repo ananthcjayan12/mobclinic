@@ -1,0 +1,191 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "autoname": "format:MED-{#####}",
+    "creation": "2025-12-23 10:00:00.000000",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "medicine_name",
+        "generic_name",
+        "dosage_form",
+        "strength",
+        "column_break_basic",
+        "category",
+        "is_active",
+        "section_dosage",
+        "default_morning",
+        "default_lunch",
+        "default_evening",
+        "default_night",
+        "column_break_dosage",
+        "default_days",
+        "default_condition",
+        "section_notes",
+        "instructions",
+        "description"
+    ],
+    "fields": [
+        {
+            "fieldname": "medicine_name",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "in_standard_filter": 1,
+            "label": "Medicine Name",
+            "reqd": 1
+        },
+        {
+            "fieldname": "generic_name",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Generic Name"
+        },
+        {
+            "default": "Tablet",
+            "fieldname": "dosage_form",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Dosage Form",
+            "options": "Tablet\nCapsule\nSyrup\nDrops\nInjection\nCream\nOintment\nGel\nPowder\nInhaler\nSuspension\nMouthwash\nOther"
+        },
+        {
+            "fieldname": "strength",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Strength",
+            "description": "e.g., 500mg, 10ml"
+        },
+        {
+            "fieldname": "column_break_basic",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "Other",
+            "fieldname": "category",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "in_standard_filter": 1,
+            "label": "Category",
+            "options": "Antibiotic\nAnalgesic\nAnti-inflammatory\nAntifungal\nAntiviral\nAntiseptic\nAnesthetic\nVitamin\nMineral\nAntacid\nAntihistamine\nSteroid\nMuscle Relaxant\nOther"
+        },
+        {
+            "default": "1",
+            "fieldname": "is_active",
+            "fieldtype": "Check",
+            "label": "Is Active"
+        },
+        {
+            "fieldname": "section_dosage",
+            "fieldtype": "Section Break",
+            "label": "Default Dosage"
+        },
+        {
+            "default": "0",
+            "fieldname": "default_morning",
+            "fieldtype": "Int",
+            "label": "Morning"
+        },
+        {
+            "default": "0",
+            "fieldname": "default_lunch",
+            "fieldtype": "Int",
+            "label": "Lunch"
+        },
+        {
+            "default": "0",
+            "fieldname": "default_evening",
+            "fieldtype": "Int",
+            "label": "Evening"
+        },
+        {
+            "default": "0",
+            "fieldname": "default_night",
+            "fieldtype": "Int",
+            "label": "Night"
+        },
+        {
+            "fieldname": "column_break_dosage",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "5",
+            "fieldname": "default_days",
+            "fieldtype": "Int",
+            "label": "Days"
+        },
+        {
+            "default": "After Food",
+            "fieldname": "default_condition",
+            "fieldtype": "Select",
+            "label": "Special Condition",
+            "options": "After Food\nBefore Food\nWith Food\nEmpty Stomach\nAs Needed\nBedtime"
+        },
+        {
+            "fieldname": "section_notes",
+            "fieldtype": "Section Break",
+            "label": "Additional Information"
+        },
+        {
+            "fieldname": "instructions",
+            "fieldtype": "Small Text",
+            "label": "Special Instructions"
+        },
+        {
+            "fieldname": "description",
+            "fieldtype": "Text Editor",
+            "label": "Description"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2025-12-23 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "Mob Clinic",
+    "name": "Medicine Template",
+    "naming_rule": "Expression",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Healthcare Administrator",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "Physician",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "quick_entry": 1,
+    "search_fields": "medicine_name,generic_name,category",
+    "sort_field": "medicine_name",
+    "sort_order": "ASC",
+    "states": [],
+    "track_changes": 1
+}

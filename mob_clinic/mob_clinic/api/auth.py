@@ -160,8 +160,8 @@ def mobile_login(usr, pwd):
         frappe.local.response["http_status_code"] = 500
         return {
             "exc_type": "ServerError",
-            "message": "Internal server error during login"
         }
+
 
 @frappe.whitelist(allow_guest=True, methods=['POST'])
 def mobile_register(full_name, email, phone, password, clinic_name, **kwargs):
@@ -375,6 +375,19 @@ def get_practitioner_profile():
                 })
         
         profile_data["working_hours"] = working_hours
+        
+        # Add clinic data for frontend
+        try:
+            clinics = clinic_helper.get_accessible_companies_for_practitioner(practitioner.name)
+            active_clinic = clinic_helper.resolve_active_clinic(
+                practitioner_name=practitioner.name,
+                clinic_param=None
+            )
+            profile_data["clinics"] = clinics
+            profile_data["active_clinic"] = active_clinic
+        except Exception:
+            profile_data["clinics"] = []
+            profile_data["active_clinic"] = None
         
         return {
             "message": "success",

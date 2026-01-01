@@ -10,6 +10,9 @@ from datetime import datetime, timedelta
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
+
+
+
 def get_current_practitioner():
     """Get the Healthcare Practitioner linked to current user"""
     user = frappe.session.user
@@ -98,15 +101,18 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         # --------------------------
         recent_transactions = _get_recent_transactions(base_filters, limit=10)
 
+        # Prepare response data
+        response_data = {
+            "summary": summary,
+            "revenue_trend": revenue_trend,
+            "payment_modes": payment_modes,
+            "top_procedures": top_procedures,
+            "recent_transactions": recent_transactions,
+        }
+
         return {
             "message": "Success",
-            "data": {
-                "summary": summary,
-                "revenue_trend": revenue_trend,
-                "payment_modes": payment_modes,
-                "top_procedures": top_procedures,
-                "recent_transactions": recent_transactions,
-            }
+            "data": response_data
         }
 
     except Exception as e:
@@ -118,10 +124,56 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         }
 
 
-def _calculate_summary(base_filters, today_date, from_date, to_date):
-    """Calculate dashboard summary metrics."""
+def _get_payments_for_period(practitioner, company, from_date, to_date):
+    """Get all payment allocations for practitioner's invoices in date range."""
+    
+    # First get all practitioner invoices (no date filter on invoices)
+    invoice_filters = {"healthcare_practitioner": practitioner, "docstatus": 1}
+    if company:
+        invoice_filters["company"] = company
+    
+    practitioner_invoices = frappe.get_all(
+        "Sales Invoice",
+        filters=invoice_filters,
+        fields=["name"],
+        pluck="name"
+    )
+    
+    if not practitioner_invoices:
+        return []
+    
+    # Get payments allocated to these invoices within the date range
+    payments = frappe.db.sql("""
+        SELECT 
+            pe.name,
+            pe.posting_date,
+            pe.mode_of_payment,
+            per.allocated_amount,
+            per.reference_name as invoice_id
+        FROM `tabPayment Entry` pe
+        INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+        WHERE pe.docstatus = 1
+            AND pe.payment_type = 'Receive'
+            AND pe.posting_date BETWEEN %s AND %s
+            AND per.reference_doctype = 'Sales Invoice'
+            AND per.reference_name IN %s
+    """, (from_date, to_date, practitioner_invoices), as_dict=True)
+    
+    return payments
 
-    # Today's collection
+
+def _calculate_summary(base_filters, today_date, from_date, to_date):
+    """Calculate dashboard summary metrics with corrected collection logic."""
+    
+    practitioner = base_filters.get("healthcare_practitioner")
+    company = base_filters.get("company")
+    
+    # TODAY'S METRICS
+    # Get actual payments received today (not invoice status)
+    today_payments = _get_payments_for_period(practitioner, company, today_date, today_date)
+    today_collection = sum(flt(p.get('allocated_amount', 0)) for p in today_payments)
+    
+    # Get today's invoices for context
     today_filters = dict(base_filters)
     today_filters["posting_date"] = today_date
     today_invoices = frappe.get_all(
@@ -129,18 +181,12 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
         filters=today_filters,
         fields=["grand_total", "outstanding_amount"]
     )
-    today_collection = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in today_invoices)
+    today_invoiced = sum(flt(inv.grand_total) for inv in today_invoices)
 
     # Yesterday's collection (for growth comparison)
     yesterday = add_days(today_date, -1)
-    yesterday_filters = dict(base_filters)
-    yesterday_filters["posting_date"] = yesterday
-    yesterday_invoices = frappe.get_all(
-        "Sales Invoice",
-        filters=yesterday_filters,
-        fields=["grand_total", "outstanding_amount"]
-    )
-    yesterday_collection = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in yesterday_invoices)
+    yesterday_payments = _get_payments_for_period(practitioner, company, yesterday, yesterday)
+    yesterday_collection = sum(flt(p.get('allocated_amount', 0)) for p in yesterday_payments)
 
     # Today's growth percentage
     if yesterday_collection > 0:
@@ -148,7 +194,11 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
     else:
         today_growth = 100.0 if today_collection > 0 else 0.0
 
-    # Month collection (from_date to to_date)
+    # PERIOD METRICS (from_date to to_date)
+    period_payments = _get_payments_for_period(practitioner, company, from_date, to_date)
+    period_collection = sum(flt(p.get('allocated_amount', 0)) for p in period_payments)
+    
+    # Period invoices for context
     month_filters = dict(base_filters)
     month_filters["posting_date"] = ["between", [from_date, to_date]]
     month_invoices = frappe.get_all(
@@ -156,53 +206,167 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
         filters=month_filters,
         fields=["grand_total", "outstanding_amount"]
     )
-    month_collection = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in month_invoices)
+    period_invoiced = sum(flt(inv.grand_total) for inv in month_invoices)
 
-    # Last month same period (for month growth comparison)
-    last_month_start = add_months(from_date, -1)
-    last_month_end = add_months(to_date, -1)
-    last_month_filters = dict(base_filters)
-    last_month_filters["posting_date"] = ["between", [last_month_start, last_month_end]]
-    last_month_invoices = frappe.get_all(
-        "Sales Invoice",
-        filters=last_month_filters,
-        fields=["grand_total", "outstanding_amount"]
-    )
-    last_month_collection = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in last_month_invoices)
+    # PREVIOUS PERIOD COMPARISON (same number of days)
+    days_diff = (to_date - from_date).days
+    prev_end = add_days(from_date, -1)
+    prev_start = add_days(prev_end, -days_diff)
+    
+    prev_payments = _get_payments_for_period(practitioner, company, prev_start, prev_end)
+    prev_collection = sum(flt(p.get('allocated_amount', 0)) for p in prev_payments)
 
-    # Month growth percentage
-    if last_month_collection > 0:
-        month_growth = round(((month_collection - last_month_collection) / last_month_collection) * 100, 1)
+    # Period growth percentage
+    if prev_collection > 0:
+        period_growth = round(((period_collection - prev_collection) / prev_collection) * 100, 1)
     else:
-        month_growth = 100.0 if month_collection > 0 else 0.0
+        period_growth = 100.0 if period_collection > 0 else 0.0
 
-    # Total outstanding
+    # Total outstanding (all time, not just period)
     outstanding_filters = dict(base_filters)
     outstanding_filters["outstanding_amount"] = [">", 0]
     outstanding_invoices = frappe.get_all(
         "Sales Invoice",
         filters=outstanding_filters,
-        fields=["outstanding_amount"]
+        fields=["outstanding_amount", "posting_date"]
     )
     total_outstanding = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices)
+    
+    # Aging analysis
+    aging_30 = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices 
+                   if (today_date - getdate(inv.posting_date)).days <= 30)
+    aging_60 = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices 
+                   if 30 < (today_date - getdate(inv.posting_date)).days <= 60)
+    aging_90_plus = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices 
+                        if (today_date - getdate(inv.posting_date)).days > 60)
 
     # Patient counts (total, new, returning in the date range)
-    patient_stats = _calculate_patient_stats(base_filters, from_date, to_date)
+    patient_stats = _calculate_patient_stats_optimized(base_filters, from_date, to_date)
+    
+    # ADDITIONAL KEY METRICS
+    collection_rate = round((period_collection / period_invoiced * 100), 1) if period_invoiced > 0 else 0
+    avg_transaction = round((period_collection / len(period_payments)), 2) if period_payments else 0
 
     return {
+        # Today
         "today_collection": round(today_collection, 2),
+        "today_invoiced": round(today_invoiced, 2),
         "today_growth": today_growth,
-        "month_collection": round(month_collection, 2),
-        "month_growth": month_growth,
+        
+        # Period (keeping old keys for backward compatibility)
+        "month_collection": round(period_collection, 2),
+        "month_growth": period_growth,
+        
+        # New period keys
+        "period_collection": round(period_collection, 2),
+        "period_invoiced": round(period_invoiced, 2),
+        "period_growth": period_growth,
+        "collection_rate": collection_rate,
+        
+        # Outstanding
         "total_outstanding": round(total_outstanding, 2),
+        "outstanding_count": len(outstanding_invoices),
+        "aging_analysis": {
+            "0_30_days": round(aging_30, 2),
+            "31_60_days": round(aging_60, 2),
+            "60_plus_days": round(aging_90_plus, 2)
+        },
+        
+        # Patients
         "total_patients": patient_stats["total_patients"],
         "new_patients": patient_stats["new_patients"],
-        "returning_patients": patient_stats["returning_patients"]
+        "returning_patients": patient_stats["returning_patients"],
+        
+        # Additional insights
+        "avg_transaction_value": avg_transaction,
+        "total_transactions": len(period_payments)
+    }
+
+
+def _calculate_patient_stats_optimized(base_filters, from_date, to_date):
+    """Calculate patient statistics - OPTIMIZED to avoid N+1 queries."""
+    
+    practitioner = base_filters.get("healthcare_practitioner")
+    company = base_filters.get("company")
+    
+    # Get unique patients in period
+    period_patients_query = """
+        SELECT DISTINCT patient
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+            AND posting_date BETWEEN %s AND %s
+            AND healthcare_practitioner = %s
+            {company_filter}
+            AND patient IS NOT NULL
+    """
+    
+    params = [from_date, to_date, practitioner]
+    company_filter = ""
+    if company:
+        company_filter = "AND company = %s"
+        params.append(company)
+    
+    period_patients = frappe.db.sql(
+        period_patients_query.format(company_filter=company_filter),
+        tuple(params),
+        as_dict=True
+    )
+    
+    patient_ids = [p.patient for p in period_patients]
+    total_patients = len(patient_ids)
+    
+    if total_patients == 0:
+        return {"total_patients": 0, "new_patients": 0, "returning_patients": 0}
+    
+    # Get first invoice date for all patients in ONE query
+    first_invoice_query = """
+        SELECT 
+            patient,
+            MIN(posting_date) as first_invoice_date
+        FROM `tabSales Invoice`
+        WHERE docstatus = 1
+            AND healthcare_practitioner = %s
+            {company_filter}
+            AND patient IN %s
+        GROUP BY patient
+    """
+    
+    params = [practitioner]
+    if company:
+        company_filter = "AND company = %s"
+        params.append(company)
+    else:
+        company_filter = ""
+    params.append(patient_ids)
+    
+    first_invoices = frappe.db.sql(
+        first_invoice_query.format(company_filter=company_filter),
+        tuple(params),
+        as_dict=True
+    )
+    
+    # Count new vs returning
+    new_patients = 0
+    returning_patients = 0
+    
+    for record in first_invoices:
+        if getdate(record.first_invoice_date) >= from_date:
+            new_patients += 1
+        else:
+            returning_patients += 1
+    
+    return {
+        "total_patients": total_patients,
+        "new_patients": new_patients,
+        "returning_patients": returning_patients
     }
 
 
 def _calculate_patient_stats(base_filters, from_date, to_date):
-    """Calculate patient statistics for the date range."""
+    """Calculate patient statistics for the date range.
+    DEPRECATED: Use _calculate_patient_stats_optimized instead to avoid N+1 queries.
+    Kept for backward compatibility.
+    """
     # Get all unique patients invoiced in the date range
     invoice_filters = dict(base_filters)
     invoice_filters["posting_date"] = ["between", [from_date, to_date]]
@@ -244,24 +408,32 @@ def _calculate_patient_stats(base_filters, from_date, to_date):
 
 
 def _calculate_revenue_trend(base_filters, from_date, to_date):
-    """Calculate daily revenue trend for the date range."""
+    """Calculate daily revenue trend based on actual payments received."""
+    
+    practitioner = base_filters.get("healthcare_practitioner")
+    company = base_filters.get("company")
+    
+    # Get all payments for the period at once
+    all_payments = _get_payments_for_period(practitioner, company, from_date, to_date)
+    
+    # Group by date
+    payments_by_date = {}
+    for payment in all_payments:
+        date_str = str(payment.posting_date)
+        if date_str not in payments_by_date:
+            payments_by_date[date_str] = 0
+        payments_by_date[date_str] += flt(payment.get('allocated_amount', 0))
+    
     revenue_trend = []
-
+    
     # Iterate through each day in the date range
     current_date = from_date
     while current_date <= to_date:
-        day_filters = dict(base_filters)
-        day_filters["posting_date"] = current_date
-
-        day_invoices = frappe.get_all(
-            "Sales Invoice",
-            filters=day_filters,
-            fields=["grand_total", "outstanding_amount"]
-        )
-        day_amount = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in day_invoices)
+        date_str = str(current_date)
+        day_amount = payments_by_date.get(date_str, 0)
 
         revenue_trend.append({
-            "date": str(current_date),
+            "date": date_str,
             "amount": round(day_amount, 2)
         })
 
@@ -480,7 +652,16 @@ def get_collection_summary(period="today", clinic=None):
         if resolved_clinic:
             filters["company"] = resolved_clinic
 
-        # Get invoices
+        # Get actual payments for the period
+        period_payments = _get_payments_for_period(
+            practitioner.name, 
+            resolved_clinic, 
+            from_date, 
+            to_date
+        )
+        total_collected = sum(flt(p.get('allocated_amount', 0)) for p in period_payments)
+
+        # Get invoices for context
         invoices = frappe.get_all(
             "Sales Invoice",
             filters=filters,
@@ -488,7 +669,6 @@ def get_collection_summary(period="today", clinic=None):
         )
 
         total_invoiced = sum(flt(inv.grand_total) for inv in invoices)
-        total_collected = sum(flt(inv.grand_total - inv.outstanding_amount) for inv in invoices)
         total_outstanding = sum(flt(inv.outstanding_amount) for inv in invoices)
 
         return {
@@ -500,7 +680,8 @@ def get_collection_summary(period="today", clinic=None):
                 "total_invoiced": round(total_invoiced, 2),
                 "total_collected": round(total_collected, 2),
                 "total_outstanding": round(total_outstanding, 2),
-                "invoice_count": len(invoices)
+                "invoice_count": len(invoices),
+                "transaction_count": len(period_payments)
             }
         }
 

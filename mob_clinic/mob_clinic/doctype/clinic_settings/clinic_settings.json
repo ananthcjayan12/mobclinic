@@ -1,283 +1,325 @@
 {
- "actions": [],
- "allow_rename": 1,
- "autoname": "field:clinic",
- "creation": "2025-12-07 12:00:00.000000",
- "doctype": "DocType",
- "editable_grid": 1,
- "engine": "InnoDB",
- "field_order": [
-  "clinic",
-  "section_break_branding",
-  "primary_color",
-  "secondary_color",
-  "text_color",
-  "background_color",
-  "column_break_brand",
-  "font_family",
-  "section_break_invoice",
-  "invoice_header_text",
-  "invoice_footer_text",
-  "invoice_terms_conditions",
-  "column_break_invoice",
-  "invoice_signature",
-  "clinic_seal",
-  "show_logo_on_invoice",
-  "show_seal_on_prescription",
-  "section_break_notification",
-  "appointment_reminder_message",
-  "payment_receipt_message",
-  "prescription_message",
-  "column_break_notification",
-  "sms_sender_name",
-  "section_break_social",
-  "facebook_url",
-  "instagram_url",
-  "column_break_social",
-  "twitter_url",
-  "google_maps_url",
-  "section_break_additional",
-  "appointment_slot_duration",
-  "allow_online_booking",
-  "column_break_additional",
-  "timezone",
-  "currency"
- ],
- "fields": [
-  {
-   "fieldname": "clinic",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Clinic",
-   "options": "Company",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "fieldname": "section_break_branding",
-   "fieldtype": "Section Break",
-   "label": "Branding & Theme"
-  },
-  {
-   "default": "#2563EB",
-   "fieldname": "primary_color",
-   "fieldtype": "Color",
-   "label": "Primary Color"
-  },
-  {
-   "default": "#10B981",
-   "fieldname": "secondary_color",
-   "fieldtype": "Color",
-   "label": "Secondary Color"
-  },
-  {
-   "default": "#1F2937",
-   "fieldname": "text_color",
-   "fieldtype": "Color",
-   "label": "Text Color"
-  },
-  {
-   "default": "#F9FAFB",
-   "fieldname": "background_color",
-   "fieldtype": "Color",
-   "label": "Background Color"
-  },
-  {
-   "fieldname": "column_break_brand",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "Inter",
-   "fieldname": "font_family",
-   "fieldtype": "Select",
-   "label": "Font Family",
-   "options": "Inter\nRoboto\nOpen Sans\nLato\nMontserrat\nPoppins\nArial\nHelvetica"
-  },
-  {
-   "fieldname": "section_break_invoice",
-   "fieldtype": "Section Break",
-   "label": "Invoice & Document Settings"
-  },
-  {
-   "fieldname": "invoice_header_text",
-   "fieldtype": "Data",
-   "label": "Invoice Header Text"
-  },
-  {
-   "fieldname": "invoice_footer_text",
-   "fieldtype": "Text Editor",
-   "label": "Invoice Footer Text"
-  },
-  {
-   "fieldname": "invoice_terms_conditions",
-   "fieldtype": "Text Editor",
-   "label": "Invoice Terms & Conditions"
-  },
-  {
-   "fieldname": "column_break_invoice",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "invoice_signature",
-   "fieldtype": "Attach Image",
-   "label": "Invoice Signature"
-  },
+  "actions": [],
+  "allow_rename": 1,
+  "autoname": "field:clinic",
+  "creation": "2025-12-07 12:00:00.000000",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "clinic",
+    "section_break_branding",
+    "primary_color",
+    "secondary_color",
+    "text_color",
+    "background_color",
+    "column_break_brand",
+    "font_family",
+    "section_break_invoice",
+    "invoice_header_text",
+    "invoice_footer_text",
+    "invoice_terms_conditions",
+    "column_break_invoice",
+    "invoice_signature",
+    "clinic_seal",
+    "show_logo_on_invoice",
+    "show_seal_on_prescription",
+    "section_break_notification",
+    "appointment_reminder_message",
+    "payment_receipt_message",
+    "prescription_message",
+    "column_break_notification",
+    "sms_sender_name",
+    "section_break_social",
+    "facebook_url",
+    "instagram_url",
+    "column_break_social",
+    "twitter_url",
+    "google_maps_url",
+    "section_break_additional",
+    "appointment_slot_duration",
+    "allow_online_booking",
+    "column_break_additional",
+    "timezone",
+    "currency",
+    "section_break_landing_page",
+    "landing_page_tagline",
+    "landing_page_stats_json",
+    "column_break_landing",
+    "landing_page_testimonials_json",
+    "landing_page_gallery_json"
+  ],
+  "fields": [
     {
-     "fieldname": "invoice_template_id",
-     "fieldtype": "Data",
-     "label": "Invoice Template ID"
+      "fieldname": "clinic",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Clinic",
+      "options": "Company",
+      "reqd": 1,
+      "unique": 1
     },
-  {
-   "fieldname": "clinic_seal",
-   "fieldtype": "Attach Image",
-   "label": "Clinic Seal"
-  },
-  {
-   "default": "1",
-   "fieldname": "show_logo_on_invoice",
-   "fieldtype": "Check",
-   "label": "Show Logo on Invoice"
-  },
-  {
-   "default": "1",
-   "fieldname": "show_seal_on_prescription",
-   "fieldtype": "Check",
-   "label": "Show Seal on Prescription"
-  },
-  {
-   "fieldname": "section_break_notification",
-   "fieldtype": "Section Break",
-   "label": "Notification Templates"
-  },
-  {
-   "description": "Use {patient_name}, {date}, {time} as placeholders",
-   "fieldname": "appointment_reminder_message",
-   "fieldtype": "Text Editor",
-   "label": "Appointment Reminder Message"
-  },
-  {
-   "description": "Use {patient_name}, {amount}, {invoice_number} as placeholders",
-   "fieldname": "payment_receipt_message",
-   "fieldtype": "Text Editor",
-   "label": "Payment Receipt Message"
-  },
-  {
-   "fieldname": "prescription_message",
-   "fieldtype": "Text Editor",
-   "label": "Prescription Message"
-  },
-  {
-   "fieldname": "column_break_notification",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Max 6 characters for SMS sender ID",
-   "fieldname": "sms_sender_name",
-   "fieldtype": "Data",
-   "label": "SMS Sender Name",
-   "length": 6
-  },
-  {
-   "fieldname": "section_break_social",
-   "fieldtype": "Section Break",
-   "label": "Social Media & Links"
-  },
-  {
-   "fieldname": "facebook_url",
-   "fieldtype": "Data",
-   "label": "Facebook URL"
-  },
-  {
-   "fieldname": "instagram_url",
-   "fieldtype": "Data",
-   "label": "Instagram URL"
-  },
-  {
-   "fieldname": "column_break_social",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "twitter_url",
-   "fieldtype": "Data",
-   "label": "Twitter URL"
-  },
-  {
-   "fieldname": "google_maps_url",
-   "fieldtype": "Data",
-   "label": "Google Maps URL"
-  },
-  {
-   "fieldname": "section_break_additional",
-   "fieldtype": "Section Break",
-   "label": "Additional Settings"
-  },
-  {
-   "default": "30",
-   "description": "Default appointment duration in minutes",
-   "fieldname": "appointment_slot_duration",
-   "fieldtype": "Int",
-   "label": "Appointment Slot Duration (Minutes)"
-  },
-  {
-   "default": "1",
-   "fieldname": "allow_online_booking",
-   "fieldtype": "Check",
-   "label": "Allow Online Booking"
-  },
-  {
-   "fieldname": "column_break_additional",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "Asia/Kolkata",
-   "fieldname": "timezone",
-   "fieldtype": "Select",
-   "label": "Timezone",
-   "options": "Asia/Kolkata\nAmerica/New_York\nAmerica/Los_Angeles\nAmerica/Chicago\nEurope/London\nEurope/Paris\nAsia/Dubai\nAsia/Singapore\nAustralia/Sydney"
-  },
-  {
-   "fieldname": "currency",
-   "fieldtype": "Link",
-   "label": "Currency",
-   "options": "Currency"
-  }
- ],
- "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2025-12-07 12:00:00.000000",
- "modified_by": "Administrator",
- "module": "Mob Clinic",
- "name": "Clinic Settings",
- "naming_rule": "By fieldname",
- "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Healthcare Administrator",
-   "share": 1,
-   "write": 1
-  }
- ],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1
+    {
+      "fieldname": "section_break_branding",
+      "fieldtype": "Section Break",
+      "label": "Branding & Theme"
+    },
+    {
+      "default": "#2563EB",
+      "fieldname": "primary_color",
+      "fieldtype": "Color",
+      "label": "Primary Color"
+    },
+    {
+      "default": "#10B981",
+      "fieldname": "secondary_color",
+      "fieldtype": "Color",
+      "label": "Secondary Color"
+    },
+    {
+      "default": "#1F2937",
+      "fieldname": "text_color",
+      "fieldtype": "Color",
+      "label": "Text Color"
+    },
+    {
+      "default": "#F9FAFB",
+      "fieldname": "background_color",
+      "fieldtype": "Color",
+      "label": "Background Color"
+    },
+    {
+      "fieldname": "column_break_brand",
+      "fieldtype": "Column Break"
+    },
+    {
+      "default": "Inter",
+      "fieldname": "font_family",
+      "fieldtype": "Select",
+      "label": "Font Family",
+      "options": "Inter\nRoboto\nOpen Sans\nLato\nMontserrat\nPoppins\nArial\nHelvetica"
+    },
+    {
+      "fieldname": "section_break_invoice",
+      "fieldtype": "Section Break",
+      "label": "Invoice & Document Settings"
+    },
+    {
+      "fieldname": "invoice_header_text",
+      "fieldtype": "Data",
+      "label": "Invoice Header Text"
+    },
+    {
+      "fieldname": "invoice_footer_text",
+      "fieldtype": "Text Editor",
+      "label": "Invoice Footer Text"
+    },
+    {
+      "fieldname": "invoice_terms_conditions",
+      "fieldtype": "Text Editor",
+      "label": "Invoice Terms & Conditions"
+    },
+    {
+      "fieldname": "column_break_invoice",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "invoice_signature",
+      "fieldtype": "Attach Image",
+      "label": "Invoice Signature"
+    },
+    {
+      "fieldname": "invoice_template_id",
+      "fieldtype": "Data",
+      "label": "Invoice Template ID"
+    },
+    {
+      "fieldname": "clinic_seal",
+      "fieldtype": "Attach Image",
+      "label": "Clinic Seal"
+    },
+    {
+      "default": "1",
+      "fieldname": "show_logo_on_invoice",
+      "fieldtype": "Check",
+      "label": "Show Logo on Invoice"
+    },
+    {
+      "default": "1",
+      "fieldname": "show_seal_on_prescription",
+      "fieldtype": "Check",
+      "label": "Show Seal on Prescription"
+    },
+    {
+      "fieldname": "section_break_notification",
+      "fieldtype": "Section Break",
+      "label": "Notification Templates"
+    },
+    {
+      "description": "Use {patient_name}, {date}, {time} as placeholders",
+      "fieldname": "appointment_reminder_message",
+      "fieldtype": "Text Editor",
+      "label": "Appointment Reminder Message"
+    },
+    {
+      "description": "Use {patient_name}, {amount}, {invoice_number} as placeholders",
+      "fieldname": "payment_receipt_message",
+      "fieldtype": "Text Editor",
+      "label": "Payment Receipt Message"
+    },
+    {
+      "fieldname": "prescription_message",
+      "fieldtype": "Text Editor",
+      "label": "Prescription Message"
+    },
+    {
+      "fieldname": "column_break_notification",
+      "fieldtype": "Column Break"
+    },
+    {
+      "description": "Max 6 characters for SMS sender ID",
+      "fieldname": "sms_sender_name",
+      "fieldtype": "Data",
+      "label": "SMS Sender Name",
+      "length": 6
+    },
+    {
+      "fieldname": "section_break_social",
+      "fieldtype": "Section Break",
+      "label": "Social Media & Links"
+    },
+    {
+      "fieldname": "facebook_url",
+      "fieldtype": "Data",
+      "label": "Facebook URL"
+    },
+    {
+      "fieldname": "instagram_url",
+      "fieldtype": "Data",
+      "label": "Instagram URL"
+    },
+    {
+      "fieldname": "column_break_social",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "twitter_url",
+      "fieldtype": "Data",
+      "label": "Twitter URL"
+    },
+    {
+      "fieldname": "google_maps_url",
+      "fieldtype": "Data",
+      "label": "Google Maps URL"
+    },
+    {
+      "fieldname": "section_break_additional",
+      "fieldtype": "Section Break",
+      "label": "Additional Settings"
+    },
+    {
+      "default": "30",
+      "description": "Default appointment duration in minutes",
+      "fieldname": "appointment_slot_duration",
+      "fieldtype": "Int",
+      "label": "Appointment Slot Duration (Minutes)"
+    },
+    {
+      "default": "1",
+      "fieldname": "allow_online_booking",
+      "fieldtype": "Check",
+      "label": "Allow Online Booking"
+    },
+    {
+      "fieldname": "column_break_additional",
+      "fieldtype": "Column Break"
+    },
+    {
+      "default": "Asia/Kolkata",
+      "fieldname": "timezone",
+      "fieldtype": "Select",
+      "label": "Timezone",
+      "options": "Asia/Kolkata\nAmerica/New_York\nAmerica/Los_Angeles\nAmerica/Chicago\nEurope/London\nEurope/Paris\nAsia/Dubai\nAsia/Singapore\nAustralia/Sydney"
+    },
+    {
+      "fieldname": "currency",
+      "fieldtype": "Link",
+      "label": "Currency",
+      "options": "Currency"
+    },
+    {
+      "fieldname": "section_break_landing_page",
+      "fieldtype": "Section Break",
+      "label": "Landing Page Settings"
+    },
+    {
+      "fieldname": "landing_page_tagline",
+      "fieldtype": "Data",
+      "label": "Tagline",
+      "description": "Short tagline for the public landing page"
+    },
+    {
+      "fieldname": "landing_page_stats_json",
+      "fieldtype": "Code",
+      "label": "Stats JSON",
+      "options": "JSON",
+      "description": "JSON object with stats like patients, years_experience, reviews, surgeries"
+    },
+    {
+      "fieldname": "column_break_landing",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "landing_page_testimonials_json",
+      "fieldtype": "Code",
+      "label": "Testimonials JSON",
+      "options": "JSON",
+      "description": "JSON array of testimonials with id, name, role, content, rating, image"
+    },
+    {
+      "fieldname": "landing_page_gallery_json",
+      "fieldtype": "Code",
+      "label": "Gallery JSON",
+      "options": "JSON",
+      "description": "JSON array of gallery items with id, type, url, caption"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2025-12-07 12:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Mob Clinic",
+  "name": "Clinic Settings",
+  "naming_rule": "By fieldname",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    },
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Healthcare Administrator",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
 }

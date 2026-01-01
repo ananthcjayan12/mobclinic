@@ -348,6 +348,112 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
             "message": f"Error creating appointment: {error_msg[:100]}"
         }
 
+@frappe.whitelist(allow_guest=True, methods=['POST'])
+def create_public_appointment(clinic, patient_name, mobile, appointment_date, appointment_time, practitioner=None, appointment_type=None, **kwargs):
+    """
+    Create a public appointment for a guest user
+    """
+    try:
+        # 1. Resolve Practitioner - use provided or fallback to first available
+        if not practitioner:
+            practitioners = frappe.get_all(
+                "Healthcare Practitioner",
+                filters={"primary_company": clinic, "status": "Active"},
+                fields=["name"],
+                limit=1
+            )
+            if practitioners:
+                practitioner = practitioners[0].name
+        
+        if not practitioner:
+             return {"message": "No doctors available at this clinic"}, 400
+
+        # 2. Find or Create Patient
+        patient_name = patient_name.strip()
+        
+        # Check if patient exists by mobile
+        existing_patient = frappe.db.get_value("Patient", {"mobile": mobile}, "name")
+        
+        if existing_patient:
+            patient_id = existing_patient
+        else:
+            # Create new patient - first_name is required
+            patient = frappe.new_doc("Patient")
+            # Split patient_name into first_name and last_name
+            name_parts = patient_name.split(' ', 1)
+            patient.first_name = name_parts[0]
+            if len(name_parts) > 1:
+                patient.last_name = name_parts[1]
+            patient.patient_name = patient_name
+            patient.mobile = mobile
+            patient.email = kwargs.get("email")
+            patient.sex = kwargs.get("sex", "Unknown")
+            patient.flags.ignore_permissions = True
+            patient.insert(ignore_permissions=True)
+            patient_id = patient.name
+        
+        # 3. Create Appointment using internal function (reusing logic but passing practitioner explicitly)
+        # We need to call create_appointment but it expects logged in user for practitioner check
+        # So we will replicate the essential creation logic here to bypass current_practitioner check
+        
+        # Overlap check
+        overlap_count = count_overlapping_appointments(
+            practitioner,
+            appointment_date,
+            appointment_time,
+            kwargs.get("duration", 30)
+        )
+        
+        if overlap_count > 0:
+             # Strict for public booking? Or allow overbooking? 
+             # Let's be strict for public to avoid chaos
+             return {"message": "Selected slot is no longer available"}, 409
+
+        # Create appointment
+        appointment = frappe.get_doc({
+            "doctype": "Patient Appointment",
+            "patient": patient_id,
+            "practitioner": practitioner,
+            "appointment_date": appointment_date,
+            "appointment_time": appointment_time,
+            "duration": kwargs.get("duration", 30),
+            "status": "Open",
+            "appointment_type": appointment_type or "Online Booking",
+            "appointment_for": "Practitioner",
+            "notes": f"Web Booking. {kwargs.get('notes', '')}",
+            "booked_via_app": 1,
+            "app_booking_source": "Public Website"
+        })
+
+        # Link Company
+        # We assume clinic name passed IS the company name or linked to it
+        # The clinic_helper.resolve_active_clinic expects a practitioner, but here we know the clinic directly
+        # If 'clinic' arg is the Company name
+        if frappe.db.exists("Company", clinic):
+            appointment.company = clinic
+
+        appointment.flags.ignore_permissions = True
+        appointment.flags.ignore_mandatory = True
+        appointment.flags.ignore_overlap_validation = True
+        appointment.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "message": "Appointment booked successfully",
+            "data": {
+                "appointment_id": appointment.name,
+                "patient_name": patient_name,
+                "date": appointment_date,
+                "time": appointment_time,
+                "status": "Confirmed"
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "Public Appointment Error")
+        return {"message": str(e)}, 500
+
+
 @frappe.whitelist(methods=['POST', 'PUT'])
 def update_appointment(appointment_id, **kwargs):
     """
@@ -768,8 +874,8 @@ def get_todays_queue():
         }
 
 
-@frappe.whitelist(methods=['GET'])
-def get_available_slots(date, duration=30, practitioner=None):
+@frappe.whitelist(allow_guest=True)
+def get_available_slots(date, duration=30, practitioner=None, clinic=None):
     """
     Get available time slots for a specific date and optionally filter by practitioner
     
@@ -783,14 +889,27 @@ def get_available_slots(date, duration=30, practitioner=None):
     """
     try:
         if not practitioner:
-            practitioner_doc = get_current_practitioner()
-            if not practitioner_doc:
-                frappe.local.response["http_status_code"] = 403
-                return {
-                    "exc_type": "PermissionError",
-                    "message": "Healthcare Practitioner profile not found"
-                }
-            practitioner = practitioner_doc.name
+            # Try to get practitioner from clinic if provided (for guest access)
+            if clinic:
+                # Query Healthcare Practitioner directly by primary_company
+                practitioners = frappe.get_all(
+                    "Healthcare Practitioner",
+                    filters={"primary_company": clinic, "status": "Active"},
+                    fields=["name"],
+                    limit=1
+                )
+                if practitioners:
+                    practitioner = practitioners[0].name
+            
+            if not practitioner:
+                practitioner_doc = get_current_practitioner()
+                if not practitioner_doc:
+                    frappe.local.response["http_status_code"] = 403
+                    return {
+                        "exc_type": "PermissionError",
+                        "message": "Healthcare Practitioner profile not found or clinic not specified"
+                    }
+                practitioner = practitioner_doc.name
         
         # Get working hours for the day
         day_of_week = getdate(date).strftime("%A")
