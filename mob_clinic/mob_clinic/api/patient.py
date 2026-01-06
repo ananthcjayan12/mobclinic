@@ -844,13 +844,14 @@ def delete_patient(patient_id):
 
 
 @frappe.whitelist(methods=['GET'])
-def search_patients(search_term, limit=10):
+def search_patients(search_term, limit=10, clinic=None):
     """
     Search patients by name, mobile, or patient ID
     
     Args:
         search_term (str): Search query
         limit (int): Maximum results to return
+        clinic (str): Optional clinic/company filter (defaults to active clinic)
         
     Returns:
         dict: Search results
@@ -858,8 +859,16 @@ def search_patients(search_term, limit=10):
     try:
         practitioner = get_current_practitioner()
         
-        # Base filters (empty for search - we want to search ALL patients)
+        # Build base filters with clinic isolation
         base_filters = {}
+        
+        # Resolve clinic and apply filter for data isolation
+        resolved_clinic = clinic_helper.resolve_active_clinic(
+            practitioner.name if practitioner else None, 
+            clinic
+        )
+        if resolved_clinic:
+            base_filters["primary_clinic"] = resolved_clinic
         
         # Build OR conditions for searching across multiple fields
         or_filters = [
@@ -871,7 +880,7 @@ def search_patients(search_term, limit=10):
         # Get patients matching search criteria
         patients = frappe.get_all(
             "Patient",
-            fields=["name", "patient_name", "mobile", "sex", "dob", "image"],
+            fields=["name", "patient_name", "mobile", "sex", "dob", "image", "primary_clinic"],
             filters=base_filters,
             or_filters=or_filters,
             limit=limit,
