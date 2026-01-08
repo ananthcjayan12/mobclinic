@@ -45,6 +45,112 @@ def get_or_create_default_service_item():
     
     return item_code
 
+def _get_gst_accounts(company):
+    """
+    Get GST accounts for a company using India Compliance.
+    
+    Args:
+        company (str): Company name
+        
+    Returns:
+        dict: GST accounts (cgst_account, sgst_account, igst_account) or None
+    """
+    if not company:
+        company = frappe.defaults.get_user_default("Company")
+    
+    if not company:
+        return None
+    
+    try:
+        # Try to use India Compliance's utility function
+        from india_compliance.gst_india.utils import get_gst_accounts_by_type
+        gst_accounts = get_gst_accounts_by_type(company, "Output", throw=False)
+        if gst_accounts:
+            return gst_accounts
+    except ImportError:
+        frappe.logger().warning("India Compliance not installed, GST accounts unavailable")
+    except Exception as e:
+        frappe.logger().warning(f"Could not get GST accounts: {str(e)}")
+    
+    return None
+
+
+def _add_gst_taxes(invoice, tax_percentage, company):
+    """
+    Add GST tax rows to invoice using proper GST accounts.
+    For intra-state transactions, adds CGST + SGST (each at half the rate).
+    For inter-state, adds IGST at full rate.
+    
+    Args:
+        invoice: Sales Invoice document
+        tax_percentage: Total GST rate (e.g., 18 for 18% GST)
+        company: Company name
+        
+    Returns:
+        bool: True if taxes were added successfully
+    """
+    gst_accounts = _get_gst_accounts(company)
+    if not gst_accounts:
+        return False
+    
+    rate = flt(tax_percentage)
+    if rate <= 0:
+        return False
+    
+    # For simplicity, use CGST + SGST (intra-state) - each at half the rate
+    # In production, you'd check customer/company state to determine CGST+SGST vs IGST
+    half_rate = rate / 2
+    
+    # Add CGST
+    if gst_accounts.get("cgst_account"):
+        invoice.append("taxes", {
+            "charge_type": "On Net Total",
+            "account_head": gst_accounts.cgst_account,
+            "description": f"CGST @ {half_rate}%",
+            "rate": half_rate
+        })
+    
+    # Add SGST
+    if gst_accounts.get("sgst_account"):
+        invoice.append("taxes", {
+            "charge_type": "On Net Total",
+            "account_head": gst_accounts.sgst_account,
+            "description": f"SGST @ {half_rate}%",
+            "rate": half_rate
+        })
+    
+    return True
+
+
+def _add_igst_tax(invoice, tax_percentage, company):
+    """
+    Add IGST tax row for inter-state transactions.
+    
+    Args:
+        invoice: Sales Invoice document
+        tax_percentage: GST rate (e.g., 18 for 18% IGST)
+        company: Company name
+        
+    Returns:
+        bool: True if tax was added successfully
+    """
+    gst_accounts = _get_gst_accounts(company)
+    if not gst_accounts or not gst_accounts.get("igst_account"):
+        return False
+    
+    rate = flt(tax_percentage)
+    if rate <= 0:
+        return False
+    
+    invoice.append("taxes", {
+        "charge_type": "On Net Total",
+        "account_head": gst_accounts.igst_account,
+        "description": f"IGST @ {rate}%",
+        "rate": rate
+    })
+    
+    return True
+
 
 def get_current_practitioner():
     """Get the Healthcare Practitioner linked to current user"""
@@ -220,6 +326,16 @@ def get_invoice(invoice_id):
                         "reference_date": pe.reference_date
                     })
         
+        # Build tax breakdown
+        tax_breakdown = []
+        for tax in invoice.taxes:
+            tax_breakdown.append({
+                "description": tax.description,
+                "rate": tax.rate or 0,
+                "tax_amount": tax.tax_amount or 0,
+                "account_head": tax.account_head
+            })
+        
         # Build response
         invoice_data = {
             "invoice_id": invoice.name,
@@ -227,10 +343,15 @@ def get_invoice(invoice_id):
             "posting_date": invoice.posting_date,
             "due_date": invoice.due_date,
             "status": invoice.status,
+            "total": invoice.total,  # Total before tax and discount
+            "net_total": invoice.net_total,
+            "discount_amount": invoice.discount_amount or 0,
+            "total_taxes_and_charges": invoice.total_taxes_and_charges or 0,
             "grand_total": invoice.grand_total,
             "outstanding_amount": invoice.outstanding_amount,
             "paid_amount": flt(invoice.grand_total) - flt(invoice.outstanding_amount),
             "items": items,
+            "taxes": tax_breakdown,
             "payments": payments,
             "is_overdue": False,
             "remarks": invoice.remarks
@@ -254,7 +375,8 @@ def get_invoice(invoice_id):
 def create_invoice(patient_id, items, posting_date=None, due_date=None, 
                    treatment_type=None, treatment_description=None,
                    appointment_reference=None, remarks=None, clinic=None,
-                   discount_amount=None, tax_amount=None, discount_percentage=None):
+                   discount_amount=None, tax_amount=None, discount_percentage=None,
+                   tax_percentage=None, tax_template=None, is_cosmetic=False):
     """
     Create a new Sales Invoice
     
@@ -269,11 +391,19 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         remarks: Additional notes
         clinic: Clinic/Company to create invoice for
         discount_amount: Fixed discount amount to apply
-        tax_amount: Tax amount (for display purposes, actual tax calculated by tax template)
         discount_percentage: Percentage discount to apply
+        tax_amount: Fixed tax amount to add
+        tax_percentage: Tax percentage to apply (e.g., 18 for 18% GST)
+        tax_template: Sales Taxes and Charges Template to use
+        is_cosmetic: If True, applies 18% GST (cosmetic procedures like whitening, veneers);
+                     If False (default), no GST for medical treatments (as per Indian GST law)
+    
+    GST Rules for Dental Clinics in India:
+        - Medical treatments (extractions, root canals, fillings): 0% GST (Exempt)
+        - Cosmetic procedures (whitening, veneers, smile design): 18% GST
     
     Returns:
-        Created invoice details
+        Created invoice details with tax breakdown
     """
     try:
         practitioner = get_current_practitioner()
@@ -328,7 +458,8 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "posting_date": posting_date_value,
             "due_date": due_date_value,
             "remarks": remarks,
-            "items": []
+            "items": [],
+            "taxes": []
         })
 
         # Assign company if clinic/company resolved
@@ -410,21 +541,78 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
 
             invoice.append("items", item_row)
         
+        # Apply tax template if provided
+        if tax_template:
+            if frappe.db.exists("Sales Taxes and Charges Template", tax_template):
+                invoice.taxes_and_charges = tax_template
+                # Let ERPNext auto-populate tax rows from template
+                invoice.set_taxes()
+        
+        # Apply manual tax if tax_amount or tax_percentage provided (and no template)
+        if not tax_template:
+            company_for_tax = resolved_clinic or invoice.company
+            
+            # Determine effective tax percentage
+            # - If tax_percentage explicitly provided, use it
+            # - If is_cosmetic=True and no tax specified, use 18% (GST for cosmetic procedures)
+            # - If is_cosmetic=False (medical treatment), no tax (GST exempt)
+            effective_tax_percentage = None
+            if tax_percentage is not None:
+                effective_tax_percentage = flt(tax_percentage)
+            elif is_cosmetic:
+                # Cosmetic dental procedures attract 18% GST in India
+                effective_tax_percentage = 18.0
+            
+            if effective_tax_percentage and effective_tax_percentage > 0:
+                # Use GST accounts with proper CGST + SGST split
+                _add_gst_taxes(invoice, effective_tax_percentage, company_for_tax)
+            elif tax_amount and flt(tax_amount) > 0:
+                # For fixed amount, use first available GST account
+                gst_accounts = _get_gst_accounts(company_for_tax)
+                if gst_accounts and gst_accounts.get("cgst_account"):
+                    # Split the amount between CGST and SGST
+                    half_amount = flt(tax_amount) / 2
+                    invoice.append("taxes", {
+                        "charge_type": "Actual",
+                        "account_head": gst_accounts.cgst_account,
+                        "description": "CGST",
+                        "tax_amount": half_amount
+                    })
+                    invoice.append("taxes", {
+                        "charge_type": "Actual",
+                        "account_head": gst_accounts.sgst_account,
+                        "description": "SGST",
+                        "tax_amount": half_amount
+                    })
+        
         # Insert invoice
         invoice.insert(ignore_permissions=True)
         
         # Submit invoice
         invoice.submit()
         
+        # Build tax breakdown for response
+        tax_breakdown = []
+        for tax in invoice.taxes:
+            tax_breakdown.append({
+                "description": tax.description,
+                "rate": tax.rate or 0,
+                "tax_amount": tax.tax_amount or 0,
+                "account_head": tax.account_head
+            })
+        
         return {
             "message": "Invoice created successfully",
             "invoice_id": invoice.name,
             "grand_total": invoice.grand_total,
             "net_total": invoice.net_total,
+            "total": invoice.total,  # Total before tax and discount
             "discount_amount": invoice.discount_amount or 0,
             "total_taxes_and_charges": invoice.total_taxes_and_charges or 0,
             "outstanding_amount": invoice.outstanding_amount,
-            "status": invoice.status
+            "status": invoice.status,
+            "is_cosmetic": is_cosmetic,
+            "tax_breakdown": tax_breakdown
         }
         
     except Exception as e:
