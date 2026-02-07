@@ -47,7 +47,17 @@
     "landing_page_stats_json",
     "column_break_landing",
     "landing_page_testimonials_json",
-    "landing_page_gallery_json"
+    "landing_page_gallery_json",
+    "section_break_whatsapp",
+    "whatsapp_enabled",
+    "whatsapp_phone_number_id",
+    "whatsapp_business_account_id",
+    "whatsapp_access_token",
+    "column_break_whatsapp",
+    "whatsapp_appointment_template",
+    "whatsapp_review_template",
+    "whatsapp_prescription_template",
+    "whatsapp_invoice_template"
   ],
   "fields": [
     {
@@ -282,6 +292,63 @@
       "label": "Gallery JSON",
       "options": "JSON",
       "description": "JSON array of gallery items with id, type, url, caption"
+    },
+    {
+      "fieldname": "section_break_whatsapp",
+      "fieldtype": "Section Break",
+      "label": "WhatsApp Business API"
+    },
+    {
+      "default": "0",
+      "fieldname": "whatsapp_enabled",
+      "fieldtype": "Check",
+      "label": "Enable WhatsApp Integration"
+    },
+    {
+      "fieldname": "whatsapp_phone_number_id",
+      "fieldtype": "Data",
+      "label": "Phone Number ID",
+      "description": "WhatsApp Phone Number ID from Meta Business"
+    },
+    {
+      "fieldname": "whatsapp_business_account_id",
+      "fieldtype": "Data",
+      "label": "Business Account ID",
+      "description": "WhatsApp Business Account ID from Meta"
+    },
+    {
+      "fieldname": "whatsapp_access_token",
+      "fieldtype": "Password",
+      "label": "Access Token",
+      "description": "Permanent access token from Meta Business"
+    },
+    {
+      "fieldname": "column_break_whatsapp",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "whatsapp_appointment_template",
+      "fieldtype": "Data",
+      "label": "Appointment Reminder Template",
+      "description": "Template name for appointment reminders"
+    },
+    {
+      "fieldname": "whatsapp_review_template",
+      "fieldtype": "Data",
+      "label": "Review Request Template",
+      "description": "Template name for review requests"
+    },
+    {
+      "fieldname": "whatsapp_prescription_template",
+      "fieldtype": "Data",
+      "label": "Prescription Template",
+      "description": "Template name for sharing prescriptions"
+    },
+    {
+      "fieldname": "whatsapp_invoice_template",
+      "fieldtype": "Data",
+      "label": "Invoice Template",
+      "description": "Template name for sharing invoices"
     }
   ],
   "index_web_pages_for_search": 1,

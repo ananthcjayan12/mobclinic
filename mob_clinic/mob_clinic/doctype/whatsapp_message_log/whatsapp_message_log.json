@@ -1,0 +1,133 @@
+{
+    "actions": [],
+    "autoname": "format:WA-{YYYY}-{#####}",
+    "creation": "2026-01-09 07:45:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "message_id",
+        "clinic",
+        "recipient_phone",
+        "template_name",
+        "column_break_main",
+        "message_type",
+        "status",
+        "sent_at",
+        "section_break_reference",
+        "reference_doctype",
+        "reference_name",
+        "section_break_error",
+        "error_message"
+    ],
+    "fields": [
+        {
+            "fieldname": "message_id",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "WhatsApp Message ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "clinic",
+            "fieldtype": "Link",
+            "in_list_view": 1,
+            "label": "Clinic",
+            "options": "Company",
+            "reqd": 1
+        },
+        {
+            "fieldname": "recipient_phone",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Recipient Phone",
+            "reqd": 1
+        },
+        {
+            "fieldname": "template_name",
+            "fieldtype": "Data",
+            "label": "Template Name"
+        },
+        {
+            "fieldname": "column_break_main",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "message_type",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Message Type",
+            "options": "\nAppointment Reminder\nReview Request\nPrescription\nInvoice\nCustom"
+        },
+        {
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Status",
+            "options": "Pending\nSent\nDelivered\nRead\nFailed",
+            "default": "Pending"
+        },
+        {
+            "fieldname": "sent_at",
+            "fieldtype": "Datetime",
+            "label": "Sent At"
+        },
+        {
+            "fieldname": "section_break_reference",
+            "fieldtype": "Section Break",
+            "label": "Reference"
+        },
+        {
+            "fieldname": "reference_doctype",
+            "fieldtype": "Data",
+            "label": "Reference DocType"
+        },
+        {
+            "fieldname": "reference_name",
+            "fieldtype": "Data",
+            "label": "Reference Name"
+        },
+        {
+            "fieldname": "section_break_error",
+            "fieldtype": "Section Break",
+            "label": "Error Details",
+            "collapsible": 1
+        },
+        {
+            "fieldname": "error_message",
+            "fieldtype": "Small Text",
+            "label": "Error Message",
+            "read_only": 1
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "links": [],
+    "modified": "2026-01-09 07:45:00.000000",
+    "modified_by": "Administrator",
+    "module": "Mob Clinic",
+    "name": "WhatsApp Message Log",
+    "naming_rule": "Expression",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "read": 1,
+            "report": 1,
+            "role": "Healthcare Administrator"
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}
