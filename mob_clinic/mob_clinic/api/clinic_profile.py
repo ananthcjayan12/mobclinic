@@ -6,7 +6,8 @@ Manage clinic information, branding, settings, and customization
 import frappe
 from frappe import _
 import json
-from frappe.utils import get_url
+from frappe.utils import get_url, cstr
+from datetime import datetime
 
 
 def _full_url(path):
@@ -19,6 +20,18 @@ def _full_url(path):
 		return get_url(path)
 	except Exception:
 		return path
+
+def _normalize_time(value):
+	"""Normalize input time to HH:MM:SS."""
+	if not value:
+		return None
+	if isinstance(value, str):
+		for fmt in ("%H:%M:%S", "%H:%M"):
+			try:
+				return datetime.strptime(value, fmt).strftime("%H:%M:%S")
+			except Exception:
+				continue
+	return cstr(value)
 
 @frappe.whitelist(allow_guest=True)
 def get_clinic_profile(clinic):
@@ -86,6 +99,31 @@ def get_clinic_profile(clinic):
 			"additional": None
 		}
 		
+		# Determine practitioner working hours (fallback to None when not available)
+		start_time = None
+		end_time = None
+		try:
+			practitioner = None
+			if clinic:
+				practitioner_name = frappe.db.get_value(
+					"Healthcare Practitioner",
+					{"primary_company": clinic, "status": "Active"},
+					"name"
+				)
+				if practitioner_name:
+					practitioner = frappe.get_doc("Healthcare Practitioner", practitioner_name)
+			if not practitioner:
+				practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": frappe.session.user})
+			if hasattr(practitioner, "clinic_working_hours"):
+				for row in practitioner.clinic_working_hours:
+					if row.is_working_day:
+						start_time = cstr(row.start_time)
+						end_time = cstr(row.end_time)
+						break
+		except Exception:
+			start_time = None
+			end_time = None
+
 		# Add settings data if available
 		if settings:
 			profile["branding"] = {
@@ -111,27 +149,29 @@ def get_clinic_profile(clinic):
 			profile["invoice_settings"]["template_id"] = getattr(settings, 'invoice_template_id', None)
 		except Exception:
 			profile["invoice_settings"]["template_id"] = None
-			
-			profile["notifications"] = {
-				"appointment_reminder": settings.appointment_reminder_message,
-				"payment_receipt": settings.payment_receipt_message,
-				"prescription_message": settings.prescription_message,
-				"sms_sender": settings.sms_sender_name
-			}
-			
-			profile["social_media"] = {
-				"facebook": settings.facebook_url,
-				"instagram": settings.instagram_url,
-				"twitter": settings.twitter_url,
-				"google_maps": settings.google_maps_url
-			}
-			
-			profile["additional"] = {
-				"appointment_slot_duration": settings.appointment_slot_duration,
-				"allow_online_booking": settings.allow_online_booking,
-				"timezone": settings.timezone,
-				"currency": settings.currency
-			}
+		
+		profile["notifications"] = {
+			"appointment_reminder": settings.appointment_reminder_message,
+			"payment_receipt": settings.payment_receipt_message,
+			"prescription_message": settings.prescription_message,
+			"sms_sender": settings.sms_sender_name
+		}
+		
+		profile["social_media"] = {
+			"facebook": settings.facebook_url,
+			"instagram": settings.instagram_url,
+			"twitter": settings.twitter_url,
+			"google_maps": settings.google_maps_url
+		}
+		
+		profile["additional"] = {
+			"appointment_slot_duration": settings.appointment_slot_duration,
+			"allow_online_booking": settings.allow_online_booking,
+			"timezone": settings.timezone,
+			"currency": settings.currency,
+			"start_time": start_time,
+			"end_time": end_time
+		}
 		
 		return {"message": "success", "profile": profile}
 	
@@ -638,7 +678,7 @@ def update_social_media(clinic, facebook=None, instagram=None, twitter=None, goo
 
 @frappe.whitelist()
 def update_additional_settings(clinic, appointment_slot_duration=None, allow_online_booking=None,
-								timezone=None, currency=None):
+								timezone=None, currency=None, start_time=None, end_time=None):
 	"""
 	Update additional clinic settings
 	
@@ -668,6 +708,49 @@ def update_additional_settings(clinic, appointment_slot_duration=None, allow_onl
 			settings.timezone = timezone
 		if currency is not None:
 			settings.currency = currency
+
+		# Update practitioner working hours if provided
+		if start_time is not None or end_time is not None:
+			try:
+				practitioner = None
+				if clinic:
+					practitioner_name = frappe.db.get_value(
+						"Healthcare Practitioner",
+						{"primary_company": clinic, "status": "Active"},
+						"name"
+					)
+					if practitioner_name:
+						practitioner = frappe.get_doc("Healthcare Practitioner", practitioner_name)
+				if not practitioner:
+					practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": frappe.session.user})
+			except Exception:
+				practitioner = None
+
+			if not practitioner:
+				return {"message": "Healthcare Practitioner profile not found"}, 403
+
+			normalized_start = _normalize_time(start_time)
+			normalized_end = _normalize_time(end_time)
+
+			days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+			existing = {}
+			if hasattr(practitioner, "clinic_working_hours"):
+				for row in practitioner.clinic_working_hours:
+					existing[row.day] = row
+
+			for day in days:
+				row = existing.get(day)
+				if not row:
+					row = practitioner.append("clinic_working_hours", {})
+					row.day = day
+					row.is_working_day = 1
+				if normalized_start is not None:
+					row.start_time = normalized_start
+				if normalized_end is not None:
+					row.end_time = normalized_end
+
+			practitioner.flags.ignore_permissions = True
+			practitioner.save(ignore_permissions=True)
 		
 		settings.flags.ignore_permissions = True
 		if settings.is_new():
@@ -683,7 +766,9 @@ def update_additional_settings(clinic, appointment_slot_duration=None, allow_onl
 				"appointment_slot_duration": settings.appointment_slot_duration,
 				"allow_online_booking": settings.allow_online_booking,
 				"timezone": settings.timezone,
-				"currency": settings.currency
+				"currency": settings.currency,
+				"start_time": _normalize_time(start_time),
+				"end_time": _normalize_time(end_time)
 			}
 		}
 	
