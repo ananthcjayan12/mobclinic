@@ -27,10 +27,15 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         else:
             filters = {}
         
-        # Get current practitioner and apply practitioner filter (if any)
+        # Get current practitioner context
         practitioner = get_current_practitioner()
-        if practitioner:
-            filters["practitioner"] = practitioner.name
+
+        # Respect incoming practitioner filter from UI:
+        # - if practitioner is provided => filter to that practitioner
+        # - if practitioner is "all"/empty/not provided => show clinic-wide appointments
+        requested_practitioner = filters.get("practitioner")
+        if requested_practitioner in ["all", "All", "ALL", "", None]:
+            filters.pop("practitioner", None)
         
         # Resolve clinic and apply company filter if present
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
