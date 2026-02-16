@@ -1,5 +1,20 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.utils import cint
+import json
+
+
+DEFAULT_ALLOWED_PAGES = [
+    "home",
+    "appointments",
+    "patients",
+    "prescriptions",
+    "invoice",
+    "financial_dashboard",
+    "settings",
+]
+
+NON_ADMIN_DEFAULT_PAGES = [page for page in DEFAULT_ALLOWED_PAGES if page != "settings"]
 
 def execute():
     """Install custom fields for mobile clinic app"""
@@ -18,6 +33,9 @@ def execute():
         # Create all custom fields
         print("Creating Healthcare Practitioner custom fields...")
         create_healthcare_practitioner_fields()
+
+        print("Bootstrapping practitioner access defaults...")
+        bootstrap_practitioner_page_access_defaults()
         
         print("Creating Patient custom fields...")
         create_patient_fields() 
@@ -134,6 +152,19 @@ def create_healthcare_practitioner_fields():
                 "fieldtype": "Table",
                 "options": "Clinic Working Hours",
                 "insert_after": "working_hours_section"
+            },
+            {
+                "fieldname": "is_clinic_admin",
+                "label": "Is Clinic Admin",
+                "fieldtype": "Check",
+                "default": 0,
+                "insert_after": "clinic_working_hours"
+            },
+            {
+                "fieldname": "allowed_pages_json",
+                "label": "Allowed Pages JSON",
+                "fieldtype": "Small Text",
+                "insert_after": "is_clinic_admin"
             }
         ]
     }
@@ -143,6 +174,65 @@ def create_healthcare_practitioner_fields():
         frappe.log_error("Healthcare Practitioner custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Healthcare Practitioner custom fields: {str(e)}")
+        raise
+
+
+def bootstrap_practitioner_page_access_defaults():
+    """Set safe defaults for clinic admin + page access fields.
+
+    Rules:
+    - Per clinic (primary_company), ensure at least one practitioner is admin.
+    - Seed allowed_pages_json only when empty.
+    - Admin gets full default pages; non-admin gets defaults without settings.
+    """
+    try:
+        practitioners = frappe.get_all(
+            "Healthcare Practitioner",
+            filters={"primary_company": ["is", "set"]},
+            fields=["name", "primary_company", "is_clinic_admin", "allowed_pages_json", "creation"],
+            order_by="creation asc",
+        )
+
+        by_company = {}
+        for row in practitioners:
+            company = row.get("primary_company")
+            if not company:
+                continue
+            by_company.setdefault(company, []).append(row)
+
+        for company, rows in by_company.items():
+            if not rows:
+                continue
+
+            has_admin = any(cint(row.get("is_clinic_admin")) for row in rows)
+            promoted_admin_name = None
+
+            if not has_admin:
+                promoted_admin_name = rows[0]["name"]
+                frappe.db.set_value(
+                    "Healthcare Practitioner",
+                    promoted_admin_name,
+                    "is_clinic_admin",
+                    1,
+                    update_modified=False,
+                )
+
+            for row in rows:
+                if row.get("allowed_pages_json"):
+                    continue
+
+                is_admin = cint(row.get("is_clinic_admin")) == 1 or row.get("name") == promoted_admin_name
+                default_pages = DEFAULT_ALLOWED_PAGES if is_admin else NON_ADMIN_DEFAULT_PAGES
+                frappe.db.set_value(
+                    "Healthcare Practitioner",
+                    row.get("name"),
+                    "allowed_pages_json",
+                    json.dumps(default_pages),
+                    update_modified=False,
+                )
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Bootstrap Practitioner Page Access Defaults Failed")
         raise
 
 def create_patient_fields():

@@ -244,6 +244,7 @@ ignore_csrf = [
 	"mob_clinic.mob_clinic.api.payment.create_payment",
 	"mob_clinic.mob_clinic.api.payment.update_payment",
 	"mob_clinic.mob_clinic.api.file_upload.upload_file",
+	"mob_clinic.mob_clinic.api.role_access.update_practitioner_permissions",
 ]
 
 # Job Events

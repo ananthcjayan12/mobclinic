@@ -5,6 +5,7 @@ from frappe.utils import cstr, get_fullname
 import json
 
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api.role_access import get_practitioner_permissions
 
 @frappe.whitelist(allow_guest=True, methods=['POST'])
 def mobile_login(usr, pwd):
@@ -70,6 +71,8 @@ def mobile_login(usr, pwd):
             
             # Add practitioner/clinic details if exists
             if practitioner:
+                permissions = get_practitioner_permissions(practitioner)
+
                 clinic_data = {
                     "practitioner_id": practitioner.name,
                     "name": practitioner.practitioner_name,
@@ -111,6 +114,9 @@ def mobile_login(usr, pwd):
 
                 response_data["user"]["clinics"] = clinics
                 response_data["user"]["active_clinic"] = active_clinic
+                response_data["user"]["is_clinic_admin"] = permissions["is_clinic_admin"]
+                response_data["user"]["allowed_pages"] = permissions["allowed_pages"]
+                response_data["user"]["permissions"] = permissions
 
                 # Persist active clinic to session if resolved (force reset for new login)
                 if active_clinic:
@@ -362,6 +368,11 @@ def get_practitioner_profile():
             "clinic_description": getattr(practitioner, 'clinic_description', ''),
             "avatar": practitioner.image
         }
+
+        permissions = get_practitioner_permissions(practitioner)
+        profile_data["is_clinic_admin"] = permissions["is_clinic_admin"]
+        profile_data["allowed_pages"] = permissions["allowed_pages"]
+        profile_data["permissions"] = permissions
         
         # Get working hours
         working_hours = []

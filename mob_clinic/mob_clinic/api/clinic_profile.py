@@ -8,6 +8,7 @@ from frappe import _
 import json
 from frappe.utils import get_url, cstr
 from datetime import datetime
+from mob_clinic.mob_clinic.api.role_access import assert_page_access
 
 
 def _full_url(path):
@@ -194,6 +195,8 @@ def update_basic_info(clinic, phone=None, email=None, website=None, registration
 		tax_id: Tax ID or GST number
 	"""
 	try:
+		assert_page_access("settings")
+
 		if not frappe.db.exists("Company", clinic):
 			return {"message": "Invalid clinic"}, 404
 		
@@ -226,6 +229,8 @@ def update_basic_info(clinic, phone=None, email=None, website=None, registration
 			}
 		}
 	
+	except frappe.PermissionError:
+		return {"message": "Not permitted"}, 403
 	except Exception as e:
 		frappe.db.rollback()
 		frappe.log_error(frappe.get_traceback(), "Update Basic Info Error")

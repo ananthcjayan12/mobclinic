@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import today, add_days, getdate, flt, nowdate
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api.role_access import assert_page_access
 
 
 def get_or_create_default_service_item():
@@ -187,6 +188,7 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
     """
     try:
         practitioner = get_current_practitioner()
+        assert_page_access("invoice", practitioner_name=practitioner.name)
         
         # Resolve active clinic and build filters
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
@@ -247,6 +249,8 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
             "total_count": len(invoices)
         }
         
+    except frappe.PermissionError:
+        raise
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Get Invoices Error")
         frappe.throw(_("Error fetching invoices: {0}").format(str(e)))
@@ -265,6 +269,7 @@ def get_invoice(invoice_id):
     """
     try:
         practitioner = get_current_practitioner()
+        assert_page_access("invoice", practitioner_name=practitioner.name)
         # enforce clinic scoping if session/practitioner has one
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
         
@@ -364,6 +369,8 @@ def get_invoice(invoice_id):
         
         return invoice_data
         
+    except frappe.PermissionError:
+        raise
     except frappe.DoesNotExistError:
         frappe.throw(_("Invoice not found"))
     except Exception as e:
@@ -407,6 +414,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
     """
     try:
         practitioner = get_current_practitioner()
+        assert_page_access("invoice", practitioner_name=practitioner.name)
 
         # Resolve clinic and validate access
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
@@ -615,6 +623,8 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "tax_breakdown": tax_breakdown
         }
         
+    except frappe.PermissionError:
+        raise
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Create Invoice Error")
         frappe.throw(_("Error creating invoice: {0}").format(str(e)))
@@ -639,6 +649,7 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
     """
     try:
         practitioner = get_current_practitioner()
+        assert_page_access("invoice", practitioner_name=practitioner.name)
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)

@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import today, nowdate, getdate, flt, add_days, add_months, get_first_day, get_last_day
 from datetime import datetime, timedelta
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api.role_access import assert_page_access
 
 
 
@@ -55,6 +56,8 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
                 "exc_type": "PermissionError",
                 "message": "Healthcare Practitioner profile not found"
             }
+
+        assert_page_access("financial_dashboard", practitioner_name=practitioner.name)
 
         # Resolve clinic (company) scope
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
@@ -115,6 +118,12 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
             "data": response_data
         }
 
+    except frappe.PermissionError:
+        frappe.local.response["http_status_code"] = 403
+        return {
+            "exc_type": "PermissionError",
+            "message": "Not permitted"
+        }
     except Exception as e:
         frappe.log_error(str(e)[:500], "Get Financial Stats Error")
         frappe.local.response["http_status_code"] = 500
