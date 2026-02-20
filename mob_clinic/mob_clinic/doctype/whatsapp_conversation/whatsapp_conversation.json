@@ -1,0 +1,153 @@
+{
+  "actions": [],
+  "autoname": "format:WAC-{YYYY}-{#####}",
+  "creation": "2026-02-17 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "clinic",
+    "wa_id",
+    "customer_name",
+    "customer_phone",
+    "section_break_last",
+    "last_message_preview",
+    "last_message_at",
+    "last_message_direction",
+    "last_message_status",
+    "section_break_state",
+    "unread_count",
+    "last_inbound_at",
+    "last_outbound_at",
+    "session_expires_at",
+    "is_session_active"
+  ],
+  "fields": [
+    {
+      "fieldname": "clinic",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Clinic",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "wa_id",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "WhatsApp ID",
+      "reqd": 1
+    },
+    {
+      "fieldname": "customer_name",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Customer Name"
+    },
+    {
+      "fieldname": "customer_phone",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "Customer Phone"
+    },
+    {
+      "fieldname": "section_break_last",
+      "fieldtype": "Section Break",
+      "label": "Last Message"
+    },
+    {
+      "fieldname": "last_message_preview",
+      "fieldtype": "Small Text",
+      "label": "Last Message Preview",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_message_at",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Last Message At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_message_direction",
+      "fieldtype": "Select",
+      "label": "Last Message Direction",
+      "options": "\nInbound\nOutbound",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_message_status",
+      "fieldtype": "Select",
+      "label": "Last Message Status",
+      "options": "Pending\nSent\nDelivered\nRead\nFailed",
+      "read_only": 1
+    },
+    {
+      "fieldname": "section_break_state",
+      "fieldtype": "Section Break",
+      "label": "Conversation State"
+    },
+    {
+      "default": "0",
+      "fieldname": "unread_count",
+      "fieldtype": "Int",
+      "label": "Unread Count",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_inbound_at",
+      "fieldtype": "Datetime",
+      "label": "Last Inbound At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "last_outbound_at",
+      "fieldtype": "Datetime",
+      "label": "Last Outbound At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "session_expires_at",
+      "fieldtype": "Datetime",
+      "label": "Session Expires At",
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "is_session_active",
+      "fieldtype": "Check",
+      "label": "Session Active",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2026-02-17 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Mob Clinic",
+  "name": "WhatsApp Conversation",
+  "naming_rule": "Expression",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    },
+    {
+      "read": 1,
+      "report": 1,
+      "role": "Healthcare Administrator"
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}

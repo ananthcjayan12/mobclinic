@@ -6,6 +6,12 @@ This file defines mandatory behavior for GitHub Copilot coding agents working on
 - Applies to all files under this repository path.
 - Primary domain: Frappe/ERPNext APIs, permissions, clinic/practitioner scoping.
 
+## WhatsApp Manager Ticket Override
+- For tickets with ID prefix `WM-`, this file must be used together with:
+   - [plans/WHATSAPP_COPILOT_INSTRUCTIONS.md](../../../../plans/WHATSAPP_COPILOT_INSTRUCTIONS.md)
+- If there is any conflict, follow the stricter rule.
+- For `WM-*` completion, update the tracker in [plans/plan.md](../../../../plans/plan.md).
+
 ## Non-Negotiable Rules
 1. **Ticket-first execution**
    - Read the ticket from [plans/plan.md](../../../../plans/plan.md).

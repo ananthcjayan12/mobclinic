@@ -188,7 +188,9 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
     """
     try:
         practitioner = get_current_practitioner()
-        assert_page_access("invoice", practitioner_name=practitioner.name)
+        # Note: Removed assert_page_access("invoice") - users with prescriptions/patients 
+        # permission should be able to VIEW invoice data for patients they're treating.
+        # Write operations (create/update/delete) still require "invoice" permission.
         
         # Resolve active clinic and build filters
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
@@ -269,7 +271,8 @@ def get_invoice(invoice_id):
     """
     try:
         practitioner = get_current_practitioner()
-        assert_page_access("invoice", practitioner_name=practitioner.name)
+        # Note: Removed assert_page_access("invoice") - users should be able to VIEW
+        # invoice details when reviewing patient records. Write operations still require permission.
         # enforce clinic scoping if session/practitioner has one
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
         
@@ -1097,6 +1100,7 @@ def delete_invoice(invoice_id):
     """
     try:
         practitioner = get_current_practitioner()
+        assert_page_access("invoice", practitioner_name=practitioner.name)
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)

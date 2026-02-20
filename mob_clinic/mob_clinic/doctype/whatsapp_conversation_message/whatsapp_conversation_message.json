@@ -1,0 +1,160 @@
+{
+  "actions": [],
+  "autoname": "format:WAM-{YYYY}-{#####}",
+  "creation": "2026-02-17 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "conversation",
+    "clinic",
+    "wa_message_id",
+    "direction",
+    "message_type",
+    "status",
+    "message_timestamp",
+    "section_break_content",
+    "content",
+    "template_name",
+    "section_break_party",
+    "sender_phone",
+    "recipient_phone",
+    "conversation_read",
+    "section_break_meta",
+    "error_message",
+    "raw_payload"
+  ],
+  "fields": [
+    {
+      "fieldname": "conversation",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Conversation",
+      "options": "WhatsApp Conversation",
+      "reqd": 1
+    },
+    {
+      "fieldname": "clinic",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Clinic",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "wa_message_id",
+      "fieldtype": "Data",
+      "in_list_view": 1,
+      "label": "WhatsApp Message ID"
+    },
+    {
+      "fieldname": "direction",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Direction",
+      "options": "\nInbound\nOutbound"
+    },
+    {
+      "fieldname": "message_type",
+      "fieldtype": "Data",
+      "label": "Message Type"
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Status",
+      "options": "Pending\nSent\nDelivered\nRead\nFailed",
+      "default": "Pending"
+    },
+    {
+      "fieldname": "message_timestamp",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Message Timestamp"
+    },
+    {
+      "fieldname": "section_break_content",
+      "fieldtype": "Section Break",
+      "label": "Content"
+    },
+    {
+      "fieldname": "content",
+      "fieldtype": "Long Text",
+      "label": "Content"
+    },
+    {
+      "fieldname": "template_name",
+      "fieldtype": "Data",
+      "label": "Template Name"
+    },
+    {
+      "fieldname": "section_break_party",
+      "fieldtype": "Section Break",
+      "label": "Participants"
+    },
+    {
+      "fieldname": "sender_phone",
+      "fieldtype": "Data",
+      "label": "Sender Phone"
+    },
+    {
+      "fieldname": "recipient_phone",
+      "fieldtype": "Data",
+      "label": "Recipient Phone"
+    },
+    {
+      "default": "0",
+      "fieldname": "conversation_read",
+      "fieldtype": "Check",
+      "label": "Conversation Read"
+    },
+    {
+      "fieldname": "section_break_meta",
+      "fieldtype": "Section Break",
+      "label": "Metadata"
+    },
+    {
+      "fieldname": "error_message",
+      "fieldtype": "Small Text",
+      "label": "Error Message"
+    },
+    {
+      "fieldname": "raw_payload",
+      "fieldtype": "Code",
+      "label": "Raw Payload",
+      "options": "JSON",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2026-02-17 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "Mob Clinic",
+  "name": "WhatsApp Conversation Message",
+  "naming_rule": "Expression",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    },
+    {
+      "read": 1,
+      "report": 1,
+      "role": "Healthcare Administrator"
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}

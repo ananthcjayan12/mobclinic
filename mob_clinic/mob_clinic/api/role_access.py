@@ -12,6 +12,7 @@ DEFAULT_ALLOWED_PAGES = [
     "prescriptions",
     "invoice",
     "financial_dashboard",
+    "whatsapp-manager",
     "settings",
 ]
 

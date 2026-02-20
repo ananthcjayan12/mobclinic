@@ -245,6 +245,8 @@ ignore_csrf = [
 	"mob_clinic.mob_clinic.api.payment.update_payment",
 	"mob_clinic.mob_clinic.api.file_upload.upload_file",
 	"mob_clinic.mob_clinic.api.role_access.update_practitioner_permissions",
+	"mob_clinic.mob_clinic.api.whatsapp.verify_webhook",
+	"mob_clinic.mob_clinic.api.whatsapp.receive_webhook",
 ]
 
 # Job Events
@@ -284,7 +286,8 @@ patches = [
     "mob_clinic.mob_clinic.patches.v1_0.create_payment_modes.execute",
     "mob_clinic.mob_clinic.patches.v1_0.initialize_clinic_settings.execute",
 	"mob_clinic.mob_clinic.patches.v1_0.create_dental_templates.execute",
-	"mob_clinic.mob_clinic.patches.v1_0.add_company_custom_fields.execute"
+	"mob_clinic.mob_clinic.patches.v1_0.add_company_custom_fields.execute",
+	"mob_clinic.mob_clinic.patches.v1_0.create_whatsapp_indexes.execute"
 ]
 
 # Authentication and authorization
