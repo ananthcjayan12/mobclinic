@@ -77,6 +77,15 @@ def _safe_json_dumps(value):
         return "{}"
 
 
+def _normalize_template_language(language):
+    code = (language or "").strip()
+    if not code:
+        return "en_US"
+    if code.lower() == "en":
+        return "en_US"
+    return code
+
+
 def _resolve_practitioner_and_clinic(clinic=None, require_admin=False):
     requester_practitioner = role_access.get_current_practitioner_doc()
     clinic_name = clinic_helper.resolve_active_clinic(
@@ -651,9 +660,10 @@ def _log_message(clinic, recipient_phone, template_name, message_type,
 
 
 @frappe.whitelist()
-def send_template_message(clinic, recipient_phone, template_name, template_params=None, 
-                          language="en", message_type="Custom", 
-                          reference_doctype=None, reference_name=None):
+def send_template_message(clinic, recipient_phone, template_name, template_params=None,
+                          language="en_US", message_type="Custom",
+                          reference_doctype=None, reference_name=None,
+                          header_document_link=None, header_document_filename=None):
     """
     Send a WhatsApp template message
     
@@ -662,7 +672,7 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
         recipient_phone: Recipient's phone number
         template_name: Approved template name
         template_params: List of parameter values (optional)
-        language: Language code (default: "en")
+        language: Language code (default: "en_US")
         message_type: Type for logging (Appointment Reminder, Review Request, etc.)
         reference_doctype: Linked document type
         reference_name: Linked document name
@@ -673,6 +683,12 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
     try:
         # Get credentials
         credentials = _get_whatsapp_credentials(clinic)
+
+        template_name = (template_name or "").strip()
+        if not template_name:
+            return {"success": False, "error": "Template name is required"}
+
+        language_code = _normalize_template_language(language)
         
         # Format phone number
         formatted_phone = _format_phone_number(recipient_phone)
@@ -690,33 +706,79 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
             "template": {
                 "name": template_name,
                 "language": {
-                    "code": language
+                    "code": language_code
                 }
             }
         }
         
+        components = []
+
+        if header_document_link:
+            components.append({
+                "type": "header",
+                "parameters": [{
+                    "type": "document",
+                    "document": {
+                        "link": str(header_document_link),
+                        "filename": str(header_document_filename or "document.pdf"),
+                    }
+                }]
+            })
+
         # Add parameters if provided
         if template_params:
             if isinstance(template_params, str):
                 template_params = json.loads(template_params)
-            
-            components = [{
+
+            components.append({
                 "type": "body",
                 "parameters": [
                     {"type": "text", "text": str(param)} for param in template_params
                 ]
-            }]
+            })
+
+        if components:
             payload["template"]["components"] = components
         
-        # Send message
-        response = _call_whatsapp_api(endpoint, payload, credentials["access_token"])
+        # Send message (retry with common language fallback for Meta template translations)
+        response = None
+        last_error = None
+        candidate_languages = []
+        fallback_languages = [language_code]
+        if (language_code or "").lower().startswith("en"):
+            fallback_languages.extend(["en_US", "en_IN", "en_GB", "en"])
+        else:
+            fallback_languages.extend(["en_US", "en_IN", "en"])
+
+        for candidate in fallback_languages:
+            if candidate and candidate not in candidate_languages:
+                candidate_languages.append(candidate)
+
+        for candidate_language in candidate_languages:
+            payload["template"]["language"]["code"] = candidate_language
+            try:
+                response = _call_whatsapp_api(endpoint, payload, credentials["access_token"])
+                break
+            except Exception as api_error:
+                last_error = api_error
+                error_text = str(api_error).lower()
+                if (
+                    "132001" in error_text
+                    or "translation" in error_text
+                    or "template name does not exist" in error_text
+                ):
+                    continue
+                raise
+
+        if response is None and last_error:
+            raise last_error
         
         # Extract message ID
         message_id = None
         if response.get("messages"):
             message_id = response["messages"][0].get("id")
         
-        # Log the message
+        # Log the message as Pending; final delivery state comes from webhook statuses
         log_id = _log_message(
             clinic=clinic,
             recipient_phone=formatted_phone,
@@ -725,7 +787,7 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
             reference_doctype=reference_doctype,
             reference_name=reference_name,
             message_id=message_id,
-            status="Sent"
+            status="Pending"
         )
         
         return {
@@ -783,9 +845,6 @@ def send_appointment_reminder(appointment_id):
         if not template_name:
             return {"success": False, "error": "Appointment reminder template not configured"}
         
-        # Get clinic name
-        clinic_name = frappe.db.get_value("Company", clinic, "company_name")
-        
         # Format date and time
         from frappe.utils import formatdate, format_time
         appt_date = formatdate(appointment.appointment_date, "dd MMM yyyy")
@@ -794,9 +853,9 @@ def send_appointment_reminder(appointment_id):
         # Prepare template parameters
         params = [
             patient.patient_name,
-            clinic_name,
             appt_date,
-            appt_time
+            appt_time,
+            appointment.name
         ]
         
         return send_template_message(
@@ -846,15 +905,9 @@ def send_review_request(appointment_id):
         
         clinic_name = frappe.db.get_value("Company", clinic, "company_name")
         
-        # Get Google Maps URL for review
-        google_maps_url = ""
-        if frappe.db.exists("Clinic Settings", clinic):
-            google_maps_url = frappe.db.get_value("Clinic Settings", clinic, "google_maps_url") or ""
-        
         params = [
             patient.patient_name,
-            clinic_name,
-            google_maps_url
+            clinic_name
         ]
         
         return send_template_message(
@@ -887,8 +940,6 @@ def send_prescription(prescription_id, patient_phone=None):
             prescription = frappe.get_doc("Patient Prescription", prescription_id)
             patient_id = prescription.patient
             clinic = prescription.company or prescription.clinic
-            prescription_date = prescription.prescription_date or prescription.creation
-            practitioner_name = prescription.practitioner_name or "Doctor"
         else:
             return {"success": False, "error": "Prescription not found"}
         
@@ -910,21 +961,13 @@ def send_prescription(prescription_id, patient_phone=None):
         if not template_name:
             return {"success": False, "error": "Prescription template not configured"}
         
-        clinic_name = frappe.db.get_value("Company", clinic, "company_name")
-        clinic_phone = frappe.db.get_value("Company", clinic, "phone_no") or ""
-        
-        # Build prescription link
-        from frappe.utils import formatdate
-        prescription_link = get_url(f"/api/method/mob_clinic.mob_clinic.api.patient_prescription.get_patient_prescription?prescription_id={prescription_id}")
-        
         params = [
             patient.patient_name,
-            clinic_name,
-            formatdate(prescription_date, "dd MMM yyyy"),
-            practitioner_name,
-            prescription_link,
-            clinic_phone
+            prescription.name
         ]
+        prescription_pdf_link = get_url(
+            f"/api/method/frappe.utils.print_format.download_pdf?doctype=Patient%20Prescription&name={prescription_id}"
+        )
         
         return send_template_message(
             clinic=clinic,
@@ -933,7 +976,9 @@ def send_prescription(prescription_id, patient_phone=None):
             template_params=params,
             message_type="Prescription",
             reference_doctype="Patient Prescription",
-            reference_name=prescription_id
+            reference_name=prescription_id,
+            header_document_link=prescription_pdf_link,
+            header_document_filename=f"{prescription.name}.pdf",
         )
     
     except Exception as e:
@@ -975,21 +1020,25 @@ def send_invoice(invoice_id, patient_phone=None):
         if not template_name:
             return {"success": False, "error": "Invoice template not configured"}
         
-        clinic_name = frappe.db.get_value("Company", clinic, "company_name")
-        clinic_phone = frappe.db.get_value("Company", clinic, "phone_no") or ""
-        
-        from frappe.utils import formatdate, fmt_money
-        invoice_link = get_url(f"/api/method/frappe.utils.print_format.download_pdf?doctype=Sales%20Invoice&name={invoice_id}")
+        appointment_reference = invoice.name
+        linked_appointment = frappe.db.get_value(
+            "Sales Invoice Item",
+            {
+                "parent": invoice.name,
+                "reference_dt": "Patient Appointment",
+            },
+            "reference_dn",
+        )
+        if linked_appointment:
+            appointment_reference = linked_appointment
         
         params = [
             patient.patient_name,
-            fmt_money(invoice.grand_total, currency=invoice.currency),
-            clinic_name,
-            invoice.name,
-            formatdate(invoice.posting_date, "dd MMM yyyy"),
-            invoice_link,
-            clinic_phone
+            appointment_reference
         ]
+        invoice_pdf_link = get_url(
+            f"/api/method/frappe.utils.print_format.download_pdf?doctype=Sales%20Invoice&name={invoice_id}"
+        )
         
         return send_template_message(
             clinic=clinic,
@@ -998,7 +1047,9 @@ def send_invoice(invoice_id, patient_phone=None):
             template_params=params,
             message_type="Invoice",
             reference_doctype="Sales Invoice",
-            reference_name=invoice_id
+            reference_name=invoice_id,
+            header_document_link=invoice_pdf_link,
+            header_document_filename=f"{invoice.name}.pdf",
         )
     
     except Exception as e:
@@ -1451,7 +1502,7 @@ def send_conversation_reply(conversation_id, message_text=None, template_name=No
             direction="Outbound",
             message_type="template" if template_name and not session_active else "text",
             content=sent_content,
-            status="Sent",
+            status="Pending",
             message_time=message_time,
             sender_phone="",
             recipient_phone=recipient_phone,
@@ -1464,7 +1515,7 @@ def send_conversation_reply(conversation_id, message_text=None, template_name=No
                 conversation=conversation,
                 content=sent_content,
                 message_direction="Outbound",
-                message_status="Sent",
+                message_status="Pending",
                 message_time=message_time,
             )
 
@@ -1476,7 +1527,7 @@ def send_conversation_reply(conversation_id, message_text=None, template_name=No
             reference_doctype="WhatsApp Conversation",
             reference_name=conversation_id,
             message_id=message_id,
-            status="Sent",
+            status="Pending",
         )
 
         frappe.db.commit()
