@@ -169,6 +169,27 @@ def get_current_practitioner():
     return practitioner
 
 
+def _assert_invoice_clinic_access(practitioner, invoice, action="access"):
+    """Ensure the current practitioner can work with an invoice in their clinic scope."""
+    resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
+    invoice_company = getattr(invoice, "company", None)
+
+    if invoice_company:
+        if not clinic_helper.validate_practitioner_access(practitioner.name, invoice_company):
+            frappe.throw(
+                _("You don't have permission to {0} this invoice").format(action),
+                frappe.PermissionError,
+            )
+
+        if resolved_clinic and invoice_company != resolved_clinic:
+            frappe.throw(
+                _("You don't have permission to {0} this invoice in the current clinic").format(action),
+                frappe.PermissionError,
+            )
+
+    return resolved_clinic
+
+
 @frappe.whitelist(methods=['GET'])
 def get_invoices(patient_id=None, status=None, start_date=None, end_date=None, 
                  limit_start=0, limit_page_length=20, clinic=None):
@@ -196,8 +217,7 @@ def get_invoices(patient_id=None, status=None, start_date=None, end_date=None,
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
 
         filters = {
-            "docstatus": ["!=" , 2],  # Exclude cancelled
-            "healthcare_practitioner": practitioner.name
+            "docstatus": ["!=", 2],  # Exclude cancelled
         }
 
         if resolved_clinic:
@@ -273,19 +293,9 @@ def get_invoice(invoice_id):
         practitioner = get_current_practitioner()
         # Note: Removed assert_page_access("invoice") - users should be able to VIEW
         # invoice details when reviewing patient records. Write operations still require permission.
-        # enforce clinic scoping if session/practitioner has one
-        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
-        
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
-        
-        # Check permissions
-        if invoice.healthcare_practitioner != practitioner.name:
-            frappe.throw(_("You don't have permission to view this invoice"))
-
-        # Enforce clinic/company scope if resolved
-        if resolved_clinic and getattr(invoice, "company", None) and invoice.company != resolved_clinic:
-            frappe.throw(_("You don't have permission to view this invoice in the current clinic"))
+        _assert_invoice_clinic_access(practitioner, invoice, action="view")
         
         # Get patient details
         patient_info = {}
@@ -656,10 +666,7 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
-        
-        # Check permissions
-        if invoice.healthcare_practitioner != practitioner.name:
-            frappe.throw(_("You don't have permission to update this invoice"))
+        _assert_invoice_clinic_access(practitioner, invoice, action="update")
         
         # Validate invoice status
         if invoice.docstatus != 1:
@@ -779,14 +786,18 @@ def get_payment_summary(patient_id):
         # Get patient
         patient = frappe.get_doc("Patient", patient_id)
         
-        # Get all invoices
+        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
+        invoice_filters = {
+            "patient": patient_id,
+            "docstatus": 1,  # Only submitted
+        }
+        if resolved_clinic:
+            invoice_filters["company"] = resolved_clinic
+
+        # Get all invoices in the active clinic for the patient
         invoices = frappe.get_all(
             "Sales Invoice",
-            filters={
-                "patient": patient_id,
-                "healthcare_practitioner": practitioner.name,
-                "docstatus": 1  # Only submitted
-            },
+            filters=invoice_filters,
             fields=[
                 "name",
                 "posting_date",
@@ -1003,10 +1014,7 @@ def send_payment_reminder(invoice_id, reminder_type="sms", message=None):
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
-        
-        # Check permissions
-        if invoice.healthcare_practitioner != practitioner.name:
-            frappe.throw(_("You don't have permission to access this invoice"))
+        _assert_invoice_clinic_access(practitioner, invoice, action="access")
         
         # Check if reminder needed
         if invoice.status == "Paid":
@@ -1104,10 +1112,7 @@ def delete_invoice(invoice_id):
         
         # Get invoice
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
-        
-        # Check permissions
-        if invoice.healthcare_practitioner != practitioner.name:
-            frappe.throw(_("You don't have permission to delete this invoice"))
+        _assert_invoice_clinic_access(practitioner, invoice, action="delete")
         
         # Store current user and switch to Administrator for deletion operations
         original_user = frappe.session.user
