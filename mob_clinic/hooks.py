@@ -84,6 +84,7 @@ required_apps = ["healthcare"]
 
 # before_install = "mob_clinic.install.before_install"
 after_install = "mob_clinic.mob_clinic.install.after_install"
+after_migrate = "mob_clinic.mob_clinic.patches.v1_0.run_setup_script.execute"
 
 # Uninstallation
 # ------------
@@ -303,4 +304,3 @@ patches = [
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-

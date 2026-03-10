@@ -111,6 +111,55 @@ def _upsert_practitioner_schedule(practitioner, start_time=None, end_time=None):
 		"end_time": normalized_end,
 	}
 
+
+def _get_or_create_clinic_settings(clinic):
+	if frappe.db.exists("Clinic Settings", clinic):
+		return frappe.get_doc("Clinic Settings", clinic)
+
+	settings = frappe.new_doc("Clinic Settings")
+	settings.clinic = clinic
+	return settings
+
+
+def _serialize_consultant_row(row):
+	return {
+		"consultant_id": row.name,
+		"consultant_type": row.consultant_type,
+		"practitioner": row.practitioner,
+		"consultant_name": row.consultant_name,
+		"mobile": row.mobile,
+		"commission_type": row.commission_type,
+		"commission_value": row.commission_value,
+		"is_active": int(row.is_active or 0),
+		"notes": row.notes,
+	}
+
+
+def _validate_consultant_payload(clinic, consultant_type, practitioner, consultant_name, commission_type, commission_value):
+	if consultant_type not in {"Internal", "External"}:
+		frappe.throw(_("Invalid consultant type"))
+
+	if commission_type not in {"Percentage", "Fixed"}:
+		frappe.throw(_("Invalid commission type"))
+
+	commission_value = frappe.utils.flt(commission_value)
+	if commission_value < 0:
+		frappe.throw(_("Commission value cannot be negative"))
+	if commission_type == "Percentage" and commission_value > 100:
+		frappe.throw(_("Percentage commission cannot exceed 100"))
+
+	if consultant_type == "Internal":
+		if not practitioner:
+			frappe.throw(_("Internal consultants must be linked to a practitioner"))
+		practitioner_doc = frappe.get_doc("Healthcare Practitioner", practitioner)
+		if practitioner_doc.get("primary_company") != clinic:
+			frappe.throw(_("Selected practitioner does not belong to this clinic"))
+		consultant_name = practitioner_doc.get("practitioner_name")
+	elif not consultant_name:
+		frappe.throw(_("Consultant name is required"))
+
+	return consultant_name, commission_value
+
 @frappe.whitelist(allow_guest=True)
 def get_clinic_profile(clinic):
 	"""
@@ -897,3 +946,143 @@ def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_t
 		frappe.db.rollback()
 		frappe.log_error(frappe.get_traceback(), "Update Practitioner Schedule Error")
 		return {"message": str(e)}, 500
+
+
+@frappe.whitelist(methods=["GET"])
+def get_clinic_consultants(clinic):
+	try:
+		assert_page_access("settings")
+
+		if not clinic or not frappe.db.exists("Company", clinic):
+			frappe.local.response["http_status_code"] = 404
+			return {"message": "Invalid clinic"}
+
+		settings = _get_or_create_clinic_settings(clinic)
+		rows = [_serialize_consultant_row(row) for row in (settings.get("consultants") or [])]
+
+		return {
+			"message": "success",
+			"data": {
+				"clinic": clinic,
+				"consultants": rows,
+			},
+		}
+	except frappe.PermissionError:
+		frappe.local.response["http_status_code"] = 403
+		return {"message": "Not permitted"}
+	except Exception as e:
+		frappe.local.response["http_status_code"] = 500
+		frappe.log_error(frappe.get_traceback(), "Get Clinic Consultants Error")
+		return {"message": str(e)}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_clinic_consultant(
+	clinic,
+	consultant_id=None,
+	consultant_type="Internal",
+	practitioner=None,
+	consultant_name=None,
+	mobile=None,
+	commission_type="Percentage",
+	commission_value=0,
+	is_active=1,
+	notes=None,
+):
+	try:
+		assert_page_access("settings")
+
+		if not clinic or not frappe.db.exists("Company", clinic):
+			frappe.local.response["http_status_code"] = 404
+			return {"message": "Invalid clinic"}
+
+		settings = _get_or_create_clinic_settings(clinic)
+		consultant_name, commission_value = _validate_consultant_payload(
+			clinic,
+			consultant_type,
+			practitioner,
+			consultant_name,
+			commission_type,
+			commission_value,
+		)
+
+		row = None
+		for existing in settings.get("consultants") or []:
+			if consultant_id and existing.name == consultant_id:
+				row = existing
+				break
+
+		if not row and consultant_type == "Internal" and practitioner:
+			for existing in settings.get("consultants") or []:
+				if existing.practitioner == practitioner:
+					row = existing
+					break
+
+		if not row:
+			row = settings.append("consultants", {})
+
+		row.consultant_type = consultant_type
+		row.practitioner = practitioner if consultant_type == "Internal" else None
+		row.consultant_name = consultant_name
+		row.mobile = mobile
+		row.commission_type = commission_type
+		row.commission_value = commission_value
+		row.is_active = int(is_active or 0)
+		row.notes = notes
+
+		settings.flags.ignore_permissions = True
+		if settings.is_new():
+			settings.insert(ignore_permissions=True)
+		else:
+			settings.save(ignore_permissions=True)
+		frappe.db.commit()
+
+		return {
+			"message": "Consultant saved successfully",
+			"data": _serialize_consultant_row(row),
+		}
+	except frappe.PermissionError:
+		frappe.local.response["http_status_code"] = 403
+		return {"message": "Not permitted"}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = 500
+		frappe.log_error(frappe.get_traceback(), "Save Clinic Consultant Error")
+		return {"message": str(e)}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_clinic_consultant(clinic, consultant_id):
+	try:
+		assert_page_access("settings")
+
+		if not clinic or not frappe.db.exists("Company", clinic):
+			frappe.local.response["http_status_code"] = 404
+			return {"message": "Invalid clinic"}
+
+		settings = _get_or_create_clinic_settings(clinic)
+		rows = settings.get("consultants") or []
+		target = None
+		for row in rows:
+			if row.name == consultant_id:
+				target = row
+				break
+
+		if not target:
+			frappe.local.response["http_status_code"] = 404
+			return {"message": "Consultant not found"}
+
+		settings.remove(target)
+		settings.flags.ignore_permissions = True
+		settings.save(ignore_permissions=True)
+		frappe.db.commit()
+
+		return {"message": "Consultant deleted successfully", "data": {"consultant_id": consultant_id}}
+	except frappe.PermissionError:
+		frappe.local.response["http_status_code"] = 403
+		return {"message": "Not permitted"}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.local.response["http_status_code"] = 500
+		frappe.log_error(frappe.get_traceback(), "Delete Clinic Consultant Error")
+		return {"message": str(e)}

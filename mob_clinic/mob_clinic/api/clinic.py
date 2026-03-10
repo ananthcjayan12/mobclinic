@@ -133,10 +133,12 @@ def set_active_clinic_session(clinic: Optional[str]):
     # Set in frappe.local.session.data (in-memory session data)
     if hasattr(frappe, "local") and hasattr(frappe.local, "session"):
         if isinstance(frappe.local.session, dict):
+            frappe.local.session["active_clinic"] = clinic
             if "data" not in frappe.local.session:
                 frappe.local.session["data"] = {}
             frappe.local.session["data"]["active_clinic"] = clinic
         else:
+            frappe.local.session.active_clinic = clinic
             if not hasattr(frappe.local.session, "data") or frappe.local.session.data is None:
                 frappe.local.session.data = {}
             frappe.local.session.data["active_clinic"] = clinic

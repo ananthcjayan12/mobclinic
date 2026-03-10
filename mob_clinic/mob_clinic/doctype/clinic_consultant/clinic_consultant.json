@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "creation": "2026-03-09 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "consultant_type",
+  "column_break_identity",
+  "is_active",
+  "practitioner",
+  "consultant_name",
+  "mobile",
+  "commission_type",
+  "column_break_commission",
+  "commission_value",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "Internal",
+   "fieldname": "consultant_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Consultant Type",
+   "options": "Internal\nExternal",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
+  },
+  {
+   "depends_on": "eval:doc.consultant_type==='Internal'",
+   "fieldname": "practitioner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fieldname": "consultant_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Consultant Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "mobile",
+   "fieldtype": "Data",
+   "label": "Mobile"
+  },
+  {
+   "default": "Percentage",
+   "fieldname": "commission_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Commission Type",
+   "options": "Percentage\nFixed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_commission",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "commission_value",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Commission Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-03-09 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Clinic Consultant",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

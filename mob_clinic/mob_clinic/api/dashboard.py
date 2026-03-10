@@ -26,8 +26,36 @@ def get_current_practitioner():
     return practitioner
 
 
+def _resolve_financial_dashboard_scope(clinic=None):
+    practitioner = get_current_practitioner()
+    if not practitioner:
+        frappe.local.response["http_status_code"] = 403
+        return None, None, {
+            "exc_type": "PermissionError",
+            "message": "Healthcare Practitioner profile not found"
+        }
+
+    assert_page_access("financial_dashboard", practitioner_name=practitioner.name)
+    resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
+    return practitioner, resolved_clinic, None
+
+
+def _normalize_practitioner_filter(practitioner_id, resolved_clinic):
+    if not practitioner_id:
+        return None
+
+    filters = {"name": practitioner_id}
+    if resolved_clinic:
+        filters["primary_company"] = resolved_clinic
+
+    if not frappe.db.exists("Healthcare Practitioner", filters):
+        frappe.throw(_("Selected practitioner is invalid for this clinic"))
+
+    return practitioner_id
+
+
 @frappe.whitelist(methods=['GET'])
-def get_financial_stats(from_date=None, to_date=None, clinic=None):
+def get_financial_stats(from_date=None, to_date=None, clinic=None, practitioner_id=None):
     """
     Get comprehensive financial dashboard statistics.
 
@@ -49,18 +77,9 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         }
     """
     try:
-        practitioner = get_current_practitioner()
-        if not practitioner:
-            frappe.local.response["http_status_code"] = 403
-            return {
-                "exc_type": "PermissionError",
-                "message": "Healthcare Practitioner profile not found"
-            }
-
-        assert_page_access("financial_dashboard", practitioner_name=practitioner.name)
-
-        # Resolve clinic (company) scope
-        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
+        practitioner, resolved_clinic, permission_error = _resolve_financial_dashboard_scope(clinic)
+        if permission_error:
+            return permission_error
 
         # Default date range: beginning of current month to today
         today_date = getdate(nowdate())
@@ -74,10 +93,14 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         else:
             from_date = getdate(from_date)
 
-        # Build base filters for practitioner and clinic
-        base_filters = {"healthcare_practitioner": practitioner.name, "docstatus": 1}
+        practitioner_filter = _normalize_practitioner_filter(practitioner_id, resolved_clinic)
+
+        # Build base filters for clinic-wide stats with optional practitioner filter
+        base_filters = {"docstatus": 1}
         if resolved_clinic:
             base_filters["company"] = resolved_clinic
+        if practitioner_filter:
+            base_filters["healthcare_practitioner"] = practitioner_filter
 
         # --------------------------
         # SUMMARY STATS
@@ -103,6 +126,7 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         # RECENT TRANSACTIONS
         # --------------------------
         recent_transactions = _get_recent_transactions(base_filters, limit=10)
+        practitioner_revenue = _calculate_practitioner_revenue(base_filters, from_date, to_date)
 
         # Prepare response data
         response_data = {
@@ -111,6 +135,11 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
             "payment_modes": payment_modes,
             "top_procedures": top_procedures,
             "recent_transactions": recent_transactions,
+            "practitioner_revenue": practitioner_revenue,
+            "filters": {
+                "clinic": resolved_clinic,
+                "practitioner_id": practitioner_filter,
+            }
         }
 
         return {
@@ -133,11 +162,188 @@ def get_financial_stats(from_date=None, to_date=None, clinic=None):
         }
 
 
+@frappe.whitelist(methods=['GET'])
+def get_consultant_payout_report(from_date=None, to_date=None, clinic=None, consultant_id=None):
+    """Return consultant payout summary and detail rows from stored invoice item snapshots."""
+    try:
+        practitioner, resolved_clinic, permission_error = _resolve_financial_dashboard_scope(clinic)
+        if permission_error:
+            return permission_error
+
+        today_date = getdate(nowdate())
+        if not to_date:
+            to_date = today_date
+        else:
+            to_date = getdate(to_date)
+
+        if not from_date:
+            from_date = get_first_day(today_date)
+        else:
+            from_date = getdate(from_date)
+
+        conditions = [
+            "si.docstatus = 1",
+            "si.posting_date BETWEEN %s AND %s",
+            "COALESCE(sii.consultant_id, '') != ''",
+        ]
+        params = [from_date, to_date]
+
+        if resolved_clinic:
+            conditions.append("si.company = %s")
+            params.append(resolved_clinic)
+
+        if consultant_id:
+            conditions.append("sii.consultant_id = %s")
+            params.append(consultant_id)
+
+        where_clause = " AND ".join(conditions)
+
+        rows = frappe.db.sql(
+            f"""
+            SELECT
+                si.name AS invoice_id,
+                si.posting_date,
+                si.patient,
+                si.patient_name,
+                si.grand_total,
+                si.outstanding_amount,
+                sii.item_code,
+                sii.item_name,
+                sii.description,
+                sii.qty,
+                sii.amount,
+                sii.consultant_id,
+                sii.consultant_name,
+                sii.consultant_type,
+                sii.consultant_practitioner,
+                sii.consultant_commission_type,
+                sii.consultant_commission_value,
+                sii.consultant_commission_amount,
+                sii.consultant_commission_source
+            FROM `tabSales Invoice Item` sii
+            INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
+            WHERE {where_clause}
+            ORDER BY si.posting_date DESC, sii.idx ASC
+            """,
+            tuple(params),
+            as_dict=True,
+        )
+
+        consultant_summary = {}
+        detail_rows = []
+        total_revenue = 0
+        total_collected = 0
+        total_commission = 0
+
+        for row in rows:
+            item_amount = flt(row.get("amount"))
+            grand_total = flt(row.get("grand_total"))
+            outstanding_amount = flt(row.get("outstanding_amount"))
+            paid_ratio = 0 if grand_total <= 0 else max(0, min(1, (grand_total - outstanding_amount) / grand_total))
+            estimated_collected = round(item_amount * paid_ratio, 2)
+            commission_amount = round(flt(row.get("consultant_commission_amount")), 2)
+
+            consultant_key = row.get("consultant_id")
+            summary = consultant_summary.get(consultant_key)
+            if not summary:
+                summary = {
+                    "consultant_id": consultant_key,
+                    "consultant_name": row.get("consultant_name") or "Unknown",
+                    "consultant_type": row.get("consultant_type"),
+                    "consultant_practitioner": row.get("consultant_practitioner"),
+                    "total_revenue": 0.0,
+                    "total_collected": 0.0,
+                    "total_commission": 0.0,
+                    "invoice_count": 0,
+                    "item_count": 0,
+                    "override_count": 0,
+                }
+                consultant_summary[consultant_key] = summary
+
+            summary["total_revenue"] += item_amount
+            summary["total_collected"] += estimated_collected
+            summary["total_commission"] += commission_amount
+            summary["item_count"] += 1
+            if row.get("consultant_commission_source") == "Override":
+                summary["override_count"] += 1
+
+            invoice_marker = summary.setdefault("_invoice_ids", set())
+            invoice_marker.add(row.get("invoice_id"))
+
+            total_revenue += item_amount
+            total_collected += estimated_collected
+            total_commission += commission_amount
+
+            detail_rows.append({
+                "invoice_id": row.get("invoice_id"),
+                "date": str(row.get("posting_date")) if row.get("posting_date") else "",
+                "patient": row.get("patient"),
+                "patient_name": row.get("patient_name"),
+                "procedure_name": row.get("item_name") or row.get("description") or row.get("item_code"),
+                "item_code": row.get("item_code"),
+                "qty": flt(row.get("qty")),
+                "total_invoiced": round(item_amount, 2),
+                "amount_received": estimated_collected,
+                "consultant_id": row.get("consultant_id"),
+                "consultant_name": row.get("consultant_name"),
+                "commission_type": row.get("consultant_commission_type"),
+                "commission_value": flt(row.get("consultant_commission_value")),
+                "commission_amount": commission_amount,
+                "commission_source": row.get("consultant_commission_source"),
+                "payment_status": "Paid" if estimated_collected >= item_amount and item_amount > 0 else ("Partly Paid" if estimated_collected > 0 else "Unpaid"),
+            })
+
+        consultants = []
+        for summary in consultant_summary.values():
+            invoice_ids = summary.pop("_invoice_ids", set())
+            summary["invoice_count"] = len(invoice_ids)
+            summary["total_revenue"] = round(summary["total_revenue"], 2)
+            summary["total_collected"] = round(summary["total_collected"], 2)
+            summary["total_commission"] = round(summary["total_commission"], 2)
+            consultants.append(summary)
+
+        consultants.sort(key=lambda item: item["total_commission"], reverse=True)
+
+        return {
+            "message": "Success",
+            "data": {
+                "clinic": resolved_clinic,
+                "from_date": str(from_date),
+                "to_date": str(to_date),
+                "selected_consultant_id": consultant_id,
+                "summary": {
+                    "total_revenue": round(total_revenue, 2),
+                    "total_collected": round(total_collected, 2),
+                    "total_commission": round(total_commission, 2),
+                    "consultant_count": len(consultants),
+                    "item_count": len(detail_rows),
+                    "invoice_count": len({row["invoice_id"] for row in detail_rows}),
+                },
+                "consultants": consultants,
+                "rows": detail_rows,
+            }
+        }
+    except frappe.PermissionError:
+        frappe.local.response["http_status_code"] = 403
+        return {
+            "exc_type": "PermissionError",
+            "message": "Not permitted"
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Get Consultant Payout Report Error")
+        frappe.local.response["http_status_code"] = 500
+        return {
+            "exc_type": "ServerError",
+            "message": str(e)
+        }
+
+
 def _get_payments_for_period(practitioner, company, from_date, to_date):
-    """Get all payment allocations for practitioner's invoices in date range."""
-    
-    # First get all practitioner invoices (no date filter on invoices)
-    invoice_filters = {"healthcare_practitioner": practitioner, "docstatus": 1}
+    """Get all payment allocations for invoices in date range, optionally filtered by practitioner."""
+
+    invoice_filters = {"docstatus": 1}
+    if practitioner:
+        invoice_filters["healthcare_practitioner"] = practitioner
     if company:
         invoice_filters["company"] = company
     
@@ -304,19 +510,23 @@ def _calculate_patient_stats_optimized(base_filters, from_date, to_date):
         FROM `tabSales Invoice`
         WHERE docstatus = 1
             AND posting_date BETWEEN %s AND %s
-            AND healthcare_practitioner = %s
+            {practitioner_filter}
             {company_filter}
             AND patient IS NOT NULL
     """
-    
-    params = [from_date, to_date, practitioner]
+
+    params = [from_date, to_date]
+    practitioner_filter = ""
+    if practitioner:
+        practitioner_filter = "AND healthcare_practitioner = %s"
+        params.append(practitioner)
     company_filter = ""
     if company:
         company_filter = "AND company = %s"
         params.append(company)
     
     period_patients = frappe.db.sql(
-        period_patients_query.format(company_filter=company_filter),
+        period_patients_query.format(company_filter=company_filter, practitioner_filter=practitioner_filter),
         tuple(params),
         as_dict=True
     )
@@ -334,13 +544,18 @@ def _calculate_patient_stats_optimized(base_filters, from_date, to_date):
             MIN(posting_date) as first_invoice_date
         FROM `tabSales Invoice`
         WHERE docstatus = 1
-            AND healthcare_practitioner = %s
+            {practitioner_filter}
             {company_filter}
             AND patient IN %s
         GROUP BY patient
     """
     
-    params = [practitioner]
+    params = []
+    if practitioner:
+        practitioner_filter = "AND healthcare_practitioner = %s"
+        params.append(practitioner)
+    else:
+        practitioner_filter = ""
     if company:
         company_filter = "AND company = %s"
         params.append(company)
@@ -349,7 +564,7 @@ def _calculate_patient_stats_optimized(base_filters, from_date, to_date):
     params.append(patient_ids)
     
     first_invoices = frappe.db.sql(
-        first_invoice_query.format(company_filter=company_filter),
+        first_invoice_query.format(company_filter=company_filter, practitioner_filter=practitioner_filter),
         tuple(params),
         as_dict=True
     )
@@ -462,8 +677,9 @@ def _calculate_payment_modes(base_filters, from_date, to_date):
     if company:
         conditions.append(f"pe.company = '{company}'")
 
-    # Get invoices for this practitioner to filter payment references
-    invoice_filter = {"healthcare_practitioner": practitioner, "docstatus": 1}
+    invoice_filter = {"docstatus": 1}
+    if practitioner:
+        invoice_filter["healthcare_practitioner"] = practitioner
     if company:
         invoice_filter["company"] = company
 
@@ -507,6 +723,90 @@ def _calculate_payment_modes(base_filters, from_date, to_date):
         })
 
     return payment_modes
+
+
+def _calculate_practitioner_revenue(base_filters, from_date, to_date):
+    """Return practitioner-level revenue summary for the selected clinic/date scope."""
+    company = base_filters.get("company")
+    practitioner = base_filters.get("healthcare_practitioner")
+
+    conditions = ["si.docstatus = 1", "si.posting_date BETWEEN %s AND %s"]
+    params = [from_date, to_date]
+    if company:
+        conditions.append("si.company = %s")
+        params.append(company)
+    if practitioner:
+        conditions.append("si.healthcare_practitioner = %s")
+        params.append(practitioner)
+
+    invoice_rows = frappe.db.sql(
+        f"""
+        SELECT
+            si.healthcare_practitioner AS practitioner_id,
+            COALESCE(hp.practitioner_name, si.healthcare_practitioner) AS practitioner_name,
+            SUM(si.grand_total) AS total_invoiced,
+            SUM(si.outstanding_amount) AS outstanding_amount,
+            COUNT(DISTINCT si.name) AS invoice_count,
+            COUNT(DISTINCT si.patient) AS patient_count
+        FROM `tabSales Invoice` si
+        LEFT JOIN `tabHealthcare Practitioner` hp ON hp.name = si.healthcare_practitioner
+        WHERE {" AND ".join(conditions)}
+        GROUP BY si.healthcare_practitioner, hp.practitioner_name
+        ORDER BY total_invoiced DESC
+        """,
+        tuple(params),
+        as_dict=True,
+    )
+
+    payment_conditions = ["pe.docstatus = 1", "pe.payment_type = 'Receive'", "pe.posting_date BETWEEN %s AND %s"]
+    payment_params = [from_date, to_date]
+    if company:
+        payment_conditions.append("si.company = %s")
+        payment_params.append(company)
+    if practitioner:
+        payment_conditions.append("si.healthcare_practitioner = %s")
+        payment_params.append(practitioner)
+
+    payment_rows = frappe.db.sql(
+        f"""
+        SELECT
+            si.healthcare_practitioner AS practitioner_id,
+            SUM(per.allocated_amount) AS total_collected
+        FROM `tabPayment Entry` pe
+        INNER JOIN `tabPayment Entry Reference` per ON per.parent = pe.name
+        INNER JOIN `tabSales Invoice` si ON si.name = per.reference_name
+        WHERE {" AND ".join(payment_conditions)}
+            AND per.reference_doctype = 'Sales Invoice'
+        GROUP BY si.healthcare_practitioner
+        """,
+        tuple(payment_params),
+        as_dict=True,
+    )
+
+    collected_map = {
+        row.get("practitioner_id"): flt(row.get("total_collected"))
+        for row in payment_rows
+    }
+
+    table = []
+    for row in invoice_rows:
+        total_invoiced = round(flt(row.get("total_invoiced")), 2)
+        total_collected = round(collected_map.get(row.get("practitioner_id"), 0), 2)
+        outstanding_amount = round(flt(row.get("outstanding_amount")), 2)
+        collection_rate = round((total_collected / total_invoiced) * 100, 1) if total_invoiced > 0 else 0
+
+        table.append({
+            "practitioner_id": row.get("practitioner_id"),
+            "practitioner_name": row.get("practitioner_name") or "Unassigned",
+            "total_invoiced": total_invoiced,
+            "total_collected": total_collected,
+            "outstanding_amount": outstanding_amount,
+            "invoice_count": int(flt(row.get("invoice_count"))),
+            "patient_count": int(flt(row.get("patient_count"))),
+            "collection_rate": collection_rate,
+        })
+
+    return table
 
 
 def _calculate_top_procedures(base_filters, from_date, to_date, limit=10):
@@ -558,8 +858,9 @@ def _get_recent_transactions(base_filters, limit=10):
     practitioner = base_filters.get("healthcare_practitioner")
     company = base_filters.get("company")
 
-    # Get practitioner's invoices
-    invoice_filter = {"healthcare_practitioner": practitioner, "docstatus": 1}
+    invoice_filter = {"docstatus": 1}
+    if practitioner:
+        invoice_filter["healthcare_practitioner"] = practitioner
     if company:
         invoice_filter["company"] = company
 
@@ -598,7 +899,9 @@ def _get_recent_transactions(base_filters, limit=10):
     for payment in recent_payments:
         invoice_info = invoice_patient_map.get(payment.invoice_id, {})
         transactions.append({
-            "id": payment.invoice_id,
+            "id": payment.id,
+            "payment_entry_id": payment.id,
+            "invoice_id": payment.invoice_id,
             "patient_name": invoice_info.get("patient_name", "Unknown"),
             "date": str(payment.date) if payment.date else "",
             "amount": round(flt(payment.amount), 2),
@@ -610,7 +913,7 @@ def _get_recent_transactions(base_filters, limit=10):
 
 
 @frappe.whitelist(methods=['GET'])
-def get_collection_summary(period="today", clinic=None):
+def get_collection_summary(period="today", clinic=None, practitioner_id=None):
     """
     Get a quick collection summary for a specific period.
 
@@ -622,15 +925,10 @@ def get_collection_summary(period="today", clinic=None):
         dict: Collection summary for the period.
     """
     try:
-        practitioner = get_current_practitioner()
-        if not practitioner:
-            frappe.local.response["http_status_code"] = 403
-            return {
-                "exc_type": "PermissionError",
-                "message": "Healthcare Practitioner profile not found"
-            }
-
-        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, clinic)
+        practitioner, resolved_clinic, permission_error = _resolve_financial_dashboard_scope(clinic)
+        if permission_error:
+            return permission_error
+        practitioner_filter = _normalize_practitioner_filter(practitioner_id, resolved_clinic)
 
         today_date = getdate(nowdate())
 
@@ -654,16 +952,17 @@ def get_collection_summary(period="today", clinic=None):
 
         # Build filters
         filters = {
-            "healthcare_practitioner": practitioner.name,
             "docstatus": 1,
             "posting_date": ["between", [from_date, to_date]]
         }
         if resolved_clinic:
             filters["company"] = resolved_clinic
+        if practitioner_filter:
+            filters["healthcare_practitioner"] = practitioner_filter
 
         # Get actual payments for the period
         period_payments = _get_payments_for_period(
-            practitioner.name, 
+            practitioner_filter,
             resolved_clinic, 
             from_date, 
             to_date

@@ -320,11 +320,13 @@ class TestPatientAPI(FrappeTestCase):
         # Update patient
         new_email = "updated@example.com"
         new_occupation = "Software Engineer"
+        new_sex = "Female"
         
         result = update_patient(
             patient_id=self.test_patient_id,
             email=new_email,
             occupation=new_occupation,
+            sex=new_sex,
             preferred_language="English"
         )
         
@@ -332,11 +334,13 @@ class TestPatientAPI(FrappeTestCase):
         self.assertEqual(result.get("message"), "Patient updated successfully")
         self.assertIn("email", result.get("updated_fields"))
         self.assertIn("occupation", result.get("updated_fields"))
+        self.assertIn("sex", result.get("updated_fields"))
         
         # Verify data was updated
         patient = frappe.get_doc("Patient", self.test_patient_id)
         self.assertEqual(patient.email, new_email)
         self.assertEqual(patient.occupation, new_occupation)
+        self.assertEqual(patient.sex, new_sex)
         
         # Reset user
         frappe.set_user("Administrator")

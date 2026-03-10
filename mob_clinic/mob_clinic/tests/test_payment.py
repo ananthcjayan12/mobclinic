@@ -6,6 +6,7 @@ Tests Sales Invoice creation, payment tracking, and reminders
 import frappe
 import unittest
 from frappe.utils import today, add_days, getdate, flt
+from mob_clinic.mob_clinic.patches.v1_0.create_consultant_invoice_fields import execute as ensure_consultant_invoice_fields
 
 
 class TestPaymentAPI(unittest.TestCase):
@@ -15,6 +16,13 @@ class TestPaymentAPI(unittest.TestCase):
     def setUpClass(cls):
         """Set up test data once for all tests"""
         frappe.set_user("Administrator")
+        if not frappe.db.exists("DocType", "Clinic Consultant"):
+            frappe.reload_doc("mob_clinic", "doctype", "clinic_consultant")
+        if not frappe.db.exists("DocField", {"parent": "Clinic Settings", "fieldname": "consultants"}):
+            frappe.reload_doc("mob_clinic", "doctype", "clinic_settings")
+        frappe.clear_cache(doctype="Clinic Settings")
+        frappe.clear_cache(doctype="Clinic Consultant")
+        ensure_consultant_invoice_fields()
         
         # Create test medical department if not exists
         if not frappe.db.exists("Medical Department", "Dentistry"):
@@ -38,6 +46,22 @@ class TestPaymentAPI(unittest.TestCase):
         else:
             cls.practitioner_id = frappe.db.get_value("Healthcare Practitioner", 
                 {"first_name": "Test", "last_name": "Payment Doctor"})
+
+        if not frappe.db.exists("Healthcare Practitioner", {"first_name": "Associate", "last_name": "Payment Doctor"}):
+            associate_practitioner = frappe.get_doc({
+                "doctype": "Healthcare Practitioner",
+                "first_name": "Associate",
+                "last_name": "Payment Doctor",
+                "gender": "Male",
+                "department": "Dentistry"
+            })
+            associate_practitioner.insert(ignore_permissions=True)
+            cls.associate_practitioner_id = associate_practitioner.name
+        else:
+            cls.associate_practitioner_id = frappe.db.get_value(
+                "Healthcare Practitioner",
+                {"first_name": "Associate", "last_name": "Payment Doctor"},
+            )
         
         # Create Healthcare Practitioner role if not exists
         if not frappe.db.exists("Role", "Healthcare Practitioner"):
@@ -103,6 +127,7 @@ class TestPaymentAPI(unittest.TestCase):
                     "item_group": item_data["item_group"],
                     "stock_uom": "Nos",
                     "is_stock_item": 0,
+                    "gst_hsn_code": "999312",
                     "standard_rate": item_data["rate"]
                 })
                 item.insert(ignore_permissions=True)
@@ -140,6 +165,15 @@ class TestPaymentAPI(unittest.TestCase):
                 company = "Test Mobile Clinic"
         
         cls.company = company
+        frappe.db.set_value("Healthcare Practitioner", cls.practitioner_id, "primary_company", company)
+        frappe.db.set_value("Healthcare Practitioner", cls.practitioner_id, "is_clinic_admin", 1)
+        frappe.db.set_value(
+            "Healthcare Practitioner",
+            cls.practitioner_id,
+            "allowed_pages_json",
+            '["home","appointments","patients","prescriptions","invoice","financial_dashboard","whatsapp-manager","settings"]',
+        )
+        frappe.db.set_value("Healthcare Practitioner", cls.associate_practitioner_id, "primary_company", company)
         
         # Ensure company has required accounts setup
         # Check if Chart of Accounts exists for this company
@@ -218,6 +252,28 @@ class TestPaymentAPI(unittest.TestCase):
         
         # Store test invoice ID for later tests
         cls.test_invoice_id = None
+
+        settings = frappe.get_doc("Clinic Settings", company) if frappe.db.exists("Clinic Settings", company) else frappe.new_doc("Clinic Settings")
+        settings.clinic = company
+        existing_consultant = None
+        for row in settings.get("consultants") or []:
+            if row.consultant_name == "Payout Consultant":
+                existing_consultant = row
+                break
+        if not existing_consultant:
+            existing_consultant = settings.append("consultants", {})
+        existing_consultant.consultant_type = "External"
+        existing_consultant.consultant_name = "Payout Consultant"
+        existing_consultant.mobile = "9998881110"
+        existing_consultant.commission_type = "Percentage"
+        existing_consultant.commission_value = 10
+        existing_consultant.is_active = 1
+        settings.flags.ignore_permissions = True
+        if settings.is_new():
+            settings.insert(ignore_permissions=True)
+        else:
+            settings.save(ignore_permissions=True)
+        cls.consultant_id = existing_consultant.name
     
     @classmethod
     def tearDownClass(cls):
@@ -259,10 +315,21 @@ class TestPaymentAPI(unittest.TestCase):
         # Delete test patient
         if frappe.db.exists("Patient", cls.patient_id):
             frappe.delete_doc("Patient", cls.patient_id, force=True)
+
+        if frappe.db.exists("Clinic Settings", cls.company):
+            settings = frappe.get_doc("Clinic Settings", cls.company)
+            for row in list(settings.get("consultants") or []):
+                if row.name == getattr(cls, "consultant_id", None) or row.consultant_name == "Payout Consultant":
+                    settings.remove(row)
+            settings.flags.ignore_permissions = True
+            settings.save(ignore_permissions=True)
         
         # Delete test practitioner
         if frappe.db.exists("Healthcare Practitioner", cls.practitioner_id):
             frappe.delete_doc("Healthcare Practitioner", cls.practitioner_id, force=True)
+
+        if frappe.db.exists("Healthcare Practitioner", getattr(cls, "associate_practitioner_id", None)):
+            frappe.delete_doc("Healthcare Practitioner", cls.associate_practitioner_id, force=True)
         
         # Delete test user
         if frappe.db.exists("User", "test_payment_doctor@example.com"):
@@ -280,6 +347,7 @@ class TestPaymentAPI(unittest.TestCase):
     def setUp(self):
         """Set up before each test"""
         frappe.set_user("test_payment_doctor@example.com")
+        frappe.local.session["active_clinic"] = self.company
     
     def test_01_create_invoice(self):
         """Test creating a new invoice"""
@@ -350,6 +418,70 @@ class TestPaymentAPI(unittest.TestCase):
         self.assertEqual(len(result["items"]), 2)
         self.assertIn("payments", result)
         self.assertEqual(result["grand_total"], 2000)
+
+    def test_03b_create_invoice_with_consultant_snapshot(self):
+        """Test consultant commission snapshot is stored on invoice items."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice, get_invoice
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            items=[
+                {
+                    "item_code": "CONS-001",
+                    "qty": 1,
+                    "rate": 500,
+                    "description": "Consultation with consultant",
+                    "consultant": {
+                        "consultant_id": self.consultant_id,
+                        "commission_type": "Fixed",
+                        "commission_value": 120,
+                        "override": True,
+                    },
+                }
+            ],
+            posting_date=today(),
+            due_date=add_days(today(), 3),
+            remarks="Consultant override test",
+        )
+
+        self.assertEqual(result["total_consultant_commission"], 120.0)
+
+        invoice_data = get_invoice(result["invoice_id"])
+        item = invoice_data["items"][0]
+        self.assertEqual(item["consultant_id"], self.consultant_id)
+        self.assertEqual(item["consultant_name"], "Payout Consultant")
+        self.assertEqual(item["consultant_commission_type"], "Fixed")
+        self.assertEqual(item["consultant_commission_value"], 120.0)
+        self.assertEqual(item["consultant_commission_amount"], 120.0)
+        self.assertEqual(item["consultant_commission_source"], "Override")
+
+    def test_03c_create_invoice_with_explicit_associated_practitioner(self):
+        """Test invoice stores the explicitly selected associated doctor."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice, get_invoice
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            practitioner_id=self.associate_practitioner_id,
+            items=[
+                {
+                    "item_code": "CONS-001",
+                    "qty": 1,
+                    "rate": 500,
+                    "description": "Receptionist-created consultation invoice",
+                }
+            ],
+            posting_date=today(),
+            due_date=add_days(today(), 5),
+            remarks="Explicit associated doctor test",
+        )
+
+        self.assertEqual(result["practitioner_id"], self.associate_practitioner_id)
+
+        invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
+        self.assertEqual(invoice.healthcare_practitioner, self.associate_practitioner_id)
+
+        invoice_data = get_invoice(result["invoice_id"])
+        self.assertEqual(invoice_data["healthcare_practitioner"], self.associate_practitioner_id)
     
     def test_04_update_payment_partial(self):
         """Test recording a partial payment"""
@@ -408,9 +540,54 @@ class TestPaymentAPI(unittest.TestCase):
         self.assertIn("total_paid", result)
         self.assertIn("total_pending", result)
         self.assertGreater(result["invoice_count"], 0)
-        self.assertEqual(result["total_invoiced"], 2000)
+        self.assertEqual(result["total_invoiced"], 3000)
         self.assertEqual(result["total_paid"], 2000)
-        self.assertEqual(result["total_pending"], 0)
+        self.assertEqual(result["total_pending"], 1000)
+
+    def test_06b_get_consultant_payout_report(self):
+        """Test consultant payout report uses stored invoice item snapshots."""
+        from mob_clinic.mob_clinic.api.dashboard import get_consultant_payout_report
+
+        result = get_consultant_payout_report(
+            from_date=today(),
+            to_date=today(),
+            clinic=self.company,
+            consultant_id=self.consultant_id,
+        )
+
+        self.assertEqual(result["message"], "Success")
+        report = result["data"]
+        self.assertEqual(report["summary"]["consultant_count"], 1)
+        self.assertEqual(report["summary"]["item_count"], 1)
+        self.assertEqual(report["summary"]["total_revenue"], 500.0)
+        self.assertEqual(report["summary"]["total_commission"], 120.0)
+        self.assertEqual(report["consultants"][0]["consultant_id"], self.consultant_id)
+        self.assertEqual(report["consultants"][0]["total_commission"], 120.0)
+        self.assertEqual(report["rows"][0]["consultant_name"], "Payout Consultant")
+        self.assertEqual(report["rows"][0]["commission_amount"], 120.0)
+        self.assertEqual(report["rows"][0]["commission_source"], "Override")
+
+    def test_06c_get_financial_stats_with_practitioner_filter(self):
+        """Test financial dashboard returns clinic data with optional practitioner filter."""
+        from mob_clinic.mob_clinic.api.dashboard import get_financial_stats
+
+        result = get_financial_stats(
+            from_date=today(),
+            to_date=today(),
+            clinic=self.company,
+            practitioner_id=self.practitioner_id,
+        )
+
+        self.assertEqual(result["message"], "Success")
+        dashboard = result["data"]
+        self.assertEqual(dashboard["filters"]["clinic"], self.company)
+        self.assertEqual(dashboard["filters"]["practitioner_id"], self.practitioner_id)
+        self.assertIn("summary", dashboard)
+        self.assertIn("recent_transactions", dashboard)
+        self.assertIn("practitioner_revenue", dashboard)
+        self.assertGreaterEqual(len(dashboard["practitioner_revenue"]), 1)
+        if dashboard["recent_transactions"]:
+            self.assertIn("invoice_id", dashboard["recent_transactions"][0])
     
     def test_07_create_invoice_with_appointment(self):
         """Test creating invoice linked to an appointment"""
@@ -453,6 +630,66 @@ class TestPaymentAPI(unittest.TestCase):
             invoice.cancel()
         frappe.delete_doc("Sales Invoice", invoice.name, force=True, ignore_permissions=True)
         frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
+
+    def test_07b_create_multiple_invoices_for_same_appointment(self):
+        """Test split billing by allowing multiple invoices for the same appointment."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice
+        import random
+
+        unique_minute = random.randint(30, 59)
+        appointment = frappe.get_doc({
+            "doctype": "Patient Appointment",
+            "patient": self.patient_id,
+            "practitioner": self.practitioner_id,
+            "appointment_date": today(),
+            "appointment_time": f"15:{unique_minute}:00",
+            "appointment_type": "Consultation",
+            "appointment_for": "Practitioner",
+            "status": "Pending Payment"
+        })
+        appointment.insert(ignore_permissions=True)
+
+        first_invoice_id = None
+        second_invoice_id = None
+
+        try:
+            first_result = create_invoice(
+                patient_id=self.patient_id,
+                appointment_reference=appointment.name,
+                items=[{"item_code": "CONS-001", "qty": 1, "rate": 500, "description": "Consultation fee"}],
+                posting_date=today(),
+            )
+            first_invoice_id = first_result["invoice_id"]
+
+            second_result = create_invoice(
+                patient_id=self.patient_id,
+                appointment_reference=appointment.name,
+                items=[{"item_code": "ROOT-001", "qty": 1, "rate": 5000, "description": "Additional procedure"}],
+                posting_date=today(),
+            )
+            second_invoice_id = second_result["invoice_id"]
+
+            self.assertNotEqual(first_invoice_id, second_invoice_id)
+
+            referenced_invoices = frappe.get_all(
+                "Sales Invoice Item",
+                filters={"reference_dt": "Patient Appointment", "reference_dn": appointment.name},
+                fields=["parent"],
+                distinct=True,
+            )
+            self.assertEqual(len(referenced_invoices), 1)
+        finally:
+            for invoice_id in [first_invoice_id, second_invoice_id]:
+                if not invoice_id or not frappe.db.exists("Sales Invoice", invoice_id):
+                    continue
+                invoice = frappe.get_doc("Sales Invoice", invoice_id)
+                if invoice.docstatus == 1:
+                    invoice.flags.ignore_permissions = True
+                    invoice.cancel()
+                frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
+
+            if frappe.db.exists("Patient Appointment", appointment.name):
+                frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
     
     def test_08_filter_invoices_by_status(self):
         """Test filtering invoices by status"""

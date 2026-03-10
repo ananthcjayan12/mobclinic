@@ -1,10 +1,17 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from mob_clinic.mob_clinic.api import auth, appointment, payment, patient, clinic as clinic_helper
+from mob_clinic.mob_clinic.api import auth, appointment, payment, patient, clinic as clinic_helper, clinic_profile
 
 class TestClinicAPI(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
+		if not frappe.db.exists("DocType", "Clinic Consultant"):
+			frappe.reload_doc("mob_clinic", "doctype", "clinic_consultant")
+		if not frappe.db.exists("DocField", {"parent": "Clinic Settings", "fieldname": "consultants"}):
+			frappe.reload_doc("mob_clinic", "doctype", "clinic_settings")
+		frappe.clear_cache(doctype="Clinic Settings")
+		frappe.clear_cache(doctype="Clinic Consultant")
+
 		# Create test companies (Clinics)
 		self.clinic_a = "_Test Clinic A"
 		self.clinic_b = "_Test Clinic B"
@@ -16,7 +23,7 @@ class TestClinicAPI(FrappeTestCase):
 					"company_name": clinic,
 					"default_currency": "INR",
 					"country": "India"
-				}).insert()
+				}).insert(ignore_if_duplicate=True)
 
 		# Create test user and practitioner
 		self.user = "test_api_practitioner@example.com"
@@ -42,6 +49,36 @@ class TestClinicAPI(FrappeTestCase):
 			doc.insert()
 		else:
 			frappe.db.set_value("Healthcare Practitioner", self.practitioner_name, "primary_company", self.clinic_a)
+		frappe.db.set_value("Healthcare Practitioner", self.practitioner_name, "is_clinic_admin", 1)
+		frappe.db.set_value(
+			"Healthcare Practitioner",
+			self.practitioner_name,
+			"allowed_pages_json",
+			'["home","appointments","patients","prescriptions","invoice","financial_dashboard","whatsapp-manager","settings"]',
+		)
+
+		self.consultant_user = "test_api_consultant@example.com"
+		if not frappe.db.exists("User", self.consultant_user):
+			frappe.get_doc({
+				"doctype": "User",
+				"email": self.consultant_user,
+				"first_name": "Consultant",
+				"last_name": "Doctor",
+				"roles": [{"role": "Physician"}]
+			}).insert()
+
+		self.consultant_practitioner_name = "_Test Consultant Practitioner"
+		if not frappe.db.exists("Healthcare Practitioner", self.consultant_practitioner_name):
+			frappe.get_doc({
+				"doctype": "Healthcare Practitioner",
+				"practitioner_name": self.consultant_practitioner_name,
+				"first_name": "Consultant",
+				"last_name": "Doctor",
+				"user_id": self.consultant_user,
+				"primary_company": self.clinic_a
+			}).insert()
+		else:
+			frappe.db.set_value("Healthcare Practitioner", self.consultant_practitioner_name, "primary_company", self.clinic_a)
 
 		# Create a test patient
 		self.patient_name = "_Test Patient API"
@@ -66,11 +103,19 @@ class TestClinicAPI(FrappeTestCase):
 		frappe.flags.in_test = True
 		
 		# Clean up test data
+		if frappe.db.exists("Clinic Settings", self.clinic_a):
+			frappe.delete_doc("Clinic Settings", self.clinic_a, force=True, ignore_permissions=True)
 		frappe.db.sql("DELETE FROM `tabPatient Appointment` WHERE patient = %s", self.patient)
 		frappe.db.sql("DELETE FROM `tabSales Invoice` WHERE patient = %s", self.patient)
 			
 		if frappe.db.exists("Patient", self.patient):
 			frappe.delete_doc("Patient", self.patient, force=True, ignore_permissions=True)
+		
+		if frappe.db.exists("Healthcare Practitioner", self.consultant_practitioner_name):
+			frappe.delete_doc("Healthcare Practitioner", self.consultant_practitioner_name, force=True, ignore_permissions=True)
+		
+		if frappe.db.exists("User", self.consultant_user):
+			frappe.delete_doc("User", self.consultant_user, force=True, ignore_permissions=True)
 			
 		if frappe.db.exists("Healthcare Practitioner", self.practitioner_name):
 			frappe.delete_doc("Healthcare Practitioner", self.practitioner_name, force=True, ignore_permissions=True)
@@ -131,3 +176,55 @@ class TestClinicAPI(FrappeTestCase):
 		# Skip this test - invoice creation requires complex ERP setup (customer, accounts, etc.)
 		# which is beyond the scope of multi-clinic logic testing
 		self.skipTest("Invoice creation requires full ERP setup")
+
+	def test_manage_clinic_consultants(self):
+		clinic_helper.set_active_clinic_session(self.clinic_a)
+
+		save_internal = clinic_profile.save_clinic_consultant(
+			clinic=self.clinic_a,
+			consultant_type="Internal",
+			practitioner=self.consultant_practitioner_name,
+			commission_type="Percentage",
+			commission_value=12.5,
+			is_active=1,
+		)
+
+		self.assertEqual(save_internal.get("message"), "Consultant saved successfully")
+		internal_row = save_internal.get("data") or {}
+		self.assertEqual(internal_row.get("practitioner"), self.consultant_practitioner_name)
+		self.assertEqual(internal_row.get("consultant_name"), "Consultant Doctor")
+		self.assertEqual(internal_row.get("commission_type"), "Percentage")
+		self.assertEqual(internal_row.get("commission_value"), 12.5)
+
+		save_external = clinic_profile.save_clinic_consultant(
+			clinic=self.clinic_a,
+			consultant_type="External",
+			consultant_name="Visiting Surgeon",
+			mobile="9990011223",
+			commission_type="Fixed",
+			commission_value=750,
+			is_active=1,
+			notes="Weekend consultant",
+		)
+
+		self.assertEqual(save_external.get("message"), "Consultant saved successfully")
+		external_row = save_external.get("data") or {}
+		self.assertEqual(external_row.get("consultant_type"), "External")
+		self.assertEqual(external_row.get("consultant_name"), "Visiting Surgeon")
+		self.assertEqual(external_row.get("commission_type"), "Fixed")
+		self.assertEqual(external_row.get("commission_value"), 750.0)
+
+		listing = clinic_profile.get_clinic_consultants(self.clinic_a)
+		self.assertEqual(listing.get("message"), "success")
+		self.assertEqual(len(listing.get("data", {}).get("consultants", [])), 2)
+
+		delete_result = clinic_profile.delete_clinic_consultant(
+			clinic=self.clinic_a,
+			consultant_id=external_row.get("consultant_id"),
+		)
+		self.assertEqual(delete_result.get("message"), "Consultant deleted successfully")
+
+		updated_listing = clinic_profile.get_clinic_consultants(self.clinic_a)
+		consultants = updated_listing.get("data", {}).get("consultants", [])
+		self.assertEqual(len(consultants), 1)
+		self.assertEqual(consultants[0].get("consultant_id"), internal_row.get("consultant_id"))

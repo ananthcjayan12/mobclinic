@@ -5,7 +5,8 @@ from mob_clinic.mob_clinic.patches.v1_0 import (
     initialize_clinic_settings,
     create_payment_modes,
     create_dental_templates,
-    create_medicine_templates
+    create_medicine_templates,
+    create_consultant_invoice_fields,
 )
 
 def execute():
@@ -40,6 +41,10 @@ def execute():
     # 6. Create Medicine Templates
     frappe.log("\n--- Creating Medicine Templates ---")
     create_medicine_templates.execute()
+
+    # 7. Ensure consultant invoice custom fields exist
+    frappe.log("\n--- Ensuring Consultant Invoice Fields ---")
+    create_consultant_invoice_fields.execute()
     
     frappe.db.commit()
     frappe.log("\nMobile Clinic Setup Completed Successfully!")

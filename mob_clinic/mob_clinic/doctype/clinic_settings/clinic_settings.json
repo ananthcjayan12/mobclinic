@@ -42,6 +42,8 @@
     "column_break_additional",
     "timezone",
     "currency",
+    "section_break_consultants",
+    "consultants",
     "section_break_landing_page",
     "landing_page_tagline",
     "landing_page_stats_json",
@@ -256,6 +258,17 @@
       "fieldtype": "Link",
       "label": "Currency",
       "options": "Currency"
+    },
+    {
+      "fieldname": "section_break_consultants",
+      "fieldtype": "Section Break",
+      "label": "Consultants"
+    },
+    {
+      "fieldname": "consultants",
+      "fieldtype": "Table",
+      "label": "Consultants",
+      "options": "Clinic Consultant"
     },
     {
       "fieldname": "section_break_landing_page",

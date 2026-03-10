@@ -7,3 +7,4 @@
 mob_clinic.mob_clinic.patches.v1_0.install_custom_fields #2025-10-21
 mob_clinic.mob_clinic.patches.v1_0.create_dental_templates #2025-12-07
 mob_clinic.mob_clinic.patches.v1_0.create_whatsapp_indexes
+mob_clinic.mob_clinic.patches.v1_0.create_consultant_invoice_fields

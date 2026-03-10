@@ -153,6 +153,106 @@ def _add_igst_tax(invoice, tax_percentage, company):
     return True
 
 
+def _get_clinic_consultant(consultant_id, clinic):
+    """Fetch a clinic consultant row and validate clinic scope."""
+    if not consultant_id:
+        return None
+
+    consultant = frappe.db.get_value(
+        "Clinic Consultant",
+        consultant_id,
+        [
+            "name",
+            "parent",
+            "consultant_type",
+            "practitioner",
+            "consultant_name",
+            "commission_type",
+            "commission_value",
+            "is_active",
+        ],
+        as_dict=True,
+    )
+
+    if not consultant:
+        frappe.throw(_("Consultant not found"))
+
+    if clinic and consultant.parent != clinic:
+        frappe.throw(_("Consultant does not belong to the selected clinic"))
+
+    if not consultant.get("is_active"):
+        frappe.throw(_("Selected consultant is inactive"))
+
+    return consultant
+
+
+def _build_consultant_snapshot(item, clinic):
+    """Build consultant commission snapshot for an invoice item."""
+    consultant_data = item.get("consultant")
+    if not consultant_data:
+        return {}
+
+    if isinstance(consultant_data, str):
+        consultant_data = json.loads(consultant_data)
+
+    consultant_id = consultant_data.get("consultant_id")
+    consultant = _get_clinic_consultant(consultant_id, clinic)
+
+    commission_type = consultant.get("commission_type")
+    commission_value = flt(consultant.get("commission_value"))
+    commission_source = "Default"
+
+    if consultant_data.get("override"):
+        override_type = consultant_data.get("commission_type")
+        override_value = flt(consultant_data.get("commission_value"))
+        if override_type not in {"Percentage", "Fixed"}:
+            frappe.throw(_("Invalid override commission type"))
+        if override_value < 0:
+            frappe.throw(_("Commission value cannot be negative"))
+        if override_type == "Percentage" and override_value > 100:
+            frappe.throw(_("Percentage commission cannot exceed 100"))
+        commission_type = override_type
+        commission_value = override_value
+        commission_source = "Override"
+
+    line_amount = flt(item.get("qty", 1)) * flt(item.get("rate"))
+    commission_amount = (
+        (line_amount * commission_value) / 100.0
+        if commission_type == "Percentage"
+        else commission_value
+    )
+
+    return {
+        "consultant_id": consultant.get("name"),
+        "consultant_name": consultant.get("consultant_name"),
+        "consultant_type": consultant.get("consultant_type"),
+        "consultant_practitioner": consultant.get("practitioner"),
+        "consultant_commission_type": commission_type,
+        "consultant_commission_value": commission_value,
+        "consultant_commission_amount": commission_amount,
+        "consultant_commission_source": commission_source,
+    }
+
+
+def _resolve_invoice_practitioner(current_practitioner, resolved_clinic, practitioner_id=None, appointment_id=None):
+    """Resolve the doctor associated with the invoice."""
+    associated_practitioner = practitioner_id
+
+    if not associated_practitioner and appointment_id and frappe.db.exists("Patient Appointment", appointment_id):
+        associated_practitioner = frappe.db.get_value("Patient Appointment", appointment_id, "practitioner")
+
+    if not associated_practitioner:
+        associated_practitioner = current_practitioner.name
+
+    if not frappe.db.exists("Healthcare Practitioner", associated_practitioner):
+        frappe.throw(_("Associated doctor not found"))
+
+    if resolved_clinic and not clinic_helper.validate_practitioner_access(associated_practitioner, resolved_clinic):
+        frappe.throw(_("Selected doctor does not belong to the active clinic"))
+
+    return associated_practitioner
+
+
 def get_current_practitioner():
     """Get the Healthcare Practitioner linked to current user"""
     user = frappe.session.user
@@ -319,7 +419,15 @@ def get_invoice(invoice_id):
                 "description": item.description,
                 "qty": item.qty,
                 "rate": item.rate,
-                "amount": item.amount
+                "amount": item.amount,
+                "consultant_id": getattr(item, "consultant_id", None),
+                "consultant_name": getattr(item, "consultant_name", None),
+                "consultant_type": getattr(item, "consultant_type", None),
+                "consultant_practitioner": getattr(item, "consultant_practitioner", None),
+                "consultant_commission_type": getattr(item, "consultant_commission_type", None),
+                "consultant_commission_value": getattr(item, "consultant_commission_value", None),
+                "consultant_commission_amount": getattr(item, "consultant_commission_amount", None),
+                "consultant_commission_source": getattr(item, "consultant_commission_source", None),
             })
         
         # Get payment entries
@@ -358,6 +466,7 @@ def get_invoice(invoice_id):
         invoice_data = {
             "invoice_id": invoice.name,
             "patient": patient_info,
+            "healthcare_practitioner": invoice.healthcare_practitioner,
             "posting_date": invoice.posting_date,
             "due_date": invoice.due_date,
             "status": invoice.status,
@@ -372,7 +481,8 @@ def get_invoice(invoice_id):
             "taxes": tax_breakdown,
             "payments": payments,
             "is_overdue": False,
-            "remarks": invoice.remarks
+            "remarks": invoice.remarks,
+            "total_consultant_commission": sum(flt(item.get("consultant_commission_amount")) for item in items),
         }
         
         # Check if overdue
@@ -396,7 +506,8 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
                    treatment_type=None, treatment_description=None,
                    appointment_reference=None, remarks=None, clinic=None,
                    discount_amount=None, tax_amount=None, discount_percentage=None,
-                   tax_percentage=None, tax_template=None, is_cosmetic=False):
+                   tax_percentage=None, tax_template=None, is_cosmetic=False,
+                   practitioner_id=None):
     """
     Create a new Sales Invoice
     
@@ -467,6 +578,22 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         # Ensure dates are proper date objects
         posting_date_value = getdate(posting_date) if posting_date else today()
         due_date_value = getdate(due_date) if due_date else add_days(posting_date_value, 7)
+
+        # Resolve appointment id from function arg or request (frontend may send `appointment_id`)
+        appointment_id = appointment_reference
+        try:
+            if not appointment_id:
+                appointment_id = frappe.local.form_dict.get("appointment_id") or frappe.form_dict.get("appointment_id")
+        except Exception:
+            # defensive: if form_dict access not available, ignore
+            appointment_id = appointment_id
+
+        associated_practitioner = _resolve_invoice_practitioner(
+            practitioner,
+            resolved_clinic,
+            practitioner_id=practitioner_id,
+            appointment_id=appointment_id,
+        )
         
         # Create Sales Invoice
         invoice = frappe.get_doc({
@@ -475,7 +602,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "patient": patient_id,
             "patient_name": patient.patient_name,
             "set_posting_time": 1,
-            "healthcare_practitioner": practitioner.name,
+            "healthcare_practitioner": associated_practitioner,
             "posting_date": posting_date_value,
             "due_date": due_date_value,
             "remarks": remarks,
@@ -495,22 +622,19 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             invoice.apply_discount_on = "Grand Total"
             invoice.additional_discount_percentage = flt(discount_percentage)
         
-        # Resolve appointment id from function arg or request (frontend may send `appointment_id`)
-        appointment_id = appointment_reference
-        try:
-            if not appointment_id:
-                appointment_id = frappe.local.form_dict.get("appointment_id") or frappe.form_dict.get("appointment_id")
-        except Exception:
-            # defensive: if form_dict access not available, ignore
-            appointment_id = appointment_id
-
-        # If appointment provided, validate it exists and is not already invoiced
+        # If appointment provided, validate it exists and belongs to the same patient.
+        # We intentionally allow multiple invoices for the same appointment because
+        # clinics may split billing across procedures or stages on the same visit.
+        appointment_already_invoiced = False
         if appointment_id:
             if not frappe.db.exists("Patient Appointment", appointment_id):
                 frappe.throw(_("Appointment not found: {0}").format(appointment_id))
-            invoiced_flag = frappe.db.get_value("Patient Appointment", appointment_id, "invoiced")
-            if invoiced_flag:
-                frappe.throw(_("Appointment {0} is already invoiced").format(appointment_id))
+            appointment_patient = frappe.db.get_value("Patient Appointment", appointment_id, "patient")
+            if appointment_patient != patient_id:
+                frappe.throw(_("Appointment {0} does not belong to the selected patient").format(appointment_id))
+            appointment_already_invoiced = bool(frappe.db.get_value("Patient Appointment", appointment_id, "invoiced"))
+
+        total_consultant_commission = 0
 
         # Add items
         first_item = True
@@ -551,9 +675,14 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
                 "description": item.get("description") or item.get("item_name") or item_code
             }
 
+            consultant_snapshot = _build_consultant_snapshot(item, resolved_clinic)
+            if consultant_snapshot:
+                item_row.update(consultant_snapshot)
+                total_consultant_commission += flt(consultant_snapshot.get("consultant_commission_amount"))
+
             # If an appointment reference was provided, attach it to the first invoice item
             # so downstream hooks can link invoices to Patient Appointment documents.
-            if appointment_id and first_item:
+            if appointment_id and first_item and not appointment_already_invoiced:
                 item_row.update({
                     "reference_dt": "Patient Appointment",
                     "reference_dn": appointment_id,
@@ -625,6 +754,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         return {
             "message": "Invoice created successfully",
             "invoice_id": invoice.name,
+            "practitioner_id": associated_practitioner,
             "grand_total": invoice.grand_total,
             "net_total": invoice.net_total,
             "total": invoice.total,  # Total before tax and discount
@@ -633,6 +763,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
             "outstanding_amount": invoice.outstanding_amount,
             "status": invoice.status,
             "is_cosmetic": is_cosmetic,
+            "total_consultant_commission": total_consultant_commission,
             "tax_breakdown": tax_breakdown
         }
         

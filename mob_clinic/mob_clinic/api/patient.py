@@ -457,6 +457,10 @@ def update_patient(patient_id, **kwargs):
     """
     try:
         patient = frappe.get_doc("Patient", patient_id)
+
+        # Accept "gender" as an API alias for the Patient.doctype field "sex".
+        if "gender" in kwargs and "sex" not in kwargs:
+            kwargs["sex"] = kwargs.get("gender")
         
         # Disable invite_user to prevent website user creation
         if hasattr(patient, 'invite_user'):
@@ -477,7 +481,8 @@ def update_patient(patient_id, **kwargs):
         allowed_fields = [
             'first_name', 'middle_name', 'last_name', 'patient_name',
             'mobile', 'phone', 'email', 'occupation', 'marital_status',
-            'profile_image', 'preferred_language', 'insurance_details', 'dob', 'address'
+            'profile_image', 'preferred_language', 'insurance_details', 'dob', 'address',
+            'sex', 'blood_group'
         ]
 
         updated_fields = []
