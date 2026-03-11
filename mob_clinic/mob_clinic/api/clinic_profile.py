@@ -8,6 +8,7 @@ from frappe import _
 import json
 from frappe.utils import get_url, cstr
 from datetime import datetime
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 from mob_clinic.mob_clinic.api.role_access import assert_page_access
 
 
@@ -110,6 +111,23 @@ def _upsert_practitioner_schedule(practitioner, start_time=None, end_time=None):
 		"start_time": normalized_start,
 		"end_time": normalized_end,
 	}
+
+
+def _get_practitioner_slot_duration(practitioner):
+	"""Return practitioner-specific slot duration when the custom field exists."""
+	if not practitioner:
+		return None
+
+	try:
+		meta = frappe.get_meta("Healthcare Practitioner")
+		if meta.has_field("appointment_slot_duration"):
+			value = getattr(practitioner, "appointment_slot_duration", None)
+			if value:
+				return int(value)
+	except Exception:
+		return None
+
+	return None
 
 
 def _get_or_create_clinic_settings(clinic):
@@ -894,6 +912,7 @@ def get_clinic_practitioner_schedules(clinic):
 					"primary_company": row.get("primary_company"),
 					"start_time": schedule["start_time"],
 					"end_time": schedule["end_time"],
+					"slot_duration": _get_practitioner_slot_duration(practitioner_doc),
 				}
 			)
 
@@ -913,7 +932,7 @@ def get_clinic_practitioner_schedules(clinic):
 
 
 @frappe.whitelist(methods=["POST"])
-def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_time=None):
+def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_time=None, slot_duration=None):
 	"""Update one practitioner's working hours for a clinic."""
 	try:
 		assert_page_access("settings")
@@ -929,6 +948,15 @@ def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_t
 			return {"message": "Practitioner does not belong to the selected clinic"}, 400
 
 		schedule = _upsert_practitioner_schedule(practitioner, start_time=start_time, end_time=end_time)
+		if slot_duration not in (None, ""):
+			slot_duration = int(slot_duration)
+			if slot_duration <= 0:
+				return {"message": "Slot duration must be greater than 0"}, 400
+			if frappe.get_meta("Healthcare Practitioner").has_field("appointment_slot_duration"):
+				practitioner.appointment_slot_duration = slot_duration
+				practitioner.flags.ignore_permissions = True
+				practitioner.save(ignore_permissions=True)
+
 		frappe.db.commit()
 
 		return {
@@ -938,6 +966,7 @@ def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_t
 				"practitioner_name": practitioner.practitioner_name,
 				"start_time": schedule["start_time"],
 				"end_time": schedule["end_time"],
+				"slot_duration": _get_practitioner_slot_duration(practitioner),
 			},
 		}
 	except frappe.PermissionError:
@@ -951,11 +980,19 @@ def update_practitioner_schedule(clinic, practitioner_id, start_time=None, end_t
 @frappe.whitelist(methods=["GET"])
 def get_clinic_consultants(clinic):
 	try:
-		assert_page_access("settings")
-
 		if not clinic or not frappe.db.exists("Company", clinic):
 			frappe.local.response["http_status_code"] = 404
 			return {"message": "Invalid clinic"}
+
+		requester = None
+		try:
+			requester = frappe.get_doc("Healthcare Practitioner", {"user_id": frappe.session.user})
+		except Exception:
+			requester = None
+
+		if not requester or not clinic_helper.validate_practitioner_access(requester.name, clinic):
+			frappe.local.response["http_status_code"] = 403
+			return {"message": "Not permitted"}
 
 		settings = _get_or_create_clinic_settings(clinic)
 		rows = [_serialize_consultant_row(row) for row in (settings.get("consultants") or [])]

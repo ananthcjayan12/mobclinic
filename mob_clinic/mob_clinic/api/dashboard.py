@@ -783,9 +783,27 @@ def _calculate_practitioner_revenue(base_filters, from_date, to_date):
         as_dict=True,
     )
 
+    commission_rows = frappe.db.sql(
+        f"""
+        SELECT
+            si.healthcare_practitioner AS practitioner_id,
+            SUM(COALESCE(sii.consultant_commission_amount, 0)) AS total_commission
+        FROM `tabSales Invoice Item` sii
+        INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+        WHERE {" AND ".join(conditions)}
+        GROUP BY si.healthcare_practitioner
+        """,
+        tuple(params),
+        as_dict=True,
+    )
+
     collected_map = {
         row.get("practitioner_id"): flt(row.get("total_collected"))
         for row in payment_rows
+    }
+    commission_map = {
+        row.get("practitioner_id"): flt(row.get("total_commission"))
+        for row in commission_rows
     }
 
     table = []
@@ -793,6 +811,7 @@ def _calculate_practitioner_revenue(base_filters, from_date, to_date):
         total_invoiced = round(flt(row.get("total_invoiced")), 2)
         total_collected = round(collected_map.get(row.get("practitioner_id"), 0), 2)
         outstanding_amount = round(flt(row.get("outstanding_amount")), 2)
+        total_commission = round(commission_map.get(row.get("practitioner_id"), 0), 2)
         collection_rate = round((total_collected / total_invoiced) * 100, 1) if total_invoiced > 0 else 0
 
         table.append({
@@ -800,6 +819,7 @@ def _calculate_practitioner_revenue(base_filters, from_date, to_date):
             "practitioner_name": row.get("practitioner_name") or "Unassigned",
             "total_invoiced": total_invoiced,
             "total_collected": total_collected,
+            "total_commission": total_commission,
             "outstanding_amount": outstanding_amount,
             "invoice_count": int(flt(row.get("invoice_count"))),
             "patient_count": int(flt(row.get("patient_count"))),

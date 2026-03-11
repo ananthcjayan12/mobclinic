@@ -39,13 +39,17 @@ def get_practitioners():
         active_clinic = clinic_helper.resolve_active_clinic(practitioner_name=session_practitioner_name, clinic_param=None)
 
         # Fetch all active practitioners, then filter by active clinic (if set).
+        practitioner_fields = [
+            "name", "practitioner_name", "mobile_phone as mobile",
+            "department", "designation", "status"
+        ]
+        if frappe.get_meta("Healthcare Practitioner").has_field("appointment_slot_duration"):
+            practitioner_fields.append("appointment_slot_duration")
+
         practitioners = frappe.get_all(
             "Healthcare Practitioner",
             filters={"status": "Active"},
-            fields=[
-                "name", "practitioner_name", "mobile_phone as mobile",
-                "department", "designation", "status"
-            ],
+            fields=practitioner_fields,
             order_by="practitioner_name asc"
         )
 

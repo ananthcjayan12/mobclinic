@@ -349,6 +349,13 @@ def get_practitioner_profile():
     """
     try:
         user = frappe.session.user
+        if not user or user == "Guest":
+            frappe.local.response["http_status_code"] = 401
+            return {
+                "exc_type": "AuthenticationError",
+                "message": "Session expired. Please login again."
+            }
+
         practitioner = frappe.get_doc("Healthcare Practitioner", {"user_id": user})
         
         profile_data = {

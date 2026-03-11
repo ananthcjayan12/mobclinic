@@ -165,6 +165,13 @@ def create_healthcare_practitioner_fields():
                 "label": "Allowed Pages JSON",
                 "fieldtype": "Small Text",
                 "insert_after": "is_clinic_admin"
+            },
+            {
+                "fieldname": "appointment_slot_duration",
+                "label": "Appointment Slot Duration (Minutes)",
+                "fieldtype": "Int",
+                "default": 30,
+                "insert_after": "allowed_pages_json"
             }
         ]
     }

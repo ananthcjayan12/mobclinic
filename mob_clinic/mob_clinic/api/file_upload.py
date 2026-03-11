@@ -66,7 +66,7 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
             }
             
         # Validate file category
-        valid_categories = ["prescription", "xray", "report", "profile", "treatment", "document"]
+        valid_categories = ["prescription", "xray", "report", "profile", "treatment", "document", "consent"]
         if file_category and file_category not in valid_categories:
             return {
                 "exc_type": "ValidationError", 
@@ -641,5 +641,11 @@ def get_file_category_config():
             "max_size_mb": 10,
             "description": "General medical documents",
             "optimize_images": False
+        },
+        "consent": {
+            "allowed_extensions": ["pdf", "jpg", "jpeg", "png", "doc", "docx"],
+            "max_size_mb": 15,
+            "description": "Consent forms and signed treatment approvals",
+            "optimize_images": True
         }
     }

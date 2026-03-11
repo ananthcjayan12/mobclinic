@@ -1,9 +1,36 @@
 import frappe
 from frappe import _
-from frappe.utils import cstr, get_datetime, nowdate, add_days, getdate, now_datetime
+from frappe.utils import cstr, cint, get_datetime, nowdate, add_days, getdate, now_datetime
 import json
 from datetime import datetime, timedelta
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+
+
+def resolve_appointment_duration(practitioner_id=None, clinic=None, duration=None):
+    """Return the practitioner-specific slot duration, falling back to clinic default and then 30."""
+    requested_duration = cint(duration)
+    if requested_duration > 0:
+        return requested_duration
+
+    resolved_clinic = clinic
+    practitioner_doc = None
+    if practitioner_id:
+        try:
+            practitioner_doc = frappe.get_doc("Healthcare Practitioner", practitioner_id)
+            resolved_clinic = resolved_clinic or getattr(practitioner_doc, "primary_company", None)
+            if frappe.get_meta("Healthcare Practitioner").has_field("appointment_slot_duration"):
+                practitioner_duration = cint(getattr(practitioner_doc, "appointment_slot_duration", 0))
+                if practitioner_duration > 0:
+                    return practitioner_duration
+        except Exception:
+            practitioner_doc = None
+
+    if resolved_clinic and frappe.db.exists("Clinic Settings", resolved_clinic):
+        clinic_duration = cint(frappe.db.get_value("Clinic Settings", resolved_clinic, "appointment_slot_duration"))
+        if clinic_duration > 0:
+            return clinic_duration
+
+    return 30
 
 @frappe.whitelist(methods=['GET'])
 def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by="appointment_date desc", clinic=None):
@@ -278,12 +305,14 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
                 "message": "Practitioner does not have access to the requested clinic"
             }
 
+        resolved_duration = resolve_appointment_duration(practitioner_name, resolved_clinic, kwargs.get("duration"))
+
         # Count overlapping appointments for this slot (allow overbooking but inform caller)
         overlap_count = count_overlapping_appointments(
             practitioner_name,
             appointment_date,
             appointment_time,
-            kwargs.get("duration", 30)
+            resolved_duration
         )
         if overlap_count:
             warning_msg = f"{overlap_count} existing appointment(s) in this time slot for the practitioner"
@@ -297,7 +326,7 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
             "practitioner": practitioner_name,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
-            "duration": kwargs.get("duration", 30),
+            "duration": resolved_duration,
             "status": "Open",
             "appointment_type": kwargs.get("appointment_type", ""),
             "appointment_for": "Practitioner",
@@ -916,6 +945,15 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
                     }
                 practitioner = practitioner_doc.name
         
+        resolved_clinic = clinic
+        if practitioner and not resolved_clinic:
+            try:
+                resolved_clinic = frappe.db.get_value("Healthcare Practitioner", practitioner, "primary_company")
+            except Exception:
+                resolved_clinic = None
+
+        resolved_duration = resolve_appointment_duration(practitioner, resolved_clinic, duration)
+
         # Get working hours for the day
         day_of_week = getdate(date).strftime("%A")
         working_hours = get_working_hours(practitioner, day_of_week)
@@ -933,7 +971,7 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
         # Generate time slots
         start_time = working_hours.get("start_time")
         end_time = working_hours.get("end_time")
-        all_slots = generate_time_slots(start_time, end_time, duration)
+        all_slots = generate_time_slots(start_time, end_time, resolved_duration)
         
         # Get booked appointments for the date
         booked_appointments = frappe.get_all(
@@ -949,7 +987,7 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
         # Filter out booked slots and format response
         slots_data = []
         for slot in all_slots:
-            is_booked = is_slot_booked(slot, booked_appointments, duration)
+            is_booked = is_slot_booked(slot, booked_appointments, resolved_duration)
             slot_info = {
                 "time": slot,
                 "available": not is_booked
@@ -957,7 +995,7 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
 
             # Count existing overlapping appointments for this slot (for frontend occupancy display)
             try:
-                existing_count = count_overlapping_appointments(practitioner, date, slot, duration)
+                existing_count = count_overlapping_appointments(practitioner, date, slot, resolved_duration)
             except Exception:
                 existing_count = 0
 
@@ -966,7 +1004,7 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
             
             if is_booked:
                 # Find the appointment booking this slot
-                booking = get_booking_for_slot(slot, booked_appointments, duration)
+                booking = get_booking_for_slot(slot, booked_appointments, resolved_duration)
                 if booking:
                     slot_info["appointment"] = {
                         "name": booking.name,
@@ -988,7 +1026,7 @@ def get_available_slots(date, duration=30, practitioner=None, clinic=None):
                     "start": cstr(start_time),
                     "end": cstr(end_time)
                 },
-                "slot_duration": duration,
+                "slot_duration": resolved_duration,
                 "total_slots": len(all_slots),
                 "available_slots": available_slots_simple, # Backward compatibility
                 "slots": slots_data, # New detailed format
