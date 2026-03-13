@@ -16,6 +16,50 @@ DEFAULT_ALLOWED_PAGES = [
 
 NON_ADMIN_DEFAULT_PAGES = [page for page in DEFAULT_ALLOWED_PAGES if page != "settings"]
 
+TEXT_CUSTOM_FIELD_PROPERTIES = {
+    "default",
+    "options",
+    "insert_after",
+    "fetch_from",
+    "depends_on",
+    "mandatory_depends_on",
+    "read_only_depends_on",
+    "collapsible_depends_on",
+    "description",
+    "label",
+    "fieldname",
+    "width",
+}
+
+
+def _normalize_custom_field_definitions(custom_fields):
+    """Coerce text-backed Custom Field properties to strings.
+
+    Frappe stores metadata like `default` on the `Custom Field` DocType as text fields.
+    During `bench migrate`, updating an existing Custom Field can save a Version row, and
+    version diff formatting expects text values there. Integer defaults such as `0` or `30`
+    can therefore fail on some environments with:
+        TypeError: expected string or bytes-like object, got 'int'
+    """
+    normalized = {}
+
+    for doctype, field_definitions in (custom_fields or {}).items():
+        normalized_fields = []
+        for field_definition in field_definitions or []:
+            field_copy = dict(field_definition)
+            for key in TEXT_CUSTOM_FIELD_PROPERTIES:
+                value = field_copy.get(key)
+                if value is not None and not isinstance(value, str):
+                    field_copy[key] = str(value)
+            normalized_fields.append(field_copy)
+        normalized[doctype] = normalized_fields
+
+    return normalized
+
+
+def _create_custom_fields(custom_fields):
+    create_custom_fields(_normalize_custom_field_definitions(custom_fields), update=True)
+
 def execute():
     """Install custom fields for mobile clinic app"""
     
@@ -177,7 +221,7 @@ def create_healthcare_practitioner_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Healthcare Practitioner custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Healthcare Practitioner custom fields: {str(e)}")
@@ -338,7 +382,7 @@ def create_patient_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Patient custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Patient custom fields: {str(e)}")
@@ -514,7 +558,7 @@ def create_patient_appointment_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Patient Appointment custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Patient Appointment custom fields: {str(e)}")
@@ -637,7 +681,7 @@ def create_patient_medical_record_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Patient Medical Record custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Patient Medical Record custom fields: {str(e)}")
@@ -693,7 +737,7 @@ def create_patient_encounter_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Patient Encounter custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Patient Encounter custom fields: {str(e)}")
@@ -797,7 +841,7 @@ def create_sales_invoice_fields():
     }
     
     try:
-        create_custom_fields(custom_fields, update=True)
+        _create_custom_fields(custom_fields)
         frappe.log_error("Sales Invoice custom fields created successfully")
     except Exception as e:
         frappe.log_error(f"Error creating Sales Invoice custom fields: {str(e)}")
