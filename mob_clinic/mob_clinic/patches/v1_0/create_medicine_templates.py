@@ -74,6 +74,65 @@ def create_medicine_templates():
         # Topical
         {"name": "Lignocaine Gel 2%", "generic": "Lidocaine", "form": "Gel", "strength": "2%", "category": "Anesthetic", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "As Needed", "instructions": "Apply on affected area before meals"},
     ]
+
+    medicines.extend([
+        # Additional oral care products
+        {"name": "Clohex ADS", "generic": "Chlorhexidine", "form": "Mouthwash", "strength": "", "category": "Antiseptic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 7, "condition": "After Food", "instructions": "Rinse for 30 seconds, do not swallow"},
+        {"name": "Vantej Fort", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use twice daily as directed"},
+        {"name": "Clohex Heal", "generic": "", "form": "Gel", "strength": "", "category": "Antiseptic", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 7, "condition": "After Food", "instructions": "Apply on affected gums or oral mucosa as directed"},
+        {"name": "Vantej Aqua", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use twice daily as directed"},
+        {"name": "Toothmin", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use twice daily as directed"},
+        {"name": "Kidodent Mouthwash", "generic": "", "form": "Mouthwash", "strength": "", "category": "Antiseptic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 7, "condition": "After Food", "instructions": "Rinse for 30 seconds, do not swallow"},
+        {"name": "Kidodent Paste", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Metrogyl DG fort", "generic": "Metronidazole", "form": "Gel", "strength": "", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected gums as directed"},
+        {"name": "Metrogyl DG LA", "generic": "Metronidazole", "form": "Gel", "strength": "", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected gums as directed"},
+        {"name": "Metrogreen", "generic": "", "form": "Gel", "strength": "", "category": "Other", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected area as directed"},
+        {"name": "Kera Cort", "generic": "", "form": "Gel", "strength": "", "category": "Steroid", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected oral lesion as directed"},
+        {"name": "Perio Guard", "generic": "", "form": "Mouthwash", "strength": "", "category": "Antiseptic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 7, "condition": "After Food", "instructions": "Rinse for 30 seconds, do not swallow"},
+        {"name": "Rexidin M Fort", "generic": "", "form": "Mouthwash", "strength": "", "category": "Antiseptic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 7, "condition": "After Food", "instructions": "Rinse for 30 seconds, do not swallow"},
+        {"name": "Odin Gel", "generic": "", "form": "Gel", "strength": "", "category": "Other", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected area as directed"},
+        {"name": "Visible White", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Sensodent Acipro", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Dental Floss", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 0, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use once daily after brushing"},
+        {"name": "Stim Flosser", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 0, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use once daily after brushing"},
+        {"name": "Ortho Brush", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Soft Brush", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Electric Brush", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+
+        # Additional medicines
+        {"name": "Addclav 625", "generic": "Amoxicillin + Clavulanic Acid", "form": "Tablet", "strength": "625mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Augmentin 625", "generic": "Amoxicillin + Clavulanic Acid", "form": "Tablet", "strength": "625mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Mox 500", "generic": "Amoxicillin", "form": "Capsule", "strength": "500mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Fenpil S", "generic": "", "form": "Tablet", "strength": "", "category": "Other", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Metrogyl 400", "generic": "Metronidazole", "form": "Tablet", "strength": "400mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Metrogyl 200", "generic": "Metronidazole", "form": "Tablet", "strength": "200mg", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Metrogyl ER", "generic": "Metronidazole", "form": "Tablet", "strength": "", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "H-pan 40", "generic": "Pantoprazole", "form": "Tablet", "strength": "40mg", "category": "Antacid", "morning": 1, "lunch": 0, "evening": 0, "night": 0, "days": 5, "condition": "Before Food"},
+        {"name": "Wyslone", "generic": "Prednisolone", "form": "Tablet", "strength": "", "category": "Steroid", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Aux Keto", "generic": "", "form": "Tablet", "strength": "", "category": "Analgesic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Nace-P", "generic": "", "form": "Tablet", "strength": "", "category": "Analgesic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Zoyas-P", "generic": "", "form": "Tablet", "strength": "", "category": "Analgesic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Calpol 650", "generic": "Paracetamol", "form": "Tablet", "strength": "650mg", "category": "Analgesic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Mox 250", "generic": "Amoxicillin", "form": "Capsule", "strength": "250mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Augmentine 375", "generic": "Amoxicillin + Clavulanic Acid", "form": "Tablet", "strength": "375mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "P-250", "generic": "Paracetamol", "form": "Tablet", "strength": "250mg", "category": "Analgesic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Meflan 500", "generic": "Mefenamic Acid", "form": "Tablet", "strength": "500mg", "category": "Analgesic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 3, "condition": "After Food"},
+        {"name": "Augmentin 228 (Syrup)", "generic": "Amoxicillin + Clavulanic Acid", "form": "Syrup", "strength": "228mg", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 5, "condition": "After Food", "instructions": "Specify ml dose per administration"},
+        {"name": "Cefiges-200", "generic": "Cefixime", "form": "Tablet", "strength": "200mg", "category": "Antibiotic", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 5, "condition": "After Food"},
+        {"name": "Calpol 120 (Syrup)", "generic": "Paracetamol", "form": "Syrup", "strength": "120mg", "category": "Analgesic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 3, "condition": "After Food", "instructions": "Specify ml dose per administration"},
+        {"name": "Calpol 250 (Syrup)", "generic": "Paracetamol", "form": "Syrup", "strength": "250mg", "category": "Analgesic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 3, "condition": "After Food", "instructions": "Specify ml dose per administration"},
+        {"name": "Metrogyl 200 (Syrup)", "generic": "Metronidazole", "form": "Syrup", "strength": "200mg", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 5, "condition": "After Food", "instructions": "Specify ml dose per administration"},
+        {"name": "Augmentine 457 (Syrup)", "generic": "Amoxicillin + Clavulanic Acid", "form": "Syrup", "strength": "457mg", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 0, "night": 1, "days": 5, "condition": "After Food", "instructions": "Specify ml dose per administration"},
+
+        # Additional pediatric and hygiene products
+        {"name": "Cheerio Paste Blue", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Cheerio Paste Pink", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Metrohex Plus Gel", "generic": "", "form": "Gel", "strength": "", "category": "Antibiotic", "morning": 1, "lunch": 1, "evening": 1, "night": 1, "days": 5, "condition": "After Food", "instructions": "Apply on affected gums as directed"},
+        {"name": "Colgate 0-2", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Colgate 3-5", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Colgate 6-9", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Brush twice daily"},
+        {"name": "Why-t", "generic": "", "form": "Other", "strength": "", "category": "Other", "morning": 1, "lunch": 0, "evening": 0, "night": 1, "days": 30, "condition": "After Food", "instructions": "Use twice daily as directed"},
+    ])
     
     created_count = 0
     skipped_count = 0

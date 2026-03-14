@@ -192,6 +192,7 @@ def get_prescription(record_id):
             "patient_age": patient_data.get("age"),
             "patient_sex": patient_data.get("sex"),
             "practitioner": practitioner_data,
+            "practitioner_name": practitioner_data.get("practitioner_name"),
             "encounter_date": record.encounter_date,
             "encounter_time": record.encounter_time,
             "department": record.medical_department,
@@ -261,8 +262,8 @@ def create_prescription(patient_id, **kwargs):
             }
         
         # Get current practitioner
-        practitioner = get_current_practitioner()
-        if not practitioner:
+        current_practitioner = get_current_practitioner()
+        if not current_practitioner:
             frappe.local.response["http_status_code"] = 403
             return {
                 "exc_type": "PermissionError",
@@ -272,16 +273,32 @@ def create_prescription(patient_id, **kwargs):
         # Get patient details
         patient = frappe.get_doc("Patient", patient_id)
         
-        # Get practitioner name and department
+        # Allow the UI to save the prescription against a selected doctor when needed.
+        selected_practitioner_name = kwargs.get("practitioner")
+        if selected_practitioner_name:
+            practitioner = frappe.db.get_value(
+                "Healthcare Practitioner",
+                selected_practitioner_name,
+                ["name", "practitioner_name", "department", "mobile_phone"],
+                as_dict=True
+            )
+            if not practitioner:
+                frappe.throw(_("Selected practitioner was not found"))
+        else:
+            practitioner = current_practitioner
+
         practitioner_name = practitioner.get("name") if isinstance(practitioner, dict) else practitioner.name
         practitioner_department = practitioner.get("department") if isinstance(practitioner, dict) else getattr(practitioner, "department", None)
-        
+
         # Resolve clinic
         clinic = kwargs.get("clinic")
-        resolved_clinic = clinic_helper.resolve_active_clinic(practitioner_name, clinic)
-        
-        if clinic and not clinic_helper.validate_practitioner_access(practitioner_name, resolved_clinic):
+        resolved_clinic = clinic_helper.resolve_active_clinic(current_practitioner.get("name"), clinic)
+
+        if clinic and not clinic_helper.validate_practitioner_access(current_practitioner.get("name"), resolved_clinic):
              frappe.throw(_("Practitioner does not have access to the requested clinic"), frappe.PermissionError)
+
+        if resolved_clinic and not clinic_helper.validate_practitioner_access(practitioner_name, resolved_clinic):
+            frappe.throw(_("Selected practitioner does not have access to the active clinic"), frappe.PermissionError)
 
         # Build document data, excluding None values to avoid field type conflicts
         doc_data = {
@@ -397,6 +414,7 @@ def create_prescription(patient_id, **kwargs):
                 "patient_id": record.patient,
                 "patient_name": record.patient_name,
                 "practitioner_id": record.practitioner,
+                "practitioner_name": frappe.db.get_value("Healthcare Practitioner", record.practitioner, "practitioner_name"),
                 "encounter_date": record.encounter_date,
                 "encounter_time": str(record.encounter_time),
                 

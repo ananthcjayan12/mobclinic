@@ -55,12 +55,13 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             order_by=order_by
         )
         
-        # Enhance patient data with custom fields
+        # Enhance patient data with appointment-derived visit metadata.
         enhanced_patients = []
         for patient in patients:
             # patient is a dict returned by frappe.get_list
             patient_name = patient.get("name")
             patient_doc = frappe.get_doc("Patient", patient_name)
+            latest_visit = get_latest_visit_details(patient_name, resolved_clinic)
 
             # Calculate numeric age from DOB
             age_years = None
@@ -75,10 +76,14 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
                 "age": age_years,
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient_doc.get("image"),
                 "registration_date": cstr(getattr(patient_doc, 'registration_date', None)),
-                "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None),
-                "total_visits": get_total_appointments(patient_name, practitioner.name if practitioner else None),
+                "last_visit": latest_visit.get("last_visit") if latest_visit else None,
+                "total_visits": get_total_appointments(patient_name),
                 "pending_amount": get_pending_amount(patient_name),
-                "preferred_language": getattr(patient_doc, 'preferred_language', 'English')
+                "preferred_language": getattr(patient_doc, 'preferred_language', 'English'),
+                "doctor": latest_visit.get("doctor") if latest_visit else None,
+                "doctor_name": latest_visit.get("doctor_name") if latest_visit else None,
+                "practitioner": latest_visit.get("practitioner") if latest_visit else None,
+                "practitioner_name": latest_visit.get("practitioner_name") if latest_visit else None
             })
 
             enhanced_patients.append(enhanced_patient)
@@ -892,11 +897,12 @@ def search_patients(search_term, limit=10, clinic=None):
             order_by="patient_name"
         )
         
-        # Enhance search results
+        # Enhance search results with latest visit/doctor metadata.
         search_results = []
         for patient in patients:
             patient_name = patient.get("name")
             patient_doc = frappe.get_doc("Patient", patient_name)
+            latest_visit = get_latest_visit_details(patient_name, resolved_clinic)
             search_results.append({
                 "patient_id": patient_name,
                 "name": patient.get("patient_name"),
@@ -904,7 +910,11 @@ def search_patients(search_term, limit=10, clinic=None):
                 "sex": patient.get("sex"),
                 "dob": cstr(patient.get("dob")),
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient.get("image"),
-                "last_visit": get_last_appointment_date(patient_name, practitioner.name if practitioner else None)
+                "last_visit": latest_visit.get("last_visit") if latest_visit else None,
+                "doctor": latest_visit.get("doctor") if latest_visit else None,
+                "doctor_name": latest_visit.get("doctor_name") if latest_visit else None,
+                "practitioner": latest_visit.get("practitioner") if latest_visit else None,
+                "practitioner_name": latest_visit.get("practitioner_name") if latest_visit else None
             })
         
         return {
@@ -926,6 +936,68 @@ def get_current_practitioner():
     try:
         return frappe.get_doc("Healthcare Practitioner", {"user_id": frappe.session.user})
     except frappe.DoesNotExistError:
+        return None
+
+def get_latest_visit_details(patient_id, clinic=None):
+    """Return the latest non-cancelled past appointment and its treating doctor."""
+    def _query(filters):
+        return frappe.get_all(
+            "Patient Appointment",
+            filters=filters,
+            fields=["name", "practitioner", "practitioner_name", "appointment_date", "appointment_time"],
+            order_by="appointment_date desc, appointment_time desc, creation desc",
+            limit=1
+        )
+
+    try:
+        filters = {
+            "patient": patient_id,
+            "status": ["!=", "Cancelled"],
+            "appointment_date": ["<=", nowdate()]
+        }
+        if clinic:
+            filters["company"] = clinic
+
+        latest_visit = _query(filters)
+
+        # Older appointment rows may not have company populated yet.
+        if not latest_visit and clinic:
+            latest_visit = _query({
+                "patient": patient_id,
+                "status": ["!=", "Cancelled"],
+                "appointment_date": ["<=", nowdate()]
+            })
+
+        if not latest_visit:
+            return None
+
+        latest_visit = latest_visit[0]
+        practitioner_id = latest_visit.get("practitioner")
+        practitioner_name = latest_visit.get("practitioner_name")
+
+        if practitioner_id and not practitioner_name:
+            practitioner_name = frappe.db.get_value(
+                "Healthcare Practitioner",
+                practitioner_id,
+                "practitioner_name"
+            )
+
+        appointment_date = latest_visit.get("appointment_date")
+        appointment_time = latest_visit.get("appointment_time")
+        if appointment_date and appointment_time:
+            last_visit = f"{appointment_date} {appointment_time}"
+        else:
+            last_visit = cstr(appointment_date)
+
+        return {
+            "appointment_id": latest_visit.get("name"),
+            "last_visit": cstr(last_visit) if last_visit else None,
+            "practitioner": practitioner_id,
+            "practitioner_name": practitioner_name,
+            "doctor": practitioner_name,
+            "doctor_name": practitioner_name
+        }
+    except Exception:
         return None
 
 def get_last_appointment_date(patient_id, practitioner_id=None):

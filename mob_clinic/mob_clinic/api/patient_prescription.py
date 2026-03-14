@@ -4,6 +4,19 @@ from frappe.utils import nowdate
 import json
 
 
+def get_session_practitioner():
+    user = frappe.session.user
+    if user == "Guest":
+        return None
+
+    return frappe.db.get_value(
+        "Healthcare Practitioner",
+        {"user_id": user},
+        ["name", "practitioner_name"],
+        as_dict=True
+    )
+
+
 @frappe.whitelist(methods=['POST'])
 def create_patient_prescription(patient_id, **kwargs):
     """
@@ -25,16 +38,19 @@ def create_patient_prescription(patient_id, **kwargs):
             frappe.local.response["http_status_code"] = 400
             return {"exc_type": "ValidationError", "message": "Patient ID is required"}
 
-        # Get practitioner
-        user = frappe.session.user
-        practitioner = None
-        if user != "Guest":
-            practitioner = frappe.db.get_value(
+        # Resolve practitioner: selected doctor should override the logged-in doctor.
+        practitioner = get_session_practitioner()
+        selected_practitioner_id = kwargs.get("practitioner")
+        if selected_practitioner_id:
+            selected_practitioner = frappe.db.get_value(
                 "Healthcare Practitioner",
-                {"user_id": user},
+                selected_practitioner_id,
                 ["name", "practitioner_name"],
                 as_dict=True
             )
+            if not selected_practitioner:
+                frappe.throw(_("Selected practitioner was not found"))
+            practitioner = selected_practitioner
 
         # Get patient name
         patient_name = frappe.db.get_value("Patient", patient_id, "patient_name")
@@ -266,6 +282,17 @@ def update_patient_prescription(prescription_id, **kwargs):
             rx.treatment_plan = kwargs.get("treatment_plan")
         if kwargs.get("status") is not None:
             rx.status = kwargs.get("status")
+        if kwargs.get("practitioner") is not None:
+            selected_practitioner = frappe.db.get_value(
+                "Healthcare Practitioner",
+                kwargs.get("practitioner"),
+                ["name", "practitioner_name"],
+                as_dict=True
+            )
+            if not selected_practitioner:
+                frappe.throw(_("Selected practitioner was not found"))
+            rx.practitioner = selected_practitioner.name
+            rx.practitioner_name = selected_practitioner.practitioner_name
         
         rx.save(ignore_permissions=True)
         frappe.db.commit()
@@ -286,5 +313,4 @@ def update_patient_prescription(prescription_id, **kwargs):
         frappe.log_error(str(e)[:500], "Update Patient Prescription Error")
         frappe.local.response["http_status_code"] = 500
         return {"exc_type": "ServerError", "message": str(e)}
-
 

@@ -5,9 +5,12 @@ Manage clinic information, branding, settings, and customization
 
 import frappe
 from frappe import _
+import base64
 import json
+import mimetypes
 from frappe.utils import get_url, cstr
 from datetime import datetime
+from urllib.parse import urlparse
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 from mob_clinic.mob_clinic.api.role_access import assert_page_access
 
@@ -34,6 +37,54 @@ def _normalize_time(value):
 			except Exception:
 				continue
 	return cstr(value)
+
+
+def _resolve_site_file_path(file_url):
+	"""Map a public/private file URL to an on-disk site path."""
+	if not file_url:
+		return None
+
+	parsed_path = urlparse(file_url).path or file_url
+	if parsed_path.startswith("/files/"):
+		return frappe.get_site_path("public", parsed_path.lstrip("/"))
+	if parsed_path.startswith("/private/files/"):
+		return frappe.get_site_path(parsed_path.lstrip("/"))
+	return None
+
+
+@frappe.whitelist(methods=["GET"])
+def get_embedded_asset(file_url):
+	"""
+	Return a site-hosted file as a data URL so PDF rendering does not depend on image CORS.
+	"""
+	try:
+		if not file_url:
+			frappe.throw(_("File URL is required"))
+
+		file_path = _resolve_site_file_path(file_url)
+		if not file_path:
+			frappe.throw(_("Unsupported file URL"))
+
+		with open(file_path, "rb") as handle:
+			content = handle.read()
+
+		mime_type = mimetypes.guess_type(urlparse(file_url).path or file_url)[0] or "application/octet-stream"
+		data_url = f"data:{mime_type};base64,{base64.b64encode(content).decode()}"
+
+		return {
+			"message": "success",
+			"data": {
+				"file_url": file_url,
+				"data_url": data_url,
+			},
+		}
+	except FileNotFoundError:
+		frappe.local.response["http_status_code"] = 404
+		return {"exc_type": "NotFound", "message": _("File was not found")}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Embedded Asset Error")
+		frappe.local.response["http_status_code"] = 500
+		return {"exc_type": "ServerError", "message": str(e)}
 
 
 def _get_practitioner_for_clinic(clinic):

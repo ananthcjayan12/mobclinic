@@ -1,6 +1,7 @@
 import frappe
 import unittest
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, today
 
 
 class TestPatientAPI(FrappeTestCase):
@@ -19,6 +20,7 @@ class TestPatientAPI(FrappeTestCase):
         
         # Create test practitioner
         cls.create_test_practitioner()
+        cls.create_secondary_practitioner()
         
         # Test patient data
         cls.test_patient_data = {
@@ -123,31 +125,93 @@ class TestPatientAPI(FrappeTestCase):
                                                       {"user_id": cls.practitioner_email}, "name")
         
         frappe.db.commit()
+
+    @classmethod
+    def create_secondary_practitioner(cls):
+        """Create a second practitioner used to verify doctor mapping in patient lists."""
+        cls.secondary_practitioner_email = "associatepractitioner@mobclinic.com"
+        cls.secondary_practitioner_name = "Associate Doctor"
+
+        frappe.set_user("Administrator")
+
+        if not frappe.db.exists("User", cls.secondary_practitioner_email):
+            user = frappe.get_doc({
+                "doctype": "User",
+                "email": cls.secondary_practitioner_email,
+                "first_name": "Associate",
+                "last_name": "Doctor",
+                "new_password": "Test@1234",
+                "user_type": "System User",
+                "send_welcome_email": 0
+            })
+            user.flags.ignore_permissions = True
+            user.flags.ignore_password_policy = True
+            user.insert(ignore_permissions=True)
+            frappe.db.commit()
+
+        if not frappe.db.exists("Healthcare Practitioner", {"user_id": cls.secondary_practitioner_email}):
+            practitioner = frappe.get_doc({
+                "doctype": "Healthcare Practitioner",
+                "first_name": "Associate",
+                "last_name": "Doctor",
+                "practitioner_name": cls.secondary_practitioner_name,
+                "status": "Active",
+                "user_id": cls.secondary_practitioner_email,
+                "mobile_phone": "+919999999999",
+                "mobile_app_enabled": 1
+            })
+            practitioner.flags.ignore_permissions = True
+            practitioner.flags.ignore_mandatory = True
+            practitioner.insert(ignore_permissions=True)
+            cls.secondary_practitioner_id = practitioner.name
+        else:
+            cls.secondary_practitioner_id = frappe.db.get_value(
+                "Healthcare Practitioner",
+                {"user_id": cls.secondary_practitioner_email},
+                "name"
+            )
+
+        frappe.db.commit()
     
     @classmethod
     def cleanup_test_data(cls):
         """Clean up test data"""
         frappe.set_user("Administrator")
-        
+
+        patient_ids = set()
+
         # Delete test patients - search by multiple criteria
         test_mobiles = ["+1234567890", "+9876543210"]
         test_emails = ["testpatient@example.com", "updated@example.com"]
-        
+
         for mobile in test_mobiles:
-            patients = frappe.get_all("Patient", filters={"mobile": mobile})
-            for p in patients:
-                frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
-        
+            patients = frappe.get_all("Patient", filters={"mobile": mobile}, fields=["name"])
+            patient_ids.update(p.name for p in patients)
+
         for email in test_emails:
-            patients = frappe.get_all("Patient", filters={"email": email})
-            for p in patients:
-                frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
-        
-        # Also delete by name pattern
-        patients = frappe.get_all("Patient", filters=[["patient_name", "like", "%Test Patient%"]])
-        for p in patients:
-            frappe.delete_doc("Patient", p.name, force=True, ignore_permissions=True)
-        
+            patients = frappe.get_all("Patient", filters={"email": email}, fields=["name"])
+            patient_ids.update(p.name for p in patients)
+
+        patients = frappe.get_all(
+            "Patient",
+            filters=[["patient_name", "like", "%Test Patient%"]],
+            fields=["name"]
+        )
+        patient_ids.update(p.name for p in patients)
+
+        if patient_ids:
+            appointments = frappe.get_all(
+                "Patient Appointment",
+                filters=[["patient", "in", list(patient_ids)]],
+                fields=["name"]
+            )
+            for appointment in appointments:
+                frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
+
+        for patient_id in patient_ids:
+            if frappe.db.exists("Patient", patient_id):
+                frappe.delete_doc("Patient", patient_id, force=True, ignore_permissions=True)
+
         # Delete test practitioner
         if frappe.db.exists("User", "testpractitioner@mobclinic.com"):
             practitioners = frappe.get_all("Healthcare Practitioner", 
@@ -156,6 +220,16 @@ class TestPatientAPI(FrappeTestCase):
                 frappe.delete_doc("Healthcare Practitioner", p.name, force=True, ignore_permissions=True)
             
             frappe.delete_doc("User", "testpractitioner@mobclinic.com", force=True, ignore_permissions=True)
+
+        if frappe.db.exists("User", "associatepractitioner@mobclinic.com"):
+            practitioners = frappe.get_all(
+                "Healthcare Practitioner",
+                filters={"user_id": "associatepractitioner@mobclinic.com"}
+            )
+            for p in practitioners:
+                frappe.delete_doc("Healthcare Practitioner", p.name, force=True, ignore_permissions=True)
+
+            frappe.delete_doc("User", "associatepractitioner@mobclinic.com", force=True, ignore_permissions=True)
         
         frappe.db.commit()
     
@@ -278,6 +352,48 @@ class TestPatientAPI(FrappeTestCase):
         frappe.set_user("Administrator")
         
         print("✓ Get patients list test passed")
+
+    def test_04a_get_patients_list_uses_latest_treating_doctor(self):
+        """Test patient list derives doctor from the patient's latest appointment history."""
+        from mob_clinic.mob_clinic.api.patient import get_patients
+        import json
+
+        appointment = frappe.get_doc({
+            "doctype": "Patient Appointment",
+            "patient": self.test_patient_id,
+            "practitioner": self.secondary_practitioner_id,
+            "appointment_date": add_days(today(), -1),
+            "appointment_time": "10:00:00",
+            "duration": 30,
+            "status": "Open",
+            "appointment_type": "Follow up",
+            "appointment_for": "Practitioner",
+            "notes": "Patient list doctor mapping regression test"
+        })
+        appointment.flags.ignore_permissions = True
+        appointment.flags.ignore_mandatory = True
+        appointment.flags.ignore_overlap_validation = True
+        appointment.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        frappe.set_user(self.practitioner_email)
+        result = get_patients(
+            filters=json.dumps({"name": self.test_patient_id}),
+            limit_page_length=20
+        )
+
+        self.assertEqual(result.get("message"), "success")
+        patient_row = next((row for row in result["data"] if row.get("name") == self.test_patient_id), None)
+        self.assertIsNotNone(patient_row, "Expected test patient in patients list")
+        self.assertEqual(patient_row.get("doctor"), self.secondary_practitioner_name)
+        self.assertEqual(patient_row.get("doctor_name"), self.secondary_practitioner_name)
+        self.assertEqual(patient_row.get("practitioner"), self.secondary_practitioner_id)
+        self.assertEqual(patient_row.get("practitioner_name"), self.secondary_practitioner_name)
+        self.assertTrue(str(patient_row.get("last_visit", "")).startswith(str(add_days(today(), -1))))
+
+        frappe.set_user("Administrator")
+
+        print("✓ Patient list doctor mapping test passed")
     
     def test_05_search_patients(self):
         """Test searching patients"""
