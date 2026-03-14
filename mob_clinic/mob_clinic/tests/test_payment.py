@@ -252,6 +252,8 @@ class TestPaymentAPI(unittest.TestCase):
         
         # Store test invoice ID for later tests
         cls.test_invoice_id = None
+        cls._extra_item_codes = set()
+        cls._extra_procedure_templates = set()
 
         settings = frappe.get_doc("Clinic Settings", company) if frappe.db.exists("Clinic Settings", company) else frappe.new_doc("Clinic Settings")
         settings.clinic = company
@@ -311,6 +313,19 @@ class TestPaymentAPI(unittest.TestCase):
         for item_code in ["CONS-001", "ROOT-001", "CLEAN-001"]:
             if frappe.db.exists("Item", item_code):
                 frappe.delete_doc("Item", item_code, force=True)
+
+        for item_code in getattr(cls, "_extra_item_codes", set()):
+            if frappe.db.exists("Item", item_code):
+                frappe.delete_doc("Item", item_code, force=True)
+
+        for procedure_name in getattr(cls, "_extra_procedure_templates", set()):
+            template_name = frappe.db.get_value(
+                "Dental Procedure Template",
+                {"procedure_name": procedure_name},
+                "name",
+            )
+            if template_name:
+                frappe.delete_doc("Dental Procedure Template", template_name, force=True)
         
         # Delete test patient
         if frappe.db.exists("Patient", cls.patient_id):
@@ -348,6 +363,37 @@ class TestPaymentAPI(unittest.TestCase):
         """Set up before each test"""
         frappe.set_user("test_payment_doctor@example.com")
         frappe.local.session["active_clinic"] = self.company
+
+    def _create_procedure_template(self, code, procedure_name, cost=1000, description="Test procedure"):
+        frappe.set_user("Administrator")
+        template_name = frappe.db.get_value(
+            "Dental Procedure Template",
+            {"procedure_name": procedure_name},
+            "name",
+        )
+        if template_name:
+            frappe.delete_doc("Dental Procedure Template", template_name, force=True, ignore_permissions=True)
+
+        if frappe.db.exists("Item", code):
+            frappe.delete_doc("Item", code, force=True, ignore_permissions=True)
+
+        template = frappe.get_doc(
+            {
+                "doctype": "Dental Procedure Template",
+                "procedure_name": procedure_name,
+                "code": code,
+                "category": "Other",
+                "default_cost": cost,
+                "duration_minutes": 30,
+                "description": description,
+                "is_active": 1,
+            }
+        )
+        template.insert(ignore_permissions=True)
+        self.__class__._extra_procedure_templates.add(procedure_name)
+        self.__class__._extra_item_codes.add(code)
+        frappe.set_user("test_payment_doctor@example.com")
+        return template
     
     def test_01_create_invoice(self):
         """Test creating a new invoice"""
@@ -865,6 +911,173 @@ class TestPaymentAPI(unittest.TestCase):
                 invoice.flags.ignore_permissions = True
                 invoice.cancel()
             frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
+
+    def test_16_create_invoice_resolves_exact_procedure_template(self):
+        """Invoice creation should use the exact procedure template item instead of Clinic Service."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice
+
+        procedure_name = "Resolver Test Procedure"
+        procedure_code = "PROC-RESOLVE-001"
+        self._create_procedure_template(
+            procedure_code,
+            procedure_name,
+            cost=1850,
+            description="Resolver test procedure for invoice mapping",
+        )
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            items=[{"item_name": procedure_name, "qty": 1, "rate": 1850}],
+            posting_date=today(),
+            due_date=add_days(today(), 7),
+        )
+
+        invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
+        self.assertEqual(invoice.items[0].item_code, procedure_code)
+        self.assertEqual(invoice.items[0].item_name, procedure_name)
+        self.assertNotEqual(invoice.items[0].item_name, "Clinic Service")
+        self.assertTrue(frappe.db.exists("Item", procedure_code))
+
+    def test_17_create_invoice_replaces_mismatched_existing_item_code(self):
+        """A wrong preselected item code should be replaced when the exact procedure name is known."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice
+
+        wrong_item_code = "WRONG-ADJ-001"
+        procedure_name = "Resolver Re-RCT"
+        procedure_code = "PROC-RESOLVE-002"
+
+        frappe.set_user("Administrator")
+        if frappe.db.exists("Item", wrong_item_code):
+            frappe.delete_doc("Item", wrong_item_code, force=True, ignore_permissions=True)
+
+        wrong_item = frappe.get_doc(
+            {
+                "doctype": "Item",
+                "item_code": wrong_item_code,
+                "item_name": "Wrong Adjacent Procedure",
+                "item_group": "Services",
+                "stock_uom": "Nos",
+                "is_stock_item": 0,
+                "is_sales_item": 1,
+                "gst_hsn_code": "999312",
+                "standard_rate": 0,
+            }
+        )
+        wrong_item.insert(ignore_permissions=True)
+        self.__class__._extra_item_codes.add(wrong_item_code)
+
+        self._create_procedure_template(
+            procedure_code,
+            procedure_name,
+            cost=3200,
+            description="Resolver rerct mapping",
+        )
+        frappe.set_user("test_payment_doctor@example.com")
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            items=[
+                {
+                    "item_code": wrong_item_code,
+                    "item_name": procedure_name,
+                    "description": procedure_name,
+                    "qty": 1,
+                    "rate": 3200,
+                }
+            ],
+            posting_date=today(),
+            due_date=add_days(today(), 7),
+        )
+
+        invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
+        self.assertEqual(invoice.items[0].item_code, procedure_code)
+        self.assertEqual(invoice.items[0].item_name, procedure_name)
+
+    def test_18_create_invoice_repairs_corrupted_item_name_using_procedure_code(self):
+        """Existing procedure items with polluted names should be repaired during invoice creation."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice
+
+        procedure_name = "Resolver Simple Extraction"
+        procedure_code = "PROC-RESOLVE-003"
+        self._create_procedure_template(
+            procedure_code,
+            procedure_name,
+            cost=600,
+            description="Resolver simple extraction mapping",
+        )
+
+        frappe.set_user("Administrator")
+        corrupted_item = frappe.get_doc(
+            {
+                "doctype": "Item",
+                "item_code": procedure_code,
+                "item_name": "14",
+                "item_group": "Services",
+                "stock_uom": "Nos",
+                "is_stock_item": 0,
+                "is_sales_item": 1,
+                "gst_hsn_code": "999312",
+                "description": "14",
+                "standard_rate": 0,
+            }
+        )
+        corrupted_item.insert(ignore_permissions=True)
+        frappe.set_user("test_payment_doctor@example.com")
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            items=[
+                {
+                    "item_code": procedure_code,
+                    "item_name": "14",
+                    "description": "14",
+                    "qty": 1,
+                    "rate": 600,
+                }
+            ],
+            posting_date=today(),
+            due_date=add_days(today(), 7),
+        )
+
+        invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
+        repaired_item = frappe.get_doc("Item", procedure_code)
+
+        self.assertEqual(invoice.items[0].item_code, procedure_code)
+        self.assertEqual(invoice.items[0].item_name, procedure_name)
+        self.assertEqual(repaired_item.item_name, procedure_name)
+        self.assertEqual(repaired_item.description, "Resolver simple extraction mapping")
+
+    def test_19_create_invoice_uses_procedure_code_even_without_matching_label(self):
+        """Procedure codes should resolve to canonical items even when the incoming label is blank or stale."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice
+
+        procedure_name = "Resolver Crown Procedure"
+        procedure_code = "PROC-RESOLVE-004"
+        self._create_procedure_template(
+            procedure_code,
+            procedure_name,
+            cost=4200,
+            description="Resolver crown mapping",
+        )
+
+        result = create_invoice(
+            patient_id=self.patient_id,
+            items=[
+                {
+                    "item_code": procedure_code,
+                    "item_name": "",
+                    "description": "",
+                    "qty": 1,
+                    "rate": 4200,
+                }
+            ],
+            posting_date=today(),
+            due_date=add_days(today(), 7),
+        )
+
+        invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
+        self.assertEqual(invoice.items[0].item_code, procedure_code)
+        self.assertEqual(invoice.items[0].item_name, procedure_name)
 
 
 def run_tests():

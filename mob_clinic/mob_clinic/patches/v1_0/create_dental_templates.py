@@ -5,12 +5,21 @@ with initial data for all clinics
 
 import frappe
 from frappe import _
+from mob_clinic.mob_clinic.procedure_items import sync_procedure_template_items
 
 def execute():
 	"""Execute the patch to create initial templates"""
 	
 	# Create procedure templates
 	create_procedure_templates()
+
+	# Ensure invoiceable Item masters exist for every procedure template
+	sync_results = sync_procedure_template_items()
+	print(
+		f"📦 Procedure Items: {sync_results['created']} created, "
+		f"{sync_results['updated']} updated, {sync_results['existing']} existing, "
+		f"{sync_results['skipped']} skipped"
+	)
 	
 	# Create condition templates
 	create_condition_templates()

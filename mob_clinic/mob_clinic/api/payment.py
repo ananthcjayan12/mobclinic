@@ -8,6 +8,13 @@ from frappe import _
 from frappe.utils import today, add_days, getdate, flt, nowdate
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 from mob_clinic.mob_clinic.api.role_access import assert_page_access
+from mob_clinic.mob_clinic.procedure_items import (
+    DEFAULT_SERVICE_GST_HSN_CODE,
+    ensure_procedure_item,
+    find_matching_procedure_definition,
+    get_procedure_label_candidates,
+    normalize_procedure_label,
+)
 
 
 def get_or_create_default_service_item():
@@ -31,6 +38,7 @@ def get_or_create_default_service_item():
                 "stock_uom": "Nos",
                 "is_stock_item": 0,  # Service items don't maintain stock
                 "is_sales_item": 1,
+                "gst_hsn_code": DEFAULT_SERVICE_GST_HSN_CODE,
                 "description": "Generic clinic service item for treatments and consultations"
             })
             item.insert(ignore_permissions=True)
@@ -45,6 +53,104 @@ def get_or_create_default_service_item():
             frappe.throw(_("Could not create or find a default service item. Please create an Item with code 'CLINIC-SERVICE' manually."))
     
     return item_code
+
+
+def _get_exact_item_code_from_candidates(candidates):
+    for candidate in candidates:
+        item_code = frappe.db.get_value("Item", {"item_name": candidate}, "item_code")
+        if item_code:
+            return item_code
+        if frappe.db.exists("Item", candidate):
+            return candidate
+    return None
+
+
+def _get_matching_procedure_definition(requested_label, item_code=None, clinic=None):
+    for value in (requested_label, item_code):
+        if not value:
+            continue
+
+        procedure = find_matching_procedure_definition(value, clinic=clinic)
+        if procedure and procedure.get("code"):
+            return procedure
+
+    return None
+
+
+def _resolve_invoice_item(item, clinic=None):
+    requested_label = (
+        item.get("procedure_name")
+        or item.get("item_name")
+        or item.get("description")
+        or ""
+    )
+    candidates = get_procedure_label_candidates(requested_label)
+    item_code = item.get("item_code")
+
+    if item_code and frappe.db.exists("Item", item_code):
+        existing_item_name = normalize_procedure_label(
+            frappe.db.get_value("Item", item_code, "item_name") or ""
+        )
+
+        procedure = _get_matching_procedure_definition(
+            requested_label,
+            item_code=item_code,
+            clinic=clinic,
+        )
+        if procedure and procedure.get("code"):
+            canonical_name = normalize_procedure_label(procedure["procedure_name"])
+            if procedure["code"] != item_code or canonical_name != existing_item_name:
+                resolved_code, _ = ensure_procedure_item(
+                    procedure["code"],
+                    procedure["procedure_name"],
+                    rate=procedure.get("rate"),
+                    description=procedure.get("description"),
+                )
+                return resolved_code, procedure["procedure_name"]
+
+        if not candidates or existing_item_name in candidates or item_code in candidates:
+            return item_code, requested_label or existing_item_name or item_code
+
+        procedure = _get_matching_procedure_definition(
+            requested_label,
+            item_code=item_code,
+            clinic=clinic,
+        )
+        if procedure and procedure.get("code"):
+            resolved_code, _ = ensure_procedure_item(
+                procedure["code"],
+                procedure["procedure_name"],
+                rate=procedure.get("rate"),
+                description=procedure.get("description"),
+            )
+            return resolved_code, procedure["procedure_name"]
+
+        exact_item_code = _get_exact_item_code_from_candidates(candidates)
+        if exact_item_code:
+            return exact_item_code, requested_label or exact_item_code
+
+        return item_code, requested_label or existing_item_name or item_code
+
+    procedure = _get_matching_procedure_definition(
+        requested_label,
+        item_code=item_code,
+        clinic=clinic,
+    )
+    if procedure and procedure.get("code"):
+        resolved_code, _ = ensure_procedure_item(
+            procedure["code"],
+            procedure["procedure_name"],
+            rate=procedure.get("rate"),
+            description=procedure.get("description"),
+        )
+        return resolved_code, procedure["procedure_name"]
+
+    if candidates:
+        exact_item_code = _get_exact_item_code_from_candidates(candidates)
+        if exact_item_code:
+            return exact_item_code, requested_label or exact_item_code
+
+    return item_code, requested_label
 
 def _get_gst_accounts(company):
     """
@@ -639,7 +745,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         # Add items
         first_item = True
         for item in items:
-            item_code = item.get("item_code")
+            item_code, resolved_label = _resolve_invoice_item(item, clinic=resolved_clinic)
             
             # If item_code doesn't exist, create it dynamically or use default service item
             if item_code:
@@ -655,6 +761,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
                             "stock_uom": "Nos",
                             "is_stock_item": 0,  # Service items don't maintain stock
                             "is_sales_item": 1,
+                            "gst_hsn_code": DEFAULT_SERVICE_GST_HSN_CODE,
                             "description": item.get("description") or item_code
                         })
                         new_item.insert(ignore_permissions=True)
@@ -672,7 +779,7 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
                 "item_code": item_code,
                 "qty": item.get("qty", 1),
                 "rate": item.get("rate"),
-                "description": item.get("description") or item.get("item_name") or item_code
+                "description": resolved_label or item.get("description") or item.get("item_name") or item_code
             }
 
             consultant_snapshot = _build_consultant_snapshot(item, resolved_clinic)
