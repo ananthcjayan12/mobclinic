@@ -66,7 +66,17 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
             }
             
         # Validate file category
-        valid_categories = ["prescription", "xray", "report", "profile", "treatment", "document", "consent"]
+        valid_categories = [
+            "prescription",
+            "xray",
+            "report",
+            "profile",
+            "treatment",
+            "document",
+            "consent",
+            "photo",
+            "other",
+        ]
         if file_category and file_category not in valid_categories:
             return {
                 "exc_type": "ValidationError", 
@@ -636,10 +646,22 @@ def get_file_category_config():
             "description": "Treatment progress photos and videos",
             "optimize_images": True
         },
+        "photo": {
+            "allowed_extensions": ["jpg", "jpeg", "png", "mp4", "mov"],
+            "max_size_mb": 50,
+            "description": "Clinical photos and videos",
+            "optimize_images": True
+        },
         "document": {
             "allowed_extensions": ["pdf", "doc", "docx", "txt"],
             "max_size_mb": 10,
             "description": "General medical documents",
+            "optimize_images": False
+        },
+        "other": {
+            "allowed_extensions": ["pdf", "doc", "docx", "txt", "jpg", "jpeg", "png"],
+            "max_size_mb": 15,
+            "description": "Other clinical documents",
             "optimize_images": False
         },
         "consent": {

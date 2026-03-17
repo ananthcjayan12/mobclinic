@@ -481,7 +481,16 @@ class TestFileUploadAPI(FrappeTestCase):
         categories = result["data"]
         
         # Check expected categories exist
-        expected_categories = ["prescription", "xray", "report", "profile", "treatment", "document"]
+        expected_categories = [
+            "prescription",
+            "xray",
+            "report",
+            "profile",
+            "treatment",
+            "document",
+            "photo",
+            "other",
+        ]
         for category in expected_categories:
             self.assertIn(category, categories)
             
@@ -494,7 +503,7 @@ class TestFileUploadAPI(FrappeTestCase):
             self.assertIn("optimize_images", category_config)
             
             # Verify optimization settings
-            if category in ["profile", "xray", "treatment", "prescription"]:
+            if category in ["profile", "xray", "treatment", "photo", "prescription"]:
                 self.assertTrue(category_config["optimize_images"], 
                               f"Category {category} should have optimization enabled")
             else:
