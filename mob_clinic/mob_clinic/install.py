@@ -61,6 +61,11 @@ def create_default_appointment_types():
             "appointment_type": "Treatment",
             "default_duration": 60,
             "color": "#9C27B0"
+        },
+        {
+            "appointment_type": "Orthodontic Follow-up",
+            "default_duration": 30,
+            "color": "#0F9D58"
         }
     ]
     

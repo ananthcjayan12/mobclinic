@@ -5,6 +5,7 @@ Tests Sales Invoice creation, payment tracking, and reminders
 
 import frappe
 import unittest
+from unittest.mock import patch
 from frappe.utils import today, add_days, getdate, flt
 from mob_clinic.mob_clinic.patches.v1_0.create_consultant_invoice_fields import execute as ensure_consultant_invoice_fields
 
@@ -16,6 +17,13 @@ class TestPaymentAPI(unittest.TestCase):
     def setUpClass(cls):
         """Set up test data once for all tests"""
         frappe.set_user("Administrator")
+        for module_name in [
+            "orthodontic_commission_payout_reference",
+            "orthodontic_commission_payout",
+            "orthodontic_ledger_entry",
+            "orthodontic_case",
+        ]:
+            frappe.reload_doc("mob_clinic", "doctype", module_name)
         if not frappe.db.exists("DocType", "Clinic Consultant"):
             frappe.reload_doc("mob_clinic", "doctype", "clinic_consultant")
         if not frappe.db.exists("DocField", {"parent": "Clinic Settings", "fieldname": "consultants"}):
@@ -281,6 +289,49 @@ class TestPaymentAPI(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up test data after all tests"""
         frappe.set_user("Administrator")
+
+        case_ids = frappe.get_all(
+            "Orthodontic Case",
+            filters={"patient": cls.patient_id},
+            pluck="name",
+        )
+
+        payout_ids = frappe.get_all(
+            "Orthodontic Commission Payout",
+            filters={"orthodontic_case": ["in", case_ids]} if case_ids else {"name": "__missing__"},
+            pluck="name",
+        )
+        for payout_id in payout_ids:
+            if frappe.db.exists("Orthodontic Commission Payout", payout_id):
+                frappe.delete_doc(
+                    "Orthodontic Commission Payout",
+                    payout_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
+
+        ledger_ids = frappe.get_all(
+            "Orthodontic Ledger Entry",
+            filters={"patient": cls.patient_id},
+            pluck="name",
+        )
+        for ledger_id in ledger_ids:
+            if frappe.db.exists("Orthodontic Ledger Entry", ledger_id):
+                frappe.delete_doc(
+                    "Orthodontic Ledger Entry",
+                    ledger_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
+
+        for case_id in case_ids:
+            if frappe.db.exists("Orthodontic Case", case_id):
+                frappe.delete_doc(
+                    "Orthodontic Case",
+                    case_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
         
         # Delete test invoices and payments
         invoices = frappe.get_all("Sales Invoice", 
@@ -394,6 +445,84 @@ class TestPaymentAPI(unittest.TestCase):
         self.__class__._extra_item_codes.add(code)
         frappe.set_user("test_payment_doctor@example.com")
         return template
+
+    def _cleanup_patient_records(self, patient_id):
+        frappe.set_user("Administrator")
+
+        case_ids = frappe.get_all(
+            "Orthodontic Case",
+            filters={"patient": patient_id},
+            pluck="name",
+        )
+
+        payout_ids = frappe.get_all(
+            "Orthodontic Commission Payout",
+            filters={"orthodontic_case": ["in", case_ids]} if case_ids else {"name": "__missing__"},
+            pluck="name",
+        )
+        for payout_id in payout_ids:
+            if frappe.db.exists("Orthodontic Commission Payout", payout_id):
+                frappe.delete_doc(
+                    "Orthodontic Commission Payout",
+                    payout_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
+
+        ledger_ids = frappe.get_all(
+            "Orthodontic Ledger Entry",
+            filters={"patient": patient_id},
+            pluck="name",
+        )
+        for ledger_id in ledger_ids:
+            if frappe.db.exists("Orthodontic Ledger Entry", ledger_id):
+                frappe.delete_doc(
+                    "Orthodontic Ledger Entry",
+                    ledger_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
+
+        for case_id in case_ids:
+            if frappe.db.exists("Orthodontic Case", case_id):
+                frappe.delete_doc(
+                    "Orthodontic Case",
+                    case_id,
+                    force=True,
+                    ignore_permissions=True,
+                )
+
+        invoices = frappe.get_all(
+            "Sales Invoice",
+            filters={"patient": patient_id},
+            fields=["name", "customer"],
+        )
+        customer_ids = {invoice.customer for invoice in invoices if invoice.customer}
+        for invoice in invoices:
+            payment_refs = frappe.get_all(
+                "Payment Entry Reference",
+                filters={"reference_name": invoice.name},
+                pluck="parent",
+            )
+            for payment_id in payment_refs:
+                if frappe.db.exists("Payment Entry", payment_id):
+                    payment_doc = frappe.get_doc("Payment Entry", payment_id)
+                    if payment_doc.docstatus == 1:
+                        payment_doc.cancel()
+                    frappe.delete_doc("Payment Entry", payment_id, force=True)
+
+            if frappe.db.exists("Sales Invoice", invoice.name):
+                invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
+                if invoice_doc.docstatus == 1:
+                    invoice_doc.cancel()
+                frappe.delete_doc("Sales Invoice", invoice.name, force=True)
+
+        for customer_id in customer_ids:
+            if frappe.db.exists("Customer", customer_id):
+                frappe.delete_doc("Customer", customer_id, force=True)
+
+        if frappe.db.exists("Patient", patient_id):
+            frappe.delete_doc("Patient", patient_id, force=True)
     
     def test_01_create_invoice(self):
         """Test creating a new invoice"""
@@ -1078,6 +1207,275 @@ class TestPaymentAPI(unittest.TestCase):
         invoice = frappe.get_doc("Sales Invoice", result["invoice_id"])
         self.assertEqual(invoice.items[0].item_code, procedure_code)
         self.assertEqual(invoice.items[0].item_name, procedure_name)
+
+    def test_20_create_orthodontic_case_with_opening_advance(self):
+        """Orthodontic case creation should calculate opening balance and accrue advance commission."""
+        from mob_clinic.mob_clinic.api.orthodontic import create_orthodontic_case
+
+        result = create_orthodontic_case(
+            patient_id=self.patient_id,
+            practitioner_id=self.practitioner_id,
+            consultant_id=self.consultant_id,
+            case_type="Fixed Braces",
+            start_date=today(),
+            estimated_duration_months=18,
+            package_fee=45000,
+            discount_amount=5000,
+            advance_paid=10000,
+            advance_payment_mode="Cash",
+            commission_model="Percentage",
+            commission_type="Percentage",
+            commission_value=10,
+            commission_basis="On collected amount",
+            default_followup_days=30,
+            notes="Upper and lower arch case",
+            clinic=self.company,
+        )
+
+        case_data = result["case"]
+        self.__class__.orthodontic_case_id = case_data["case_id"]
+
+        self.assertEqual(case_data["net_fee"], 40000.0)
+        self.assertEqual(case_data["total_paid"], 10000.0)
+        self.assertEqual(case_data["balance_amount"], 30000.0)
+        self.assertEqual(case_data["total_commission_accrued"], 1000.0)
+        self.assertEqual(case_data["pending_commission_amount"], 1000.0)
+        self.assertEqual(case_data["consultant_id"], self.consultant_id)
+        self.assertEqual(case_data["status"], "Active")
+
+        opening_entry = frappe.get_all(
+            "Orthodontic Ledger Entry",
+            filters={"orthodontic_case": case_data["case_id"]},
+            fields=[
+                "name",
+                "payment_amount",
+                "consultant_commission_amount",
+                "is_adjustment",
+                "sales_invoice",
+                "payment_entry",
+                "payment_mode",
+            ],
+            order_by="creation asc",
+            limit_page_length=1,
+        )[0]
+        self.assertEqual(opening_entry.payment_amount, 10000.0)
+        self.assertEqual(opening_entry.consultant_commission_amount, 1000.0)
+        self.assertEqual(opening_entry.is_adjustment, 1)
+        self.assertEqual(opening_entry.payment_mode, "Cash")
+        self.assertTrue(opening_entry.sales_invoice)
+        self.assertTrue(opening_entry.payment_entry)
+
+    def test_20b_create_orthodontic_case_with_advance_and_no_commission(self):
+        """Opening advance should still create receipt when a consultant is selected but commission is disabled."""
+        from mob_clinic.mob_clinic.api.orthodontic import create_orthodontic_case
+
+        unique = frappe.generate_hash(length=8)
+        unique_digits = "".join(str(ord(char) % 10) for char in unique)[:8]
+        patient = frappe.get_doc(
+            {
+                "doctype": "Patient",
+                "first_name": "Ortho",
+                "last_name": "No Commission",
+                "sex": "Male",
+                "mobile": f"+919900{unique_digits}",
+                "email": f"ortho-no-commission-{unique}@mobclinic.test",
+                "invite_user": 0,
+            }
+        )
+        patient.insert(ignore_permissions=True)
+
+        try:
+            result = create_orthodontic_case(
+                patient_id=patient.name,
+                practitioner_id=self.practitioner_id,
+                consultant_id=self.consultant_id,
+                case_type="Retainer",
+                start_date=today(),
+                estimated_duration_months=6,
+                package_fee=12000,
+                advance_paid=2000,
+                advance_payment_mode="Cash",
+                clinic=self.company,
+            )
+
+            case_data = result["case"]
+            opening_entry = frappe.get_all(
+                "Orthodontic Ledger Entry",
+                filters={"orthodontic_case": case_data["case_id"]},
+                fields=[
+                    "name",
+                    "payment_amount",
+                    "consultant_commission_amount",
+                    "sales_invoice",
+                    "payment_entry",
+                ],
+                order_by="creation asc",
+                limit_page_length=1,
+            )[0]
+
+            self.assertEqual(case_data["total_paid"], 2000.0)
+            self.assertEqual(case_data["total_commission_accrued"], 0.0)
+            self.assertEqual(opening_entry.consultant_commission_amount, 0.0)
+            self.assertTrue(opening_entry.sales_invoice)
+            self.assertTrue(opening_entry.payment_entry)
+
+            invoice = frappe.get_doc("Sales Invoice", opening_entry.sales_invoice)
+            self.assertFalse(invoice.items[0].consultant_id)
+            self.assertEqual(flt(invoice.items[0].consultant_commission_amount), 0.0)
+        finally:
+            self._cleanup_patient_records(patient.name)
+
+    def test_20c_invoice_payload_skips_fixed_per_case_override(self):
+        """Case-level fixed commission should stay on the ortho ledger and not be remapped onto invoice lines."""
+        from mob_clinic.mob_clinic.api.orthodontic import _build_invoice_consultant_payload
+
+        case_doc = frappe._dict(
+            {
+                "consultant_id": self.consultant_id,
+                "company": self.company,
+                "commission_model": "Fixed per case",
+            }
+        )
+        commission_snapshot = {
+            "consultant_commission_source": "Default",
+            "consultant_commission_type": "Fixed",
+            "consultant_commission_value": 1200,
+        }
+
+        with patch(
+            "mob_clinic.mob_clinic.api.orthodontic._get_clinic_consultant",
+            return_value={"commission_type": "Percentage", "commission_value": 10},
+        ):
+            payload = _build_invoice_consultant_payload(case_doc, commission_snapshot)
+
+        self.assertIsNone(payload)
+
+    def test_21_add_orthodontic_ledger_entry_with_receipt(self):
+        """Paid orthodontic visits should always create linked accounting records."""
+        from mob_clinic.mob_clinic.api.orthodontic import (
+            add_orthodontic_ledger_entry,
+            get_patient_orthodontic_summary,
+        )
+
+        result = add_orthodontic_ledger_entry(
+            case_id=self.orthodontic_case_id,
+            visit_date=today(),
+            visit_notes="Wire change and review",
+            payment_amount=2000,
+            payment_mode="Cash",
+            next_appointment_date=add_days(today(), 30),
+        )
+
+        ledger = result["ledger_entry"]
+        case_data = result["case"]
+        self.__class__.orthodontic_paid_ledger_id = ledger["ledger_entry_id"]
+
+        self.assertTrue(ledger["sales_invoice"])
+        self.assertTrue(ledger["payment_entry"])
+        self.assertEqual(ledger["payment_amount"], 2000.0)
+        self.assertEqual(ledger["commission_amount"], 200.0)
+        self.assertEqual(ledger["balance_after_entry"], 28000.0)
+        self.assertEqual(case_data["total_paid"], 12000.0)
+        self.assertEqual(case_data["balance_amount"], 28000.0)
+        self.assertEqual(case_data["total_commission_accrued"], 1200.0)
+        self.assertEqual(case_data["pending_commission_amount"], 1200.0)
+        self.assertEqual(case_data["next_appointment_date"], str(add_days(today(), 30)))
+
+        invoice = frappe.get_doc("Sales Invoice", ledger["sales_invoice"])
+        self.assertEqual(invoice.items[0].consultant_id, self.consultant_id)
+        self.assertEqual(invoice.items[0].consultant_commission_amount, 200.0)
+
+        summary = get_patient_orthodontic_summary(self.patient_id, clinic=self.company)
+        self.assertEqual(summary["summary"]["case_id"], self.orthodontic_case_id)
+        self.assertEqual(summary["summary"]["balance_amount"], 28000.0)
+        self.assertGreaterEqual(len(summary["summary"]["recent_ledger"]), 2)
+
+    def test_21b_linked_orthodontic_ledger_entry_locks_accounting_fields(self):
+        """Accounting-linked orthodontic payments should not allow visit date or mode edits."""
+        from mob_clinic.mob_clinic.api.orthodontic import update_orthodontic_ledger_entry
+
+        with self.assertRaisesRegex(frappe.ValidationError, "visit date"):
+            update_orthodontic_ledger_entry(
+                ledger_entry_id=self.orthodontic_paid_ledger_id,
+                visit_date=add_days(today(), 1),
+            )
+
+        with self.assertRaisesRegex(frappe.ValidationError, "payment mode"):
+            update_orthodontic_ledger_entry(
+                ledger_entry_id=self.orthodontic_paid_ledger_id,
+                payment_mode="UPI",
+            )
+
+        updated = update_orthodontic_ledger_entry(
+            ledger_entry_id=self.orthodontic_paid_ledger_id,
+            visit_notes="Wire change completed",
+            next_appointment_date=add_days(today(), 35),
+        )
+        self.assertEqual(updated["ledger_entry"]["visit_notes"], "Wire change completed")
+        self.assertEqual(updated["ledger_entry"]["next_appointment_date"], str(add_days(today(), 35)))
+
+    def test_22_record_and_reverse_orthodontic_commission_payout(self):
+        """Commission payout history should update pending totals and remain reversible."""
+        from mob_clinic.mob_clinic.api.orthodontic import (
+            create_orthodontic_commission_payout,
+            list_orthodontic_commission_payouts,
+            reverse_orthodontic_commission_payout,
+        )
+
+        payout_result = create_orthodontic_commission_payout(
+            case_id=self.orthodontic_case_id,
+            paid_amount=600,
+            posting_date=today(),
+            payment_mode="Bank Transfer",
+            reference_no="UTR-ORTHO-001",
+            notes="March ortho commission payout",
+        )
+
+        payout = payout_result["payout"]
+        case_data = payout_result["case"]
+
+        self.assertEqual(payout["paid_amount"], 600.0)
+        self.assertEqual(case_data["total_commission_paid"], 600.0)
+        self.assertEqual(case_data["pending_commission_amount"], 600.0)
+        self.assertEqual(
+            sum(row["commission_paid_amount"] for row in payout["allocations"]),
+            600.0,
+        )
+
+        payout_history = list_orthodontic_commission_payouts(case_id=self.orthodontic_case_id)
+        self.assertEqual(len(payout_history["payouts"]), 1)
+        self.assertEqual(payout_history["payouts"][0]["status"], "Submitted")
+
+        reversed_result = reverse_orthodontic_commission_payout(
+            payout_id=payout["payout_id"],
+            notes="Correction",
+        )
+        reversed_case = reversed_result["case"]
+        reversed_payout = reversed_result["payout"]
+
+        self.assertEqual(reversed_payout["status"], "Reversed")
+        self.assertEqual(reversed_case["total_commission_paid"], 0.0)
+        self.assertEqual(reversed_case["pending_commission_amount"], 1200.0)
+
+    def test_23_financial_dashboard_exposes_orthodontic_balance_separately(self):
+        """Main financial dashboard should show invoice outstanding and orthodontic balance as separate metrics."""
+        from mob_clinic.mob_clinic.api.dashboard import get_financial_stats
+
+        result = get_financial_stats(
+            from_date=today(),
+            to_date=today(),
+            clinic=self.company,
+            practitioner_id=self.practitioner_id,
+        )
+
+        self.assertEqual(result["message"], "Success")
+        summary = result["data"]["summary"]
+        self.assertIn("orthodontic_balance", summary)
+        self.assertIn("orthodontic_case_count", summary)
+        self.assertIn("total_receivables", summary)
+        self.assertEqual(summary["orthodontic_balance"], 28000.0)
+        self.assertEqual(summary["orthodontic_case_count"], 1)
+        self.assertGreaterEqual(summary["total_receivables"], summary["orthodontic_balance"])
 
 
 def run_tests():

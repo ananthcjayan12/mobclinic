@@ -1,0 +1,154 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:ORTHO-PAYOUT-{#####}",
+ "creation": "2026-03-17 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "orthodontic_case",
+  "company",
+  "consultant_id",
+  "consultant_name",
+  "consultant_practitioner",
+  "posting_date",
+  "paid_amount",
+  "payment_mode",
+  "reference_no",
+  "notes",
+  "paid_by",
+  "status",
+  "reversal_notes",
+  "allocations"
+ ],
+ "fields": [
+  {
+   "fieldname": "orthodontic_case",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Orthodontic Case",
+   "options": "Orthodontic Case",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Clinic",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "consultant_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Consultant ID"
+  },
+  {
+   "fieldname": "consultant_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Consultant Name"
+  },
+  {
+   "fieldname": "consultant_practitioner",
+   "fieldtype": "Link",
+   "label": "Consultant Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "paid_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Paid Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_mode",
+   "fieldtype": "Data",
+   "label": "Payment Mode"
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "label": "Reference No"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "paid_by",
+   "fieldtype": "Link",
+   "label": "Paid By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "default": "Submitted",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Submitted\nReversed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reversal_notes",
+   "fieldtype": "Small Text",
+   "label": "Reversal Notes"
+  },
+  {
+   "fieldname": "allocations",
+   "fieldtype": "Table",
+   "label": "Allocations",
+   "options": "Orthodontic Commission Payout Reference",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Orthodontic Commission Payout",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Practitioner",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "posting_date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

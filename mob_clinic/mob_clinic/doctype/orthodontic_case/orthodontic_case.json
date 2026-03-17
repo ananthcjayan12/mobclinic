@@ -1,0 +1,322 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:ORTHO-CASE-{#####}",
+ "creation": "2026-03-17 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "patient_section",
+  "company",
+  "patient",
+  "patient_name",
+  "practitioner",
+  "practitioner_name",
+  "status",
+  "case_section",
+  "case_type",
+  "start_date",
+  "estimated_duration_months",
+  "estimated_end_date",
+  "default_followup_days",
+  "notes",
+  "financial_section",
+  "package_fee",
+  "discount_amount",
+  "discount_percentage",
+  "advance_paid",
+  "net_fee",
+  "total_paid",
+  "balance_amount",
+  "last_visit_date",
+  "last_payment_date",
+  "next_appointment_date",
+  "is_active",
+  "commission_section",
+  "consultant_id",
+  "consultant_name",
+  "consultant_type",
+  "consultant_practitioner",
+  "commission_model",
+  "commission_type",
+  "commission_value",
+  "commission_basis",
+  "total_commission_accrued",
+  "total_commission_paid",
+  "pending_commission_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "patient_section",
+   "fieldtype": "Section Break",
+   "label": "Patient"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Clinic",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Patient",
+   "options": "Patient",
+   "reqd": 1
+  },
+  {
+   "fieldname": "patient_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Patient Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "practitioner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Treating Doctor",
+   "options": "Healthcare Practitioner",
+   "reqd": 1
+  },
+  {
+   "fieldname": "practitioner_name",
+   "fieldtype": "Data",
+   "label": "Doctor Name",
+   "read_only": 1
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Planned\nActive\nOn Hold\nCompleted\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "case_section",
+   "fieldtype": "Section Break",
+   "label": "Case"
+  },
+  {
+   "fieldname": "case_type",
+   "fieldtype": "Data",
+   "label": "Case Type"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "estimated_duration_months",
+   "fieldtype": "Int",
+   "label": "Estimated Duration (Months)"
+  },
+  {
+   "fieldname": "estimated_end_date",
+   "fieldtype": "Date",
+   "label": "Estimated End Date",
+   "read_only": 1
+  },
+  {
+   "default": "30",
+   "fieldname": "default_followup_days",
+   "fieldtype": "Int",
+   "label": "Default Follow-up Days"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "financial_section",
+   "fieldtype": "Section Break",
+   "label": "Financials"
+  },
+  {
+   "fieldname": "package_fee",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Package Fee",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount"
+  },
+  {
+   "default": "0",
+   "fieldname": "discount_percentage",
+   "fieldtype": "Percent",
+   "label": "Discount Percentage"
+  },
+  {
+   "default": "0",
+   "fieldname": "advance_paid",
+   "fieldtype": "Currency",
+   "label": "Advance Paid"
+  },
+  {
+   "fieldname": "net_fee",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Net Fee",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_paid",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Paid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "balance_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Balance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_visit_date",
+   "fieldtype": "Date",
+   "label": "Last Visit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_payment_date",
+   "fieldtype": "Date",
+   "label": "Last Payment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_appointment_date",
+   "fieldtype": "Date",
+   "label": "Next Appointment",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active",
+   "read_only": 1
+  },
+  {
+   "fieldname": "commission_section",
+   "fieldtype": "Section Break",
+   "label": "Commission"
+  },
+  {
+   "fieldname": "consultant_id",
+   "fieldtype": "Data",
+   "label": "Consultant ID"
+  },
+  {
+   "fieldname": "consultant_name",
+   "fieldtype": "Data",
+   "label": "Consultant Name"
+  },
+  {
+   "fieldname": "consultant_type",
+   "fieldtype": "Data",
+   "label": "Consultant Type"
+  },
+  {
+   "fieldname": "consultant_practitioner",
+   "fieldtype": "Link",
+   "label": "Consultant Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "default": "None",
+   "fieldname": "commission_model",
+   "fieldtype": "Select",
+   "label": "Commission Model",
+   "options": "None\nPercentage\nFixed per payment\nFixed per case"
+  },
+  {
+   "fieldname": "commission_type",
+   "fieldtype": "Select",
+   "label": "Commission Type",
+   "options": "\nPercentage\nFixed"
+  },
+  {
+   "default": "0",
+   "fieldname": "commission_value",
+   "fieldtype": "Float",
+   "label": "Commission Value"
+  },
+  {
+   "fieldname": "commission_basis",
+   "fieldtype": "Select",
+   "label": "Commission Basis",
+   "options": "\nOn collected amount\nOn net case value"
+  },
+  {
+   "fieldname": "total_commission_accrued",
+   "fieldtype": "Currency",
+   "label": "Total Commission Accrued",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_commission_paid",
+   "fieldtype": "Currency",
+   "label": "Total Commission Paid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pending_commission_amount",
+   "fieldtype": "Currency",
+   "label": "Pending Commission",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Orthodontic Case",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Practitioner",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

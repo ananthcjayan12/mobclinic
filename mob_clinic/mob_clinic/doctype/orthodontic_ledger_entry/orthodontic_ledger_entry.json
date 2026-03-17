@@ -1,0 +1,251 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:ORTHO-LEDGER-{#####}",
+ "creation": "2026-03-17 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "orthodontic_case",
+  "company",
+  "patient",
+  "visit_date",
+  "visit_notes",
+  "payment_amount",
+  "payment_mode",
+  "balance_after_entry",
+  "next_appointment_date",
+  "sales_invoice",
+  "payment_entry",
+  "receipt_number",
+  "created_by",
+  "is_adjustment",
+  "adjustment_reason",
+  "consultant_id",
+  "consultant_name",
+  "consultant_type",
+  "consultant_practitioner",
+  "consultant_commission_type",
+  "consultant_commission_value",
+  "consultant_commission_amount",
+  "consultant_commission_source",
+  "commission_basis",
+  "commission_status",
+  "commission_payout_reference",
+  "commission_paid_date",
+  "commission_paid_amount",
+  "commission_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "orthodontic_case",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Orthodontic Case",
+   "options": "Orthodontic Case",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Clinic",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "label": "Patient",
+   "options": "Patient",
+   "read_only": 1
+  },
+  {
+   "fieldname": "visit_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Visit Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "visit_notes",
+   "fieldtype": "Small Text",
+   "label": "Visit Notes"
+  },
+  {
+   "default": "0",
+   "fieldname": "payment_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Payment Amount"
+  },
+  {
+   "fieldname": "payment_mode",
+   "fieldtype": "Link",
+   "label": "Payment Mode",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "balance_after_entry",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Balance After Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_appointment_date",
+   "fieldtype": "Date",
+   "label": "Next Appointment Date"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry"
+  },
+  {
+   "fieldname": "receipt_number",
+   "fieldtype": "Data",
+   "label": "Receipt Number"
+  },
+  {
+   "fieldname": "created_by",
+   "fieldtype": "Link",
+   "label": "Created By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_adjustment",
+   "fieldtype": "Check",
+   "label": "Is Adjustment"
+  },
+  {
+   "fieldname": "adjustment_reason",
+   "fieldtype": "Small Text",
+   "label": "Adjustment Reason"
+  },
+  {
+   "fieldname": "consultant_id",
+   "fieldtype": "Data",
+   "label": "Consultant ID"
+  },
+  {
+   "fieldname": "consultant_name",
+   "fieldtype": "Data",
+   "label": "Consultant Name"
+  },
+  {
+   "fieldname": "consultant_type",
+   "fieldtype": "Data",
+   "label": "Consultant Type"
+  },
+  {
+   "fieldname": "consultant_practitioner",
+   "fieldtype": "Link",
+   "label": "Consultant Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fieldname": "consultant_commission_type",
+   "fieldtype": "Data",
+   "label": "Commission Type"
+  },
+  {
+   "default": "0",
+   "fieldname": "consultant_commission_value",
+   "fieldtype": "Float",
+   "label": "Commission Value"
+  },
+  {
+   "default": "0",
+   "fieldname": "consultant_commission_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Commission Amount"
+  },
+  {
+   "fieldname": "consultant_commission_source",
+   "fieldtype": "Data",
+   "label": "Commission Source"
+  },
+  {
+   "fieldname": "commission_basis",
+   "fieldtype": "Data",
+   "label": "Commission Basis"
+  },
+  {
+   "default": "Not Applicable",
+   "fieldname": "commission_status",
+   "fieldtype": "Select",
+   "label": "Commission Status",
+   "options": "Not Applicable\nUnpaid\nPartly Paid\nPaid"
+  },
+  {
+   "fieldname": "commission_payout_reference",
+   "fieldtype": "Data",
+   "label": "Commission Payout Reference"
+  },
+  {
+   "fieldname": "commission_paid_date",
+   "fieldtype": "Date",
+   "label": "Commission Paid Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "commission_paid_amount",
+   "fieldtype": "Currency",
+   "label": "Commission Paid Amount"
+  },
+  {
+   "fieldname": "commission_note",
+   "fieldtype": "Small Text",
+   "label": "Commission Note"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mob Clinic",
+ "name": "Orthodontic Ledger Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Practitioner",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "visit_date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
+

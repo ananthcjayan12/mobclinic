@@ -1,4 +1,5 @@
 import frappe
+from mob_clinic.mob_clinic.install import create_default_appointment_types
 from mob_clinic.mob_clinic.patches.v1_0 import (
     install_custom_fields,
     add_company_custom_fields,
@@ -50,6 +51,10 @@ def execute():
     # 8. Ensure consultant invoice custom fields exist
     frappe.log("\n--- Ensuring Consultant Invoice Fields ---")
     create_consultant_invoice_fields.execute()
+
+    # 9. Ensure default appointment types exist
+    frappe.log("\n--- Ensuring Default Appointment Types ---")
+    create_default_appointment_types()
     
     frappe.db.commit()
     frappe.log("\nMobile Clinic Setup Completed Successfully!")

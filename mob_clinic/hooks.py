@@ -25,7 +25,7 @@ required_apps = ["healthcare"]
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/mob_clinic/css/mob_clinic.css"
+app_include_css = "/assets/mob_clinic/css/orthodontic_tracker.css"
 # app_include_js = "/assets/mob_clinic/js/mob_clinic.js"
 
 # include js, css files in header of web template
@@ -43,7 +43,9 @@ required_apps = ["healthcare"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Patient": "public/js/patient.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}

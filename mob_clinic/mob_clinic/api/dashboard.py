@@ -382,6 +382,11 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
     
     practitioner = base_filters.get("healthcare_practitioner")
     company = base_filters.get("company")
+    orthodontic_filters = {"is_active": 1, "status": ["in", ["Planned", "Active", "On Hold"]]}
+    if company:
+        orthodontic_filters["company"] = company
+    if practitioner:
+        orthodontic_filters["practitioner"] = practitioner
     
     # TODAY'S METRICS
     # Get actual payments received today (not invoice status)
@@ -446,6 +451,14 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
         fields=["outstanding_amount", "posting_date"]
     )
     total_outstanding = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices)
+    orthodontic_cases = frappe.get_all(
+        "Orthodontic Case",
+        filters=orthodontic_filters,
+        fields=["balance_amount"],
+    )
+    orthodontic_balance = sum(
+        flt(case.get("balance_amount")) for case in orthodontic_cases
+    )
     
     # Aging analysis
     aging_30 = sum(flt(inv.outstanding_amount) for inv in outstanding_invoices 
@@ -481,6 +494,9 @@ def _calculate_summary(base_filters, today_date, from_date, to_date):
         # Outstanding
         "total_outstanding": round(total_outstanding, 2),
         "outstanding_count": len(outstanding_invoices),
+        "orthodontic_balance": round(orthodontic_balance, 2),
+        "orthodontic_case_count": len(orthodontic_cases),
+        "total_receivables": round(total_outstanding + orthodontic_balance, 2),
         "aging_analysis": {
             "0_30_days": round(aging_30, 2),
             "31_60_days": round(aging_60, 2),
