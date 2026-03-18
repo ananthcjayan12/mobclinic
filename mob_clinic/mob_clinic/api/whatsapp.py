@@ -7,11 +7,12 @@ import frappe
 from frappe import _
 import requests
 import json
+import base64
 import hmac
 import hashlib
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
-from frappe.utils import now_datetime, get_url
+from frappe.utils import now_datetime
 from frappe.utils.password import (
     get_decrypted_password,
     remove_encrypted_password,
@@ -598,6 +599,49 @@ def _format_phone_number(phone):
     return phone
 
 
+def _decode_uploaded_pdf(pdf_base64):
+    """Decode a base64 PDF payload sent by the UI."""
+    if not pdf_base64:
+        return None
+
+    encoded = str(pdf_base64).strip()
+    if not encoded:
+        return None
+
+    if "," in encoded and encoded.lower().startswith("data:"):
+        encoded = encoded.split(",", 1)[1]
+
+    try:
+        return base64.b64decode(encoded, validate=True)
+    except Exception as exc:
+        raise ValueError("Invalid PDF payload") from exc
+
+
+def _upload_media_to_whatsapp(phone_number_id, access_token, file_bytes, filename, mime_type="application/pdf"):
+    """
+    Upload a media file to WhatsApp Cloud API and return the media_id.
+    Meta will host the file so the template can reference it by ID.
+    """
+    endpoint = f"{WHATSAPP_API_BASE}/{phone_number_id}/media"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    files = {
+        "file": (filename, file_bytes, mime_type),
+    }
+    data = {
+        "messaging_product": "whatsapp",
+        "type": mime_type,
+    }
+    resp = requests.post(endpoint, headers=headers, files=files, data=data, timeout=60)
+    resp_data = resp.json()
+    if resp.status_code != 200:
+        error_msg = resp_data.get("error", {}).get("message", "Unknown media upload error")
+        raise Exception(f"Media upload failed: {error_msg}")
+    media_id = resp_data.get("id")
+    if not media_id:
+        raise Exception("Media upload returned no media ID")
+    return media_id
+
+
 def _call_whatsapp_api(endpoint, payload, access_token):
     """
     Make HTTP request to WhatsApp Cloud API
@@ -663,7 +707,8 @@ def _log_message(clinic, recipient_phone, template_name, message_type,
 def send_template_message(clinic, recipient_phone, template_name, template_params=None,
                           language="en_US", message_type="Custom",
                           reference_doctype=None, reference_name=None,
-                          header_document_link=None, header_document_filename=None):
+                          header_document_filename=None,
+                          header_document_id=None):
     """
     Send a WhatsApp template message
     
@@ -713,13 +758,13 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
         
         components = []
 
-        if header_document_link:
+        if header_document_id:
             components.append({
                 "type": "header",
                 "parameters": [{
                     "type": "document",
                     "document": {
-                        "link": str(header_document_link),
+                        "id": str(header_document_id),
                         "filename": str(header_document_filename or "document.pdf"),
                     }
                 }]
@@ -764,8 +809,10 @@ def send_template_message(clinic, recipient_phone, template_name, template_param
                 error_text = str(api_error).lower()
                 if (
                     "132001" in error_text
+                    or "132000" in error_text
                     or "translation" in error_text
                     or "template name does not exist" in error_text
+                    or "number of parameters" in error_text
                 ):
                     continue
                 raise
@@ -926,7 +973,7 @@ def send_review_request(appointment_id):
 
 
 @frappe.whitelist()
-def send_prescription(prescription_id, patient_phone=None):
+def send_prescription(prescription_id, patient_phone=None, pdf_base64=None, pdf_filename=None):
     """
     Share prescription via WhatsApp
     
@@ -965,10 +1012,18 @@ def send_prescription(prescription_id, patient_phone=None):
             patient.patient_name,
             prescription.name
         ]
-        prescription_pdf_link = get_url(
-            f"/api/method/frappe.utils.print_format.download_pdf?doctype=Patient%20Prescription&name={prescription_id}"
+
+        pdf_bytes = _decode_uploaded_pdf(pdf_base64)
+        if not pdf_bytes:
+            return {"success": False, "error": "PDF is required. Please generate it from the UI."}
+        filename = pdf_filename or f"{prescription.name}.pdf"
+        media_id = _upload_media_to_whatsapp(
+            credentials["phone_number_id"],
+            credentials["access_token"],
+            pdf_bytes,
+            filename,
         )
-        
+
         return send_template_message(
             clinic=clinic,
             recipient_phone=phone,
@@ -977,8 +1032,8 @@ def send_prescription(prescription_id, patient_phone=None):
             message_type="Prescription",
             reference_doctype="Patient Prescription",
             reference_name=prescription_id,
-            header_document_link=prescription_pdf_link,
-            header_document_filename=f"{prescription.name}.pdf",
+            header_document_id=media_id,
+            header_document_filename=filename,
         )
     
     except Exception as e:
@@ -987,7 +1042,7 @@ def send_prescription(prescription_id, patient_phone=None):
 
 
 @frappe.whitelist()
-def send_invoice(invoice_id, patient_phone=None):
+def send_invoice(invoice_id, patient_phone=None, pdf_base64=None, pdf_filename=None):
     """
     Share invoice/payment receipt via WhatsApp
     
@@ -998,8 +1053,10 @@ def send_invoice(invoice_id, patient_phone=None):
     try:
         invoice = frappe.get_doc("Sales Invoice", invoice_id)
         
-        # Get patient from customer
-        patient_id = frappe.db.get_value("Patient", {"customer": invoice.customer}, "name")
+        # Get patient: prefer direct patient field, fall back to customer lookup
+        patient_id = invoice.get("patient") or frappe.db.get_value(
+            "Patient", {"customer": invoice.customer}, "name"
+        )
         
         if not patient_id:
             return {"success": False, "error": "No patient linked to invoice"}
@@ -1036,10 +1093,18 @@ def send_invoice(invoice_id, patient_phone=None):
             patient.patient_name,
             appointment_reference
         ]
-        invoice_pdf_link = get_url(
-            f"/api/method/frappe.utils.print_format.download_pdf?doctype=Sales%20Invoice&name={invoice_id}"
+
+        pdf_bytes = _decode_uploaded_pdf(pdf_base64)
+        if not pdf_bytes:
+            return {"success": False, "error": "PDF is required. Please generate it from the UI."}
+        filename = pdf_filename or f"{invoice.name}.pdf"
+        media_id = _upload_media_to_whatsapp(
+            credentials["phone_number_id"],
+            credentials["access_token"],
+            pdf_bytes,
+            filename,
         )
-        
+
         return send_template_message(
             clinic=clinic,
             recipient_phone=phone,
@@ -1048,8 +1113,8 @@ def send_invoice(invoice_id, patient_phone=None):
             message_type="Invoice",
             reference_doctype="Sales Invoice",
             reference_name=invoice_id,
-            header_document_link=invoice_pdf_link,
-            header_document_filename=f"{invoice.name}.pdf",
+            header_document_id=media_id,
+            header_document_filename=filename,
         )
     
     except Exception as e:
