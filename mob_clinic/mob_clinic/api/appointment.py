@@ -4,6 +4,7 @@ from frappe.utils import cstr, cint, get_datetime, nowdate, add_days, getdate, n
 import json
 from datetime import datetime, timedelta
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 
 
 def resolve_appointment_duration(practitioner_id=None, clinic=None, duration=None):
@@ -346,6 +347,7 @@ def create_appointment(patient_id, appointment_date, appointment_time, **kwargs)
         # (healthcare.PatientAppointment.validate_overlaps checks this flag).
         appointment.flags.ignore_overlap_validation = True
         appointment.insert(ignore_permissions=True)
+        set_seed_namespace("Patient Appointment", appointment.name, get_request_seed_namespace())
         frappe.db.commit()
         
         # Get the created appointment with enhanced data
@@ -407,6 +409,7 @@ def create_public_appointment(clinic, patient_name, mobile, appointment_date, ap
         
         # Check if patient exists by mobile
         existing_patient = frappe.db.get_value("Patient", {"mobile": mobile}, "name")
+        seed_namespace = get_request_seed_namespace()
         
         if existing_patient:
             patient_id = existing_patient
@@ -424,6 +427,7 @@ def create_public_appointment(clinic, patient_name, mobile, appointment_date, ap
             patient.sex = kwargs.get("sex", "Unknown")
             patient.flags.ignore_permissions = True
             patient.insert(ignore_permissions=True)
+            set_seed_namespace("Patient", patient.name, seed_namespace)
             patient_id = patient.name
         
         # 3. Create Appointment using internal function (reusing logic but passing practitioner explicitly)
@@ -470,6 +474,7 @@ def create_public_appointment(clinic, patient_name, mobile, appointment_date, ap
         appointment.flags.ignore_mandatory = True
         appointment.flags.ignore_overlap_validation = True
         appointment.insert(ignore_permissions=True)
+        set_seed_namespace("Patient Appointment", appointment.name, seed_namespace)
         frappe.db.commit()
 
         return {

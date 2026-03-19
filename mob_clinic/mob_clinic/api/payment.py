@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import today, add_days, getdate, flt, nowdate
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 from mob_clinic.mob_clinic.api.role_access import assert_page_access
+from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 from mob_clinic.mob_clinic.procedure_items import (
     DEFAULT_SERVICE_GST_HSN_CODE,
     ensure_procedure_item,
@@ -847,6 +848,9 @@ def create_invoice(patient_id, items, posting_date=None, due_date=None,
         
         # Submit invoice
         invoice.submit()
+        seed_namespace = get_request_seed_namespace()
+        set_seed_namespace("Customer", customer_id, seed_namespace)
+        set_seed_namespace("Sales Invoice", invoice.name, seed_namespace)
         
         # Build tax breakdown for response
         tax_breakdown = []
@@ -980,6 +984,7 @@ def update_payment(invoice_id, paid_amount, mode_of_payment,
             # Insert and submit with full validation (for proper GL entries)
             payment_entry.insert(ignore_permissions=True)
             payment_entry.submit()
+            set_seed_namespace("Payment Entry", payment_entry.name, get_request_seed_namespace())
         finally:
             # Restore original user
             frappe.set_user(current_user)
@@ -1221,6 +1226,7 @@ def pay_patient_pending_invoices(patient_id, amount, mode_of_payment, payment_da
             try:
                 payment_entry.insert(ignore_permissions=True)
                 payment_entry.submit()
+                set_seed_namespace("Payment Entry", payment_entry.name, get_request_seed_namespace())
             finally:
                 frappe.set_user(current_user)
 

@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import nowdate, now_datetime, getdate
 import json
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 
 
 def _format_status_for_api(status_value):
@@ -367,7 +368,14 @@ def create_prescription(patient_id, **kwargs):
                 if med.get("drug_name"):
                     drug_data["drug_name"] = med.get("drug_name")
                 
-                # Optional: dosage, period, dosage_form as text in comment
+                if med.get("dosage"):
+                    drug_data["dosage"] = med.get("dosage")
+                if med.get("period"):
+                    drug_data["period"] = med.get("period")
+                if med.get("dosage_form"):
+                    drug_data["dosage_form"] = med.get("dosage_form")
+
+                # Keep human-readable medication instructions in the comment as well.
                 comment_parts = []
                 if med.get("dosage"):
                     comment_parts.append(f"Dosage: {med.get('dosage')}")
@@ -405,6 +413,7 @@ def create_prescription(patient_id, **kwargs):
                     })
         
         record.insert(ignore_permissions=True)
+        set_seed_namespace("Patient Encounter", record.name, get_request_seed_namespace())
         frappe.db.commit()
         
         return {

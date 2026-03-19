@@ -1,11 +1,44 @@
-import frappe
+import json
 from typing import List, Optional, Union
+
+import frappe
+
+
+def _parse_company_list(value) -> List[str]:
+    if not value:
+        return []
+
+    parsed = value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        try:
+            parsed = json.loads(stripped)
+        except Exception:
+            parsed = [item.strip() for item in stripped.split(",") if item.strip()]
+
+    if not isinstance(parsed, (list, tuple)):
+        return []
+
+    companies: List[str] = []
+    seen = set()
+    for item in parsed:
+        if not isinstance(item, str):
+            continue
+        company = item.strip()
+        if company and company not in seen:
+            seen.add(company)
+            companies.append(company)
+
+    return companies
 
 
 def get_accessible_companies_for_practitioner(practitioner_name: Optional[str]) -> List[str]:
     """Return a list of company names accessible to the practitioner.
 
     - Reads `primary_company` from Healthcare Practitioner custom field.
+    - Reads optional `accessible_companies_json` when present.
     - If a child table `practitioner_companies` exists, includes those too.
     - If `practitioner_name` is falsy, returns an empty list.
     """
@@ -21,6 +54,12 @@ def get_accessible_companies_for_practitioner(practitioner_name: Optional[str]) 
     primary = doc.get("primary_company")
     if primary:
         companies.append(primary)
+
+    # Optional JSON field for multi-clinic access without a child table.
+    extra_companies = _parse_company_list(getattr(doc, "accessible_companies_json", None))
+    for company in extra_companies:
+        if company not in companies:
+            companies.append(company)
 
     # Optional child table for additional companies
     if hasattr(doc, "practitioner_companies") and doc.get("practitioner_companies"):

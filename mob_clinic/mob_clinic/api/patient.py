@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import cstr, get_datetime, nowdate, today, getdate
 import json
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 
 @frappe.whitelist(methods=['GET'])
 def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20, order_by="registration_date desc, creation desc", clinic=None):
@@ -404,6 +405,8 @@ def create_patient(**kwargs):
             patient.name = make_autoname("HLC-PAT-.YYYY.-.#####")
             patient.flags.name_set = True
             patient.insert(ignore_permissions=True, set_name=patient.name)
+
+        set_seed_namespace("Patient", patient.name, get_request_seed_namespace())
         
         frappe.db.commit()
         
