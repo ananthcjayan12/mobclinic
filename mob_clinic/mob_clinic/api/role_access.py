@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import frappe
 
@@ -17,6 +17,10 @@ DEFAULT_ALLOWED_PAGES = [
 ]
 
 NON_ADMIN_DEFAULT_PAGES = [page for page in DEFAULT_ALLOWED_PAGES if page != "settings"]
+PATIENT_SCOPE_ALL = "patients_all"
+PATIENT_SCOPE_USER = "patients_user"
+PATIENT_SCOPE_KEYS = [PATIENT_SCOPE_ALL, PATIENT_SCOPE_USER]
+ALLOWED_PERMISSION_KEYS = DEFAULT_ALLOWED_PAGES + PATIENT_SCOPE_KEYS
 
 
 def _parse_bool(value: Any) -> bool:
@@ -51,11 +55,27 @@ def sanitize_allowed_pages(allowed_pages: Any) -> List[str]:
         if not isinstance(item, str):
             continue
         key = item.strip()
-        if key in DEFAULT_ALLOWED_PAGES and key not in seen:
+        if key in ALLOWED_PERMISSION_KEYS and key not in seen:
             seen.add(key)
             filtered.append(key)
 
     return filtered
+
+
+def _normalize_patient_scope_access(allowed_pages: List[str]) -> Tuple[List[str], str]:
+    has_patients_access = "patients" in allowed_pages or any(scope in allowed_pages for scope in PATIENT_SCOPE_KEYS)
+    patient_scope = PATIENT_SCOPE_USER if PATIENT_SCOPE_USER in allowed_pages else PATIENT_SCOPE_ALL
+
+    normalized = [page for page in allowed_pages if page not in PATIENT_SCOPE_KEYS]
+    if has_patients_access:
+        if "patients" not in normalized:
+            normalized.append("patients")
+        if patient_scope not in normalized:
+            normalized.append(patient_scope)
+    else:
+        normalized = [page for page in normalized if page != "patients"]
+
+    return normalized, patient_scope
 
 
 def get_practitioner_permissions(practitioner_doc) -> Dict[str, Any]:
@@ -71,10 +91,21 @@ def get_practitioner_permissions(practitioner_doc) -> Dict[str, Any]:
     if not is_clinic_admin and "settings" in allowed_pages:
         allowed_pages = [page for page in allowed_pages if page != "settings"]
 
+    allowed_pages, patient_scope = _normalize_patient_scope_access(allowed_pages)
+
     return {
         "is_clinic_admin": is_clinic_admin,
         "allowed_pages": allowed_pages,
+        "patient_scope": patient_scope,
     }
+
+
+def get_practitioner_patient_scope(practitioner_doc) -> str:
+    try:
+        permissions = get_practitioner_permissions(practitioner_doc)
+        return permissions.get("patient_scope") or PATIENT_SCOPE_ALL
+    except Exception:
+        return PATIENT_SCOPE_ALL
 
 
 def _get_requester_practitioner():
@@ -179,6 +210,7 @@ def get_clinic_practitioner_permissions(clinic: Optional[str] = None):
                     "primary_company": row.get("primary_company"),
                     "is_clinic_admin": permissions["is_clinic_admin"],
                     "allowed_pages": permissions["allowed_pages"],
+                    "patient_scope": permissions.get("patient_scope", PATIENT_SCOPE_ALL),
                 }
             )
 
@@ -236,6 +268,8 @@ def update_practitioner_permissions(
         if not target_admin and "settings" in filtered_pages:
             filtered_pages = [page for page in filtered_pages if page != "settings"]
 
+        filtered_pages, patient_scope = _normalize_patient_scope_access(filtered_pages)
+
         frappe.db.set_value(
             "Healthcare Practitioner",
             target.name,
@@ -254,6 +288,7 @@ def update_practitioner_permissions(
                 "practitioner_id": target.name,
                 "is_clinic_admin": target_admin,
                 "allowed_pages": filtered_pages,
+                "patient_scope": patient_scope,
             },
         }
 

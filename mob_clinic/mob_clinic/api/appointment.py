@@ -4,6 +4,7 @@ from frappe.utils import cstr, cint, get_datetime, nowdate, add_days, getdate, n
 import json
 from datetime import datetime, timedelta
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api import role_access
 from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 
 
@@ -57,6 +58,9 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         
         # Get current practitioner context
         practitioner = get_current_practitioner()
+        patient_scope = role_access.PATIENT_SCOPE_ALL
+        if practitioner:
+            patient_scope = role_access.get_practitioner_patient_scope(practitioner)
 
         # Respect incoming practitioner filter from UI:
         # - if practitioner is provided => filter to that practitioner
@@ -64,6 +68,11 @@ def get_appointments(filters=None, limit_start=0, limit_page_length=20, order_by
         requested_practitioner = filters.get("practitioner")
         if requested_practitioner in ["all", "All", "ALL", "", None]:
             filters.pop("practitioner", None)
+
+        # Practitioner-scoped visibility override:
+        # when "User Patients" is selected, always restrict to current practitioner's appointments.
+        if patient_scope == role_access.PATIENT_SCOPE_USER and practitioner:
+            filters["practitioner"] = practitioner.name
         
         # Resolve clinic and apply company filter if present
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
@@ -182,6 +191,16 @@ def get_appointment(appointment_id):
     """
     try:
         appointment = frappe.get_doc("Patient Appointment", appointment_id)
+
+        requester = get_current_practitioner()
+        if requester:
+            patient_scope = role_access.get_practitioner_patient_scope(requester)
+            if patient_scope == role_access.PATIENT_SCOPE_USER and appointment.practitioner != requester.name:
+                frappe.local.response["http_status_code"] = 403
+                return {
+                    "exc_type": "PermissionError",
+                    "message": "Not permitted to view this appointment"
+                }
         
         # Get patient details
         patient_data = get_patient_basic_info(appointment.patient)

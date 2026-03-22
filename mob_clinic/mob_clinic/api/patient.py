@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import cstr, get_datetime, nowdate, today, getdate
 import json
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api import role_access
 from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
 
 @frappe.whitelist(methods=['GET'])
@@ -35,16 +36,28 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
         else:
             filters = {}
             
-        # Get current practitioner for context but don't filter by it in search
+        # Get current practitioner context
         practitioner = get_current_practitioner()
+        practitioner_scoped_visibility = _is_user_patient_scope(practitioner)
         
         # Resolve clinic and apply filter
         resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name if practitioner else None, clinic)
         if resolved_clinic:
             filters["primary_clinic"] = resolved_clinic
-        
-        # Note: Search should include all patients, not filter by practitioner
-        # This allows practitioners to find and add new patients to their practice
+
+        # When scope is "User Patients", only include patients with appointments under
+        # the logged-in practitioner (within active clinic when available).
+        if practitioner_scoped_visibility and practitioner:
+            scoped_patient_ids = _get_practitioner_patient_ids(practitioner.name, resolved_clinic)
+            if not scoped_patient_ids:
+                return {
+                    "message": "success",
+                    "data": [],
+                    "total_count": 0,
+                    "page_length": limit_page_length,
+                    "start": limit_start
+                }
+            filters["name"] = ["in", scoped_patient_ids]
         
         # Get patients
         patients = frappe.get_all(
@@ -62,7 +75,8 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
             # patient is a dict returned by frappe.get_list
             patient_name = patient.get("name")
             patient_doc = frappe.get_doc("Patient", patient_name)
-            latest_visit = get_latest_visit_details(patient_name, resolved_clinic)
+            scoped_practitioner = practitioner.name if practitioner_scoped_visibility and practitioner else None
+            latest_visit = get_latest_visit_details(patient_name, resolved_clinic, scoped_practitioner)
 
             # Calculate numeric age from DOB
             age_years = None
@@ -78,7 +92,7 @@ def get_patients(fields=None, filters=None, limit_start=0, limit_page_length=20,
                 "avatar": getattr(patient_doc, 'profile_image', None) or patient_doc.get("image"),
                 "registration_date": cstr(getattr(patient_doc, 'registration_date', None)),
                 "last_visit": latest_visit.get("last_visit") if latest_visit else None,
-                "total_visits": get_total_appointments(patient_name),
+                "total_visits": get_total_appointments(patient_name, scoped_practitioner),
                 "pending_amount": get_pending_amount(patient_name),
                 "preferred_language": getattr(patient_doc, 'preferred_language', 'English'),
                 "doctor": latest_visit.get("doctor") if latest_visit else None,
@@ -120,8 +134,17 @@ def get_patient(patient_id):
         dict: Detailed patient information
     """
     try:
-        patient = frappe.get_doc("Patient", patient_id)
         practitioner = get_current_practitioner()
+        if practitioner and _is_user_patient_scope(practitioner):
+            resolved_clinic = clinic_helper.resolve_active_clinic(practitioner.name, None)
+            if not _practitioner_can_access_patient(patient_id, practitioner.name, resolved_clinic):
+                frappe.local.response["http_status_code"] = 403
+                return {
+                    "exc_type": "PermissionError",
+                    "message": "Not permitted to view this patient"
+                }
+
+        patient = frappe.get_doc("Patient", patient_id)
         
         # Calculate numeric age from DOB
         age_years = None
@@ -871,6 +894,7 @@ def search_patients(search_term, limit=10, clinic=None):
     """
     try:
         practitioner = get_current_practitioner()
+        practitioner_scoped_visibility = _is_user_patient_scope(practitioner)
         
         # Build base filters with clinic isolation
         base_filters = {}
@@ -882,6 +906,15 @@ def search_patients(search_term, limit=10, clinic=None):
         )
         if resolved_clinic:
             base_filters["primary_clinic"] = resolved_clinic
+
+        if practitioner_scoped_visibility and practitioner:
+            scoped_patient_ids = _get_practitioner_patient_ids(practitioner.name, resolved_clinic)
+            if not scoped_patient_ids:
+                return {
+                    "message": "success",
+                    "data": []
+                }
+            base_filters["name"] = ["in", scoped_patient_ids]
         
         # Build OR conditions for searching across multiple fields
         or_filters = [
@@ -905,7 +938,8 @@ def search_patients(search_term, limit=10, clinic=None):
         for patient in patients:
             patient_name = patient.get("name")
             patient_doc = frappe.get_doc("Patient", patient_name)
-            latest_visit = get_latest_visit_details(patient_name, resolved_clinic)
+            scoped_practitioner = practitioner.name if practitioner_scoped_visibility and practitioner else None
+            latest_visit = get_latest_visit_details(patient_name, resolved_clinic, scoped_practitioner)
             search_results.append({
                 "patient_id": patient_name,
                 "name": patient.get("patient_name"),
@@ -941,7 +975,44 @@ def get_current_practitioner():
     except frappe.DoesNotExistError:
         return None
 
-def get_latest_visit_details(patient_id, clinic=None):
+
+def _is_user_patient_scope(practitioner_doc) -> bool:
+    if not practitioner_doc:
+        return False
+    return role_access.get_practitioner_patient_scope(practitioner_doc) == role_access.PATIENT_SCOPE_USER
+
+
+def _get_practitioner_patient_ids(practitioner_id, clinic=None):
+    filters = {"practitioner": practitioner_id}
+    if clinic:
+        filters["company"] = clinic
+
+    appointments = frappe.get_all(
+        "Patient Appointment",
+        filters=filters,
+        fields=["patient"],
+        limit_page_length=0,
+    )
+    patient_ids = sorted({row.get("patient") for row in appointments if row.get("patient")})
+    return patient_ids
+
+
+def _practitioner_can_access_patient(patient_id, practitioner_id, clinic=None) -> bool:
+    filters = {"patient": patient_id, "practitioner": practitioner_id}
+    if clinic:
+        filters["company"] = clinic
+
+    if frappe.db.exists("Patient Appointment", filters):
+        return True
+
+    # Fallback for older appointment rows where company may not be set.
+    if clinic and frappe.db.exists("Patient Appointment", {"patient": patient_id, "practitioner": practitioner_id}):
+        return True
+
+    return False
+
+
+def get_latest_visit_details(patient_id, clinic=None, practitioner_id=None):
     """Return the latest non-cancelled past appointment and its treating doctor."""
     def _query(filters):
         return frappe.get_all(
@@ -960,16 +1031,21 @@ def get_latest_visit_details(patient_id, clinic=None):
         }
         if clinic:
             filters["company"] = clinic
+        if practitioner_id:
+            filters["practitioner"] = practitioner_id
 
         latest_visit = _query(filters)
 
         # Older appointment rows may not have company populated yet.
         if not latest_visit and clinic:
-            latest_visit = _query({
+            fallback_filters = {
                 "patient": patient_id,
                 "status": ["!=", "Cancelled"],
                 "appointment_date": ["<=", nowdate()]
-            })
+            }
+            if practitioner_id:
+                fallback_filters["practitioner"] = practitioner_id
+            latest_visit = _query(fallback_filters)
 
         if not latest_visit:
             return None
