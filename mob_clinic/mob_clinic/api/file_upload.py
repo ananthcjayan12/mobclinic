@@ -16,10 +16,12 @@ import os
 import json
 import base64
 import re
+import mimetypes
 from frappe import _
 from frappe.utils import get_files_path, get_url, cstr, now_datetime
 from frappe.core.api.file import create_new_folder
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
+from mob_clinic.mob_clinic.api import patient as patient_api
 
 
 def secure_filename(filename):
@@ -32,6 +34,178 @@ def secure_filename(filename):
     filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
     filename = re.sub(r'\s+', '_', filename)
     return filename.strip('.')
+
+
+def _get_private_download_url(file_id):
+    return f"/api/method/mob_clinic.mob_clinic.api.file_upload.download_file?file_id={file_id}"
+
+
+def _build_download_url(file_id, file_url, is_private):
+    if not file_url:
+        return None
+
+    if is_private:
+        return _get_private_download_url(file_id)
+
+    return get_url(file_url)
+
+
+def _get_file_access_context(attached_to_doctype, attached_to_name):
+    if not attached_to_doctype or not attached_to_name:
+        return {}
+
+    if attached_to_doctype == "Patient":
+        patient_doc = frappe.db.get_value(
+            "Patient",
+            attached_to_name,
+            ["name", "primary_clinic"],
+            as_dict=True,
+        )
+        if not patient_doc:
+            return {}
+
+        return {
+            "patient_id": patient_doc.name,
+            "clinic": patient_doc.primary_clinic,
+        }
+
+    if attached_to_doctype == "Company":
+        return {"clinic": attached_to_name}
+
+    if not frappe.db.exists(attached_to_doctype, attached_to_name):
+        return {}
+
+    context = {}
+    meta = frappe.get_meta(attached_to_doctype)
+    fieldnames = [fieldname for fieldname in ("patient", "company", "appointment") if meta.has_field(fieldname)]
+    if fieldnames:
+        context.update(
+            frappe.db.get_value(attached_to_doctype, attached_to_name, fieldnames, as_dict=True) or {}
+        )
+
+    appointment_id = context.get("appointment")
+    if appointment_id and frappe.db.exists("Patient Appointment", appointment_id):
+        appointment_context = frappe.db.get_value(
+            "Patient Appointment",
+            appointment_id,
+            ["patient", "company"],
+            as_dict=True,
+        ) or {}
+        context["patient"] = context.get("patient") or appointment_context.get("patient")
+        context["company"] = context.get("company") or appointment_context.get("company")
+
+    patient_id = context.get("patient")
+    clinic = context.get("company")
+
+    if patient_id and not clinic and frappe.db.exists("Patient", patient_id):
+        clinic = frappe.db.get_value("Patient", patient_id, "primary_clinic")
+
+    return {
+        "patient_id": patient_id,
+        "clinic": clinic,
+    }
+
+
+def _can_practitioner_access_private_file(file_doc):
+    if not file_doc.is_private:
+        return True
+
+    if frappe.has_permission("File", "read", file_doc):
+        return True
+
+    practitioner_doc = patient_api.get_current_practitioner()
+    if not practitioner_doc:
+        return False
+
+    context = _get_file_access_context(file_doc.attached_to_doctype, file_doc.attached_to_name)
+    patient_id = context.get("patient_id")
+    clinic = context.get("clinic")
+
+    if clinic and not clinic_helper.validate_practitioner_access(practitioner_doc.name, clinic):
+        return False
+
+    if patient_api._is_user_patient_scope(practitioner_doc):
+        if not patient_id:
+            return False
+
+        candidate_clinics = [clinic] if clinic else clinic_helper.get_accessible_companies_for_practitioner(practitioner_doc.name)
+        if not candidate_clinics:
+            candidate_clinics = [None]
+
+        return any(
+            patient_api._practitioner_can_access_patient(patient_id, practitioner_doc.name, candidate_clinic)
+            for candidate_clinic in candidate_clinics
+        )
+
+    if clinic:
+        return True
+
+    if patient_id:
+        accessible_companies = clinic_helper.get_accessible_companies_for_practitioner(practitioner_doc.name)
+        if not accessible_companies:
+            return patient_api._practitioner_can_access_patient(patient_id, practitioner_doc.name, None)
+
+        patient_clinic = frappe.db.get_value("Patient", patient_id, "primary_clinic")
+        if patient_clinic:
+            return patient_clinic in accessible_companies
+
+        return any(
+            patient_api._practitioner_can_access_patient(patient_id, practitioner_doc.name, candidate_clinic)
+            for candidate_clinic in accessible_companies
+        )
+
+    return False
+
+
+def _set_file_response(file_doc):
+    file_name = file_doc.file_name or os.path.basename(file_doc.file_url or "")
+    content_type = mimetypes.guess_type(file_name or "")[0] or "application/octet-stream"
+    inline_types = ("image/", "application/pdf", "text/")
+
+    frappe.local.response.filename = file_name
+    frappe.local.response.filecontent = file_doc.get_content()
+    frappe.local.response.type = "download"
+    frappe.local.response.content_type = content_type
+    frappe.local.response.display_content_as = "inline" if content_type.startswith(inline_types) else "attachment"
+
+
+@frappe.whitelist(methods=['GET'])
+def download_file(file_id=None, file_url=None):
+    """
+    Download a file using mob_clinic access rules for private attachments.
+
+    Args:
+        file_id (str): File document ID
+        file_url (str): File URL fallback when file_id is unavailable
+    """
+    try:
+        if file_id:
+            file_doc = frappe.get_doc("File", file_id)
+        elif file_url:
+            file_doc = frappe.get_doc("File", {"file_url": file_url})
+        else:
+            frappe.local.response["http_status_code"] = 400
+            return {
+                "exc_type": "ValidationError",
+                "message": "Either file_id or file_url is required"
+            }
+
+        if file_doc.is_private and not _can_practitioner_access_private_file(file_doc):
+            frappe.throw(_("You don't have permission to access this file"), frappe.PermissionError)
+
+        _set_file_response(file_doc)
+    except frappe.DoesNotExistError:
+        frappe.local.response["http_status_code"] = 404
+        return {
+            "exc_type": "DoesNotExistError",
+            "message": "File not found"
+        }
+    except frappe.PermissionError:
+        frappe.local.response["http_status_code"] = 403
+        return {
+            "exc_type": "PermissionError",
+            "message": "You don't have permission to access this file"
+        }
 
 
 
@@ -193,10 +367,11 @@ def upload_file(file_name=None, content=None, decode_base64=False, folder="Home"
         
         # Add download URL
         if file_doc.file_url:
-            if file_doc.is_private:
-                file_info["download_url"] = f"/api/method/frappe.core.doctype.file.file.download_file?file_url={file_doc.file_url}"
-            else:
-                file_info["download_url"] = get_url(file_doc.file_url)
+            file_info["download_url"] = _build_download_url(
+                file_doc.name,
+                file_doc.file_url,
+                file_doc.is_private,
+            )
                 
         return {
             "message": "File uploaded successfully",
@@ -232,7 +407,7 @@ def get_file(file_id):
         file_doc = frappe.get_doc("File", file_id)
         
         # Check permissions
-        if file_doc.is_private and not frappe.has_permission("File", "read", file_doc):
+        if file_doc.is_private and not _can_practitioner_access_private_file(file_doc):
             return {
                 "exc_type": "PermissionError",
                 "message": "You don't have permission to access this file"
@@ -285,10 +460,11 @@ def get_file(file_id):
             
         # Add download URL
         if file_doc.file_url:
-            if file_doc.is_private:
-                file_info["download_url"] = f"/api/method/frappe.core.doctype.file.file.download_file?file_url={file_doc.file_url}"
-            else:
-                file_info["download_url"] = get_url(file_doc.file_url)
+            file_info["download_url"] = _build_download_url(
+                file_doc.name,
+                file_doc.file_url,
+                file_doc.is_private,
+            )
                 
         return {
             "message": "success",
@@ -435,6 +611,11 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
         # Enhance file information and apply category filter if needed
         filtered_files = []
         for file_info in files:
+            if file_info["is_private"]:
+                file_doc = frappe.get_doc("File", file_info["file_id"])
+                if not _can_practitioner_access_private_file(file_doc):
+                    continue
+
             # Extract category and description from comments
             comments = frappe.get_all("Comment", 
                 filters={"reference_doctype": "File", "reference_name": file_info["file_id"], "comment_type": "Info"},
@@ -470,10 +651,11 @@ def list_files(reference_doctype=None, reference_name=None, file_category=None,
                 
             # Add download URL
             if file_info["file_url"]:
-                if file_info["is_private"]:
-                    file_info["download_url"] = f"/api/method/frappe.core.doctype.file.file.download_file?file_url={file_info['file_url']}"
-                else:
-                    file_info["download_url"] = get_url(file_info["file_url"])
+                file_info["download_url"] = _build_download_url(
+                    file_info["file_id"],
+                    file_info["file_url"],
+                    file_info["is_private"],
+                )
                     
             # Format file size
             if file_info["file_size"]:

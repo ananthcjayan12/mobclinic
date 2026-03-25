@@ -24,9 +24,25 @@ class TestFileUploadAPI(FrappeTestCase):
     def setUpClass(cls):
         """Set up test data once for all tests"""
         super().setUpClass()
+        cls.company = frappe.defaults.get_global_default("company")
         
-        # Create test practitioner
-        cls.create_test_practitioner()
+        # Create test practitioners in the same clinic
+        cls.create_test_practitioner(
+            email="test_file_doctor@example.com",
+            first_name="Test File",
+            last_name="Doctor",
+            phone="+1111111111",
+            practitioner_attr="practitioner_id",
+            email_attr="practitioner_email",
+        )
+        cls.create_test_practitioner(
+            email="test_file_associate@example.com",
+            first_name="Test File",
+            last_name="Associate",
+            phone="+1111111112",
+            practitioner_attr="associate_practitioner_id",
+            email_attr="associate_practitioner_email",
+        )
         
         # Create test patient for file attachments
         cls.create_test_patient()
@@ -39,33 +55,43 @@ class TestFileUploadAPI(FrappeTestCase):
         cls.test_file_ids = []
         
     @classmethod
-    def create_test_practitioner(cls):
-        """Create test healthcare practitioner"""
+    def create_test_practitioner(cls, email, first_name, last_name, phone, practitioner_attr, email_attr):
+        """Create a test healthcare practitioner."""
         try:
-            # Create user first
-            if not frappe.db.exists("User", "test_file_doctor@example.com"):
+            if not frappe.db.exists("User", email):
                 user_doc = frappe.get_doc({
                     "doctype": "User",
-                    "email": "test_file_doctor@example.com",
-                    "first_name": "Test File",
-                    "last_name": "Doctor",
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name,
                     "send_welcome_email": 0,
                     "user_type": "System User"
                 })
                 user_doc.insert(ignore_permissions=True)
                 
-            # Create healthcare practitioner
-            if not frappe.db.exists("Healthcare Practitioner", {"user_id": "test_file_doctor@example.com"}):
+            if not frappe.db.exists("Healthcare Practitioner", {"user_id": email}):
                 practitioner_doc = frappe.get_doc({
                     "doctype": "Healthcare Practitioner",
-                    "first_name": "Test File",
-                    "last_name": "Doctor", 
-                    "user_id": "test_file_doctor@example.com",
-                    "mobile_phone": "+1111111111"
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "user_id": email,
+                    "mobile_phone": phone,
                 })
                 practitioner_doc.insert(ignore_permissions=True)
-                cls.practitioner_email = "test_file_doctor@example.com"
-                cls.practitioner_id = practitioner_doc.name
+            else:
+                practitioner_doc = frappe.get_doc("Healthcare Practitioner", {"user_id": email})
+
+            setattr(cls, email_attr, email)
+            setattr(cls, practitioner_attr, practitioner_doc.name)
+
+            if cls.company:
+                frappe.db.set_value("Healthcare Practitioner", practitioner_doc.name, "primary_company", cls.company)
+                frappe.db.set_value(
+                    "Healthcare Practitioner",
+                    practitioner_doc.name,
+                    "allowed_pages_json",
+                    '["home","appointments","patients","patients_all","prescriptions","invoice"]',
+                )
                 
         except Exception as e:
             print(f"Error creating test practitioner: {e}")
@@ -86,6 +112,8 @@ class TestFileUploadAPI(FrappeTestCase):
             })
             patient_doc.insert(ignore_permissions=True)
             cls.test_patient_id = patient_doc.name
+            if cls.company:
+                frappe.db.set_value("Patient", cls.test_patient_id, "primary_clinic", cls.company)
             
         except Exception as e:
             print(f"Error creating test patient: {e}")
@@ -210,6 +238,83 @@ class TestFileUploadAPI(FrappeTestCase):
         frappe.set_user("Administrator")
         
         print("✓ Get file info test passed")
+
+    def test_03a_cross_practitioner_private_file_access(self):
+        """Private patient files should remain accessible across practitioners in the same clinic."""
+        from mob_clinic.mob_clinic.api.file_upload import upload_file, get_file, download_file
+
+        if not self.test_patient_id or not getattr(self, "associate_practitioner_email", None):
+            self.skipTest("Cross-practitioner file access prerequisites not available")
+
+        frappe.set_user(self.practitioner_email)
+        upload_result = upload_file(
+            file_name="shared_private_report.txt",
+            content=base64.b64encode(b"shared private content").decode(),
+            decode_base64=True,
+            file_category="report",
+            description="Cross practitioner private report",
+            reference_doctype="Patient",
+            reference_name=self.test_patient_id,
+            is_private=1,
+        )
+
+        self.assertEqual(upload_result.get("message"), "File uploaded successfully")
+        file_id = upload_result["data"]["file_id"]
+        self.test_file_ids.append(file_id)
+
+        frappe.set_user(self.associate_practitioner_email)
+        get_result = get_file(file_id)
+        self.assertEqual(get_result.get("message"), "success")
+        self.assertIn("mob_clinic.mob_clinic.api.file_upload.download_file", get_result["data"]["download_url"])
+
+        frappe.local.response = frappe._dict({})
+        download_file(file_id=file_id)
+
+        self.assertEqual(frappe.local.response.get("filename"), "shared_private_report.txt")
+        self.assertEqual(frappe.local.response.get("type"), "download")
+        self.assertEqual(frappe.local.response.get("filecontent"), "shared private content")
+
+        frappe.set_user("Administrator")
+
+        print("✓ Cross practitioner private file access test passed")
+
+    def test_03b_backfill_private_file_docshares_patch(self):
+        """Patch should backfill native shares so the existing private-file route can work."""
+        from mob_clinic.mob_clinic.api.file_upload import upload_file
+        from mob_clinic.mob_clinic.patches.v1_0.backfill_private_file_docshares import execute as backfill_docshares
+
+        if not self.test_patient_id or not getattr(self, "associate_practitioner_email", None):
+            self.skipTest("Patch prerequisites not available")
+
+        frappe.set_user(self.practitioner_email)
+        upload_result = upload_file(
+            file_name="legacy-private-proof.txt",
+            content=base64.b64encode(b"legacy private content").decode(),
+            decode_base64=True,
+            file_category="report",
+            description="Legacy private proof",
+            reference_doctype="Patient",
+            reference_name=self.test_patient_id,
+            is_private=1,
+        )
+
+        self.assertEqual(upload_result.get("message"), "File uploaded successfully")
+        file_id = upload_result["data"]["file_id"]
+        self.test_file_ids.append(file_id)
+
+        frappe.set_user(self.associate_practitioner_email)
+        self.assertFalse(frappe.has_permission("File", "read", frappe.get_doc("File", file_id)))
+
+        frappe.set_user("Administrator")
+        patch_result = backfill_docshares(clinic=self.company)
+        self.assertGreaterEqual(patch_result.get("shares_created", 0), 1)
+
+        frappe.set_user(self.associate_practitioner_email)
+        self.assertTrue(frappe.has_permission("File", "read", frappe.get_doc("File", file_id)))
+
+        frappe.set_user("Administrator")
+
+        print("✓ Backfill private file docshares patch test passed")
     
     def test_04_list_files(self):
         """Test listing files with filters"""
@@ -343,8 +448,8 @@ class TestFileUploadAPI(FrappeTestCase):
             reference_doctype="Patient",
             reference_name="INVALID-PATIENT-ID"
         )
-        self.assertEqual(result.get("exc_type"), "ValidationError")
-        self.assertIn("does not exist", result.get("message"))
+        self.assertEqual(result.get("exc_type"), "NotFoundError")
+        self.assertIn("not found", result.get("message"))
         
         # Reset user
         frappe.set_user("Administrator")
@@ -541,6 +646,10 @@ class TestFileUploadAPI(FrappeTestCase):
                 frappe.delete_doc("Healthcare Practitioner", cls.practitioner_id, force=True)
             if hasattr(cls, 'practitioner_email') and frappe.db.exists("User", cls.practitioner_email):
                 frappe.delete_doc("User", cls.practitioner_email, force=True)
+            if hasattr(cls, 'associate_practitioner_id') and frappe.db.exists("Healthcare Practitioner", cls.associate_practitioner_id):
+                frappe.delete_doc("Healthcare Practitioner", cls.associate_practitioner_id, force=True)
+            if hasattr(cls, 'associate_practitioner_email') and frappe.db.exists("User", cls.associate_practitioner_email):
+                frappe.delete_doc("User", cls.associate_practitioner_email, force=True)
         except:
             pass
 
