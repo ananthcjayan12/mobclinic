@@ -6,6 +6,8 @@ from pathlib import Path
 import click
 
 import frappe
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from frappe.commands import get_site, pass_context
 
 from mob_clinic.r2_restore import (
@@ -80,6 +82,8 @@ def restore_from_r2(
 		aws_access_key_id=restore_config.access_key_id,
 		aws_secret_access_key=restore_config.secret_access_key,
 		endpoint_url=restore_config.endpoint_url,
+		region_name="auto",
+		config=Config(signature_version="s3v4"),
 	)
 
 	objects: list[BackupObject] = []
@@ -88,7 +92,19 @@ def restore_from_r2(
 		params = {"Bucket": restore_config.bucket, "Prefix": restore_config.prefix}
 		if continuation_token:
 			params["ContinuationToken"] = continuation_token
-		response = s3_client.list_objects_v2(**params)
+		try:
+			response = s3_client.list_objects_v2(**params)
+		except ClientError as exc:
+			error_code = exc.response.get("Error", {}).get("Code")
+			message = exc.response.get("Error", {}).get("Message") or str(exc)
+			if error_code == "SignatureDoesNotMatch":
+				raise click.ClickException(
+					"R2 rejected the request signature. Re-check the endpoint URL and credentials. "
+					"For Cloudflare R2 the endpoint should look like "
+					"https://<ACCOUNT_ID>.r2.cloudflarestorage.com, or the EU/FedRAMP variant if the bucket "
+					"uses a jurisdiction-specific endpoint."
+				) from exc
+			raise click.ClickException(f"Failed to list backups from R2: {message}") from exc
 		for entry in response.get("Contents", []):
 			objects.append(BackupObject(key=entry["Key"], last_modified=entry.get("LastModified")))
 		if not response.get("IsTruncated"):
@@ -147,33 +163,41 @@ def restore_from_r2(
 		)
 
 	click.echo("Restoring backup into staging site...")
-	_restore(
-		site=target_site,
-		sql_file_path=str(downloaded_db),
-		encryption_key=backup_encryption_key,
-		db_root_username=db_root_username,
-		db_root_password=db_root_password,
-		verbose=context.verbose,
-		install_app=(),
-		admin_password=None,
-		force=force,
-		with_public_files=str(downloaded_public) if downloaded_public else None,
-		with_private_files=str(downloaded_private) if downloaded_private else None,
-	)
+	try:
+		frappe.init(site=target_site)
+		_restore(
+			site=target_site,
+			sql_file_path=str(downloaded_db),
+			encryption_key=backup_encryption_key,
+			db_root_username=db_root_username,
+			db_root_password=db_root_password,
+			verbose=context.verbose,
+			install_app=(),
+			admin_password=None,
+			force=force,
+			with_public_files=str(downloaded_public) if downloaded_public else None,
+			with_private_files=str(downloaded_private) if downloaded_private else None,
+		)
+	finally:
+		frappe.destroy()
 
 	target_site_config_path = get_site_config_path(target_site)
-	for key in ("encryption_key", "backup_encryption_key"):
-		value = production_site_config.get(key)
-		if value:
-			update_site_config(key, value, site_config_path=str(target_site_config_path))
-			click.echo(f"Updated {key} on {target_site}")
+	try:
+		frappe.init(site=target_site)
+		for key in ("encryption_key", "backup_encryption_key"):
+			value = production_site_config.get(key)
+			if value:
+				update_site_config(key, value, site_config_path=str(target_site_config_path))
+				click.echo(f"Updated {key} on {target_site}")
+	finally:
+		frappe.destroy()
 
 	try:
-		import frappe.utils.scheduler
+		from frappe.utils import scheduler as scheduler_utils
 
 		frappe.init(site=target_site)
 		frappe.connect()
-		frappe.utils.scheduler.disable_scheduler()
+		scheduler_utils.disable_scheduler()
 		frappe.db.commit()
 		click.echo(f"Scheduler disabled for {target_site}")
 	finally:
