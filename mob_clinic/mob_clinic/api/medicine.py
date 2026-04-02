@@ -167,7 +167,7 @@ def _parse_medicine_fields(kwargs):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_medicines(clinic=None, search=None, category=None, limit_start=0, limit_page_length=50):
+def get_medicines(clinic=None, search=None, category=None, limit_start=0, limit_page_length=0):
     """Alias for UI parity with procedures/conditions."""
     return get_medicine_templates(
         clinic=clinic,
@@ -179,7 +179,7 @@ def get_medicines(clinic=None, search=None, category=None, limit_start=0, limit_
 
 
 @frappe.whitelist(methods=["GET"])
-def get_medicine_templates(clinic=None, search=None, category=None, limit_start=0, limit_page_length=50):
+def get_medicine_templates(clinic=None, search=None, category=None, limit_start=0, limit_page_length=0):
     """
     Get medicines.
 
