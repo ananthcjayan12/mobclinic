@@ -9,3 +9,4 @@ mob_clinic.mob_clinic.patches.v1_0.create_dental_templates #2025-12-07
 mob_clinic.mob_clinic.patches.v1_0.sync_procedure_template_items #2026-03-14
 mob_clinic.mob_clinic.patches.v1_0.create_whatsapp_indexes
 mob_clinic.mob_clinic.patches.v1_0.create_consultant_invoice_fields
+mob_clinic.mob_clinic.patches.v1_0.ensure_fiscal_year_for_all_clinics #2026-04-04

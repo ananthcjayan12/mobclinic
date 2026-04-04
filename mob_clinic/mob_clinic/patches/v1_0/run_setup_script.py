@@ -9,6 +9,7 @@ from mob_clinic.mob_clinic.patches.v1_0 import (
     sync_procedure_template_items,
     create_medicine_templates,
     create_consultant_invoice_fields,
+    ensure_fiscal_year_for_all_clinics,
 )
 
 def execute():
@@ -55,6 +56,10 @@ def execute():
     # 9. Ensure default appointment types exist
     frappe.log("\n--- Ensuring Default Appointment Types ---")
     create_default_appointment_types()
+
+    # 10. Ensure current fiscal year is present and linked to all clinics
+    frappe.log("\n--- Ensuring Fiscal Year For All Clinics ---")
+    ensure_fiscal_year_for_all_clinics.execute()
     
     frappe.db.commit()
     frappe.log("\nMobile Clinic Setup Completed Successfully!")
