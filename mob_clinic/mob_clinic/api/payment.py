@@ -5,7 +5,7 @@ Uses ERPNext Sales Invoice DocType with Healthcare extensions
 
 import frappe
 from frappe import _
-from frappe.utils import today, add_days, getdate, flt, nowdate
+from frappe.utils import today, add_days, getdate, flt, nowdate, now_datetime
 from mob_clinic.mob_clinic.api import clinic as clinic_helper
 from mob_clinic.mob_clinic.api.role_access import assert_page_access
 from mob_clinic.mob_clinic.playwright_seed import get_request_seed_namespace, set_seed_namespace
@@ -1096,7 +1096,15 @@ def get_payment_summary(patient_id):
         frappe.throw(_("Error fetching payment summary: {0}").format(str(e)))
 
 @frappe.whitelist(methods=['POST'])
-def pay_patient_pending_invoices(patient_id, amount, mode_of_payment, payment_date=None, reference_no=None, reference_date=None):
+def pay_patient_pending_invoices(
+    patient_id,
+    amount,
+    mode_of_payment,
+    payment_date=None,
+    reference_no=None,
+    reference_date=None,
+    appointment_id=None,
+):
     """
     Pay pending invoices for a patient using the provided amount (FIFO).
 
@@ -1107,6 +1115,7 @@ def pay_patient_pending_invoices(patient_id, amount, mode_of_payment, payment_da
         payment_date: Optional payment posting date (default: today)
         reference_no: Optional transaction/reference number
         reference_date: Optional transaction date
+        appointment_id: Optional queue appointment context to mark as completed after payment
 
     Returns:
         dict: { payments: [{payment_id, company, paid_amount}], remaining_amount }
@@ -1231,6 +1240,37 @@ def pay_patient_pending_invoices(patient_id, amount, mode_of_payment, payment_da
                 frappe.set_user(current_user)
 
             payments_created.append({"payment_id": payment_entry.name, "company": company, "paid_amount": paid_amt})
+
+        # Queue behavior: when payment is performed from Today's Queue context,
+        # mark that same-day appointment as Completed even if the payment was
+        # allocated to older invoices.
+        if appointment_id and payments_created:
+            try:
+                appt = frappe.db.get_value(
+                    "Patient Appointment",
+                    appointment_id,
+                    ["name", "patient", "appointment_date", "status"],
+                    as_dict=True,
+                )
+                if appt and appt.get("patient") == patient_id:
+                    appt_date = appt.get("appointment_date")
+                    appt_status = appt.get("status") or ""
+                    if (
+                        appt_date
+                        and getdate(appt_date) == getdate(today())
+                        and appt_status not in ("Cancelled", "Closed")
+                    ):
+                        frappe.db.set_value(
+                            "Patient Appointment",
+                            appointment_id,
+                            {"status": "Completed", "payment_time": now_datetime()},
+                            update_modified=False,
+                        )
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"Queue status sync failed for appointment {appointment_id}",
+                )
 
         return {"message": "Payments processed", "payments": payments_created, "remaining_amount": remaining}
 

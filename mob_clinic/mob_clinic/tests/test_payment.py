@@ -865,6 +865,81 @@ class TestPaymentAPI(unittest.TestCase):
 
             if frappe.db.exists("Patient Appointment", appointment.name):
                 frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
+
+    def test_07c_queue_payment_marks_today_appointment_completed(self):
+        """Any payment from queue context should complete today's appointment even if paid to older invoices."""
+        from mob_clinic.mob_clinic.api.payment import create_invoice, pay_patient_pending_invoices
+        import random
+
+        unique_minute = random.randint(30, 59)
+        appointment = frappe.get_doc({
+            "doctype": "Patient Appointment",
+            "patient": self.patient_id,
+            "practitioner": self.practitioner_id,
+            "appointment_date": today(),
+            "appointment_time": f"16:{unique_minute}:00",
+            "appointment_type": "Consultation",
+            "appointment_for": "Practitioner",
+            "status": "Waiting",
+        })
+        appointment.insert(ignore_permissions=True)
+
+        old_invoice_id = None
+        today_invoice_id = None
+        try:
+            old_invoice = create_invoice(
+                patient_id=self.patient_id,
+                items=[{"item_code": "CONS-001", "qty": 1, "rate": 2000}],
+                posting_date=add_days(today(), -5),
+            )
+            old_invoice_id = old_invoice["invoice_id"]
+
+            today_invoice = create_invoice(
+                patient_id=self.patient_id,
+                appointment_reference=appointment.name,
+                items=[{"item_code": "ROOT-001", "qty": 1, "rate": 2000}],
+                posting_date=today(),
+            )
+            today_invoice_id = today_invoice["invoice_id"]
+
+            pay_patient_pending_invoices(
+                patient_id=self.patient_id,
+                amount=1000,
+                mode_of_payment="Cash",
+                payment_date=today(),
+                reference_no="QUEUE-PAY-TEST",
+                reference_date=today(),
+                appointment_id=appointment.name,
+            )
+
+            appointment.reload()
+            self.assertEqual(appointment.status, "Completed")
+            self.assertTrue(appointment.payment_time)
+        finally:
+            for invoice_id in [old_invoice_id, today_invoice_id]:
+                if not invoice_id or not frappe.db.exists("Sales Invoice", invoice_id):
+                    continue
+                invoice_doc = frappe.get_doc("Sales Invoice", invoice_id)
+                if invoice_doc.docstatus == 1:
+                    payment_refs = frappe.get_all(
+                        "Payment Entry Reference",
+                        filters={"reference_doctype": "Sales Invoice", "reference_name": invoice_id},
+                        fields=["parent"],
+                    )
+                    for ref in payment_refs:
+                        if frappe.db.exists("Payment Entry", ref.parent):
+                            pe = frappe.get_doc("Payment Entry", ref.parent)
+                            if pe.docstatus == 1:
+                                pe.flags.ignore_permissions = True
+                                pe.cancel()
+                            frappe.delete_doc("Payment Entry", ref.parent, force=True, ignore_permissions=True)
+                    invoice_doc.reload()
+                    invoice_doc.flags.ignore_permissions = True
+                    invoice_doc.cancel()
+                frappe.delete_doc("Sales Invoice", invoice_id, force=True, ignore_permissions=True)
+
+            if frappe.db.exists("Patient Appointment", appointment.name):
+                frappe.delete_doc("Patient Appointment", appointment.name, force=True, ignore_permissions=True)
     
     def test_08_filter_invoices_by_status(self):
         """Test filtering invoices by status"""
