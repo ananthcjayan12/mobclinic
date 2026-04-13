@@ -10,6 +10,7 @@ from mob_clinic.mob_clinic.patches.v1_0 import (
     create_medicine_templates,
     create_consultant_invoice_fields,
     ensure_fiscal_year_for_all_clinics,
+    fix_invalid_groups
 )
 
 def execute():
@@ -60,6 +61,9 @@ def execute():
     # 10. Ensure current fiscal year is present and linked to all clinics
     frappe.log("\n--- Ensuring Fiscal Year For All Clinics ---")
     ensure_fiscal_year_for_all_clinics.execute()
+
+    #11 fix invalid groups
+    fix_invalid_groups.execute()
     
     frappe.db.commit()
     frappe.log("\nMobile Clinic Setup Completed Successfully!")
