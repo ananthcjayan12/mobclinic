@@ -54,7 +54,7 @@ class TestClinicAPI(FrappeTestCase):
 			"Healthcare Practitioner",
 			self.practitioner_name,
 			"allowed_pages_json",
-			'["home","appointments","patients","prescriptions","invoice","financial_dashboard","whatsapp-manager","settings"]',
+			'["home","appointments","patients","prescriptions","consent_forms","invoice","financial_dashboard","whatsapp-manager","settings"]',
 		)
 
 		self.consultant_user = "test_api_consultant@example.com"

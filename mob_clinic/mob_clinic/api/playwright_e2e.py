@@ -44,6 +44,7 @@ DEFAULT_ADMIN_PAGES = [
     "appointments",
     "patients",
     "prescriptions",
+    "consent_forms",
     "invoice",
     "financial_dashboard",
     "whatsapp-manager",
@@ -55,6 +56,7 @@ LIMITED_USER_PAGES = [
     "appointments",
     "patients",
     "prescriptions",
+    "consent_forms",
     "invoice",
 ]
 

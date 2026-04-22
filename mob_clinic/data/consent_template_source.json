@@ -1,0 +1,427 @@
+{
+  "en": {
+    "general": {
+      "label": "General Dentistry Informed Consent Form",
+      "short": "General dentistry",
+      "sections": [
+        {
+          "heading": "1. Examination and X-rays",
+          "body": "I understand that the initial visit may require radiographs in order to complete the examination, diagnosis, and treatment plan."
+        },
+        {
+          "heading": "2. Drugs, Medication and Sedation",
+          "body": "I have been informed and understand that antibiotic, analgesics, and other medications can cause allergic reactions causing redness, swelling of tissues, pain, itching, vomiting, and/or anaphylactic shock (severe allergic reaction). They may cause drowsiness and lack of awareness and coordination, which can be increased by the use of alcohol or other drugs. I understand that and fully agree not to operate any vehicle or hazardous device for at least 12 hours or until fully recovered from the effects of the anesthetic medication and drugs that may have been given me in the office for my treatment. I understand that failure to take medications prescribed for me in the manner prescribed may offer risks of continued or aggravated infection, pain, and potential resistance to effect treatment of my condition. I understand that antibiotics can reduce the effectiveness of oral contraceptives."
+        },
+        {
+          "heading": "3. Changes in Treatment Plan",
+          "body": "I understand that during treatment, it may be necessary to change or add procedures because of conditions found while working on teeth that were not discovered during examination, the most common being root canal therapy following routine restorative procedures. I give my permission to the Dentist to make any or all changes and additions as necessary."
+        },
+        {
+          "heading": "4. Temporomandibular Joint Dysfunctions (TMJ)",
+          "body": "I understand that symptoms of popping, clicking, locking and pain can intensify or develop in the joint of the lower (near the ear) subsequent to routine dental treatment wherein the mouth is held in the open position. However, symptoms of TMJ associated with dental treatment are usually transitory in nature and well tolerated by most patients. I understand that should the need for treatment arise, then I will be referred to a specialist for treatment, and the cost of which is my responsibility."
+        },
+        {
+          "heading": "5. Fillings",
+          "body": "I understand that care must be exercised in chewing on filling during the first 24 hours to avoid breakage, and tooth sensitivity is common after-effect of a newly placed filling."
+        },
+        {
+          "heading": "6. Removal of Teeth (Extraction)",
+          "body": "Alternative to removal has been explained to me (root canal therapy, crowns, periodontal surgery, etc.) and I authorize the Dentist to remove the following teeth and any others necessary for the reasons in paragraph #3. I understand removing teeth does not always remove all infection if present and it may be necessary to have further treatment. I understand the risks involved is having teeth removed, some of which are pain, swelling, and spread of infection, dry socket, loss of feeling in my teeth, lips, tongue, and surrounding tissue (parathesia) that can last for an indefinite period of time or fractured jaw. I understand I may need further treatment by a specialist or even hospitalization if complications arise during or following treatment, the cost of which is my responsibility."
+        },
+        {
+          "heading": "7. Crowns, Bridges, Veneers and Bonding",
+          "body": "I understand that sometimes it is not possible to match the color of natural teeth exactly with artificial teeth. I further understand that I may be wearing temporary crowns, which may come off easily and that I must be careful to ensure that they are kept on until the permanent crowns are delivered. I realized that the final opportunity to make changes in my new crowns, bridge or cap (including shape, fit, size, placement, and color) will be done before cementation. It has been explained to me that, in very few cases, cosmetic procedures may result in the need for future root canal treatment, which cannot always be predicted or anticipated. I understand that cosmetic procedures may affect tooth surfaces and may require modification of daily cleaning procedures."
+        },
+        {
+          "heading": "8. Dentures – Complete or Partial",
+          "body": "I realize that full or partial dentures are artificial, constructed of plastic, metal and or porcelain. The problems of wearing those appliances have been explained to me including looseness, soreness, and possible breakage. I realize the final opportunity to make changes in my new denture (including shape, fit, size, placement, and color) will be “teeth in wax” try-in visit. I understand that most dentures require relining approximately three to twelve months after initial placement. The cost for this procedure is not the initial denture fee."
+        },
+        {
+          "heading": "9. Endodontic Treatment (Root Canal)",
+          "body": "I realize there is no guarantee that root canal treatment will save my tooth and those complications can occur from the treatment and that occasionally metal objects are cemented in the tooth, or extend through the root, which does not necessarily affect the success of the treatment. I understand that occasionally additional surgical procedures may be necessary following root canal treatment (apicoectomy)."
+        },
+        {
+          "heading": "10. Periodontal Treatment",
+          "body": "I understand that I have a serious condition causing gum inflammation and/or bone loss and that it can lead to the loss of my teeth. Alternative treatment plans have been explained to me, including non-surgical cleaning, gum surgery and/or extractions. I understand the success of a treatment depends in part on my efforts to brush and floss daily, receive regular cleaning as directed, following a healthy diet, avoid tobacco products and follow other recommendations."
+        }
+      ],
+      "text": "I understand that the initial visit may require radiographs in order to complete the examination, diagnosis, and treatment plan.\n\nI give my permission to {doctor} to perform {procedure} for the condition: {condition}. I understand that during treatment, it may be necessary to change or add procedures because of conditions found while working on teeth that were not discovered during examination, and I give my permission to make any or all changes and additions as necessary."
+    },
+    "endodontic": {
+      "label": "Endodontic Consent and Information Form",
+      "short": "Endodontic",
+      "sections": [
+        {
+          "heading": null,
+          "body": "We would like our patients to be informed about the various procedures involved in endodontics therapy and have their consent before starting treatment. Conservative root canal therapy or endodontic surgery might be required for complete treatment of the tooth. The following discusses possible risks that may occur from endodontic treatment and other treatment choices."
+        },
+        {
+          "heading": "Risks Specific to Endodontic Therapy",
+          "body": "The risks include:",
+          "items": [
+            "The possibility of instruments breakage within the root canals: extra openings of the crown or root of the tooth.",
+            "Damaged bridges, existing fillings, crowns or porcelain veneers.",
+            "Loss of tooth structure in gaining access to canals.",
+            "Cracked teeth."
+          ],
+          "footer": "During treatment, complications may occur which make treatment impossible or which may require dental surgery."
+        },
+        {
+          "heading": "Other Treatment Choices",
+          "body": "These include no treatment, waiting for more definite development of symptoms or tooth extraction. Risks involved in these choices might include pain, infection, swelling, loss of teeth and infection to other areas."
+        },
+        {
+          "heading": "Consent",
+          "body": "I, the undersigned, being the patient (parents or guardian of minor patient) consent to the performing of procedures decided upon to be necessary or advisable in the opinion of the doctor. I understand that root canal treatment is an attempt to save a tooth that might otherwise required extraction. Although root canal therapy has a very high degree of success, it cannot be guaranteed."
+        }
+      ],
+      "text": "I, the undersigned, being the patient (parents or guardian of minor patient) consent to the performing of procedures decided upon to be necessary or advisable in the opinion of {doctor}. I understand that root canal treatment is an attempt to save {condition} that might otherwise required extraction. Although root canal therapy has a very high degree of success, it cannot be guaranteed.\n\nConservative root canal therapy or endodontic surgery might be required for complete treatment of the tooth. I understand that {procedure} has been recommended."
+    },
+    "oral_surgery": {
+      "label": "Consent Form for Oral Surgery / Wisdom Teeth Removal",
+      "short": "Oral surgery",
+      "sections": [
+        {
+          "heading": null,
+          "body": "I have been advised to have the following procedure(s) performed: {procedure}\n\nI understand why this treatment has been recommended. I understand the nature of the surgical procedure and have had opportunity to discuss it with the operator. I have been given options for anesthesia and have chosen: {anesthesia}\n\nI understand that I can choose to be referred out for a general anesthetic at a hospital, or for overall management by an Oral & Maxillofacial Surgeon. I understand that {doctor} is not a specialist Oral & Maxillofacial surgeon, but a general Dental Surgeon who has routinely practiced oral surgery, such as wisdom teeth removal. I understand that wisdom teeth removal and oral surgery, like any surgical procedure, are not without risk."
+        },
+        {
+          "heading": "These risks include:",
+          "items": [
+            "Swelling and stiffness of the jaw – usually lasting about a week.",
+            "Bleeding – usually easily controlled and rarely requiring medical attention.",
+            "Pain and discomfort – usually well controlled by prescribed pain killers.",
+            "Infection – uncommon, particularly if good oral hygiene is maintained after surgery.",
+            "Dry socket – leading to a persistently painful tooth socket which can be slow to heal, and which would require further management (most common with smokers).",
+            "Damage to adjacent teeth and fractures of the mandible – these are very rare complications and you will be advised if this risk applies to you.",
+            "Numbness, tingling and altered sensation of the lip, chin, tongue, gums and back teeth – this is due to the proximity of two nerves which supply these areas, to lower wisdom teeth. If this takes place, it can last for months and very rarely be permanent.",
+            "Sinus perforation, communication or root displacement – can take place where an upper back tooth root which protrudes into the maxillary sinus is removed. A second surgical procedure may be required to manage such problems.",
+            "Allergy or other adverse reaction to drugs which are administered – such as anaesthetics and sedatives.",
+            "The risks and benefits for the procedure have been discussed with me to my satisfaction, including the risks and benefits of no treatment."
+          ]
+        }
+      ],
+      "text": "I have been advised to have the following procedure(s) performed: {procedure}\n\nI understand why this treatment has been recommended. I understand the nature of the surgical procedure and have had opportunity to discuss it with {doctor}. I understand that I can choose to be referred out for a general anesthetic at a hospital, or for overall management by an Oral & Maxillofacial Surgeon. I understand that wisdom teeth removal and oral surgery, like any surgical procedure, are not without risk.\n\nThe risks and benefits for the procedure have been discussed with me to my satisfaction, including the risks and benefits of no treatment."
+    },
+    "implants": {
+      "label": "Consent for Dental Implants",
+      "short": "Dental implants",
+      "sections": [
+        {
+          "heading": null,
+          "body": "After a careful oral examination and study of my dental condition, {doctor} has advised me that my missing tooth/teeth may be replaced with artificial teeth supported by dental implants as follows: {condition}\n\nAll risks/benefits and instructions pertaining to sedation and surgical complications appear on the “Surgical Consent” sheet. I have selected the above treatment and have read and understand all items pertaining to the “Surgical Consent” sheet.",
+          "items": [
+            "In order to treat this condition, {doctor} has recommended that my treatment include dental implant(s) to be implanted into the jawbone. I understand that this surgical phase is followed by a prosthetic phase where artificial dentures, bridges or crowns are placed by the dentist/prosthodontist.",
+            "I understand that sedation may be utilized and that a local anesthetic will be administered to me as part of the treatment. My gum tissue will be opened to expose the bone, implants will be placed and the gum tissue will be sutured during the healing phase.",
+            "I understand that the healing phase of surgery varies from patient to patient and case to case, but typically last between 2-6 months. I understand that dentures or partial dentures that place pressure on the surgical site are to be avoided for 1-2 weeks following surgery.",
+            "I further understand that if during surgery the clinical situations turn out to be unfavorable for the implant, {doctor} will make a professional judgment to manage this. This includes canceling the procedure, supplemental bone and soft tissue grafting to allow placement, gum closure and security of the dental implants. These procedures might be done in conjunction or separately from the implant placement.",
+            "I understand that some implants require second stage surgeries. Overlying tissues will be opened at the appropriate time and the stability of the implant will be verified. If the implant appears satisfactory, an attachment will be connected to the implant. The artificial crown fabrication may begin after healing of this soft tissue. I understand that I will be referred back to my dentist/prosthodontist to have this artificial crown/denture treatment.",
+            "Expected benefits: The purpose of dental implants is to allow me to have more functional artificial teeth and an improved appearance. The implants provide support, anchorage and retention for the artificial replacement.",
+            "Principal risks and complications: I understand that a small number of patients do not respond successfully to implant placement. In such cases, implants may have to be removed and replaced. Because each patient’s conditions are unique, long-term success may not occur. I understand that complications may result from the implant surgery, drugs or anesthetics.",
+            "There is no method that will accurately predict or evaluate how my gum and bone will heal. I understand that there may be a need for a revision procedure if the initial results are not satisfactory. In addition, the success of dental implant procedures can be affected by medical conditions, dietary and nutritional problems, smoking, alcohol consumption, clenching and grinding of teeth, inadequate oral hygiene and medications that I may be taking.",
+            "To my knowledge, I have reported to {doctor} any prior drug reactions, allergies, diseases, symptoms, habits or conditions which might in any way relate to this surgical procedure. I understand that my diligence in providing the personal daily care recommended by {doctor} and taking all medications as prescribed are important to the ultimate success of the procedure.",
+            "Alternatives to suggested treatment: I understand that alternatives to dental implant surgery include: No treatment, removable appliances and other procedures depending on circumstances.",
+            "Necessary follow-up and self-care: I understand that it is important for me to continue regular visits to dentist. Implants, natural teeth and appliances must be maintained in a clean, hygienic manner. Implants and appliances should be examined by the dentist or {doctor} periodically."
+          ]
+        },
+        {
+          "heading": "Patient Consent",
+          "body": "I have been fully informed of the nature of implant surgery, the procedure to be utilized, the risks and benefits of implant surgery and the selected anesthesia, the alternative treatments available and the necessity for follow-up and self-care. I have had an opportunity to ask any questions I may have in connection with the treatment and to discuss my concerns with {doctor}.\n\nI hereby consent to the performance of dental implant surgery as presented to me during consultation and the treatment plan as described in this document. I CERTIFY THAT I HAVE READ AND FULLY UNDERSTAND THIS CONSENT DOCUMENT: DENTAL IMPLANT SURGERY CONSENT FORM."
+        }
+      ],
+      "text": "After a careful oral examination and study of my dental condition, {doctor} has advised me that my missing tooth/teeth may be replaced with artificial teeth supported by dental implants.\n\nI have been fully informed of the nature of implant surgery, the procedure to be utilized, the risks and benefits of implant surgery and the selected anesthesia, the alternative treatments available and the necessity for follow-up and self-care. I have had an opportunity to ask any questions I may have in connection with the treatment.\n\nI hereby consent to the performance of {procedure} as presented to me during consultation. I CERTIFY THAT I HAVE READ AND FULLY UNDERSTAND THIS CONSENT DOCUMENT: DENTAL IMPLANT SURGERY CONSENT FORM."
+    },
+    "periodontal": {
+      "label": "Consent for Periodontal Surgery",
+      "short": "Periodontal",
+      "sections": [
+        {
+          "heading": "Diagnosis",
+          "body": "On careful oral examination and study of my dental condition, {doctor} has advised me that I have periodontal (gum) disease. I understand that periodontal disease weakens support of my teeth by separating the gum from the teeth and can also be destructive for the bone that supports the teeth. This separation of the gums (pockets) allows for greater accumulation of bacteria under the gum and can result in further erosion or loss of bone and gum supporting the roots of my teeth. If untreated, periodontal disease can cause teeth loss and has other adverse consequences."
+        },
+        {
+          "heading": "Recommended Treatment",
+          "body": "My dentist has recommended periodontal surgery. I understand that sedation may be utilized and that a local anesthetic will be administered to me as part of the treatment. I further understand that antibiotics and other substances may be applied to the roots of my teeth.\n\nDuring this procedure, my gum will be opened to permit better access to the roots and to the eroded bone. Inflamed and infected gum tissue will be removed and the root surfaces will be thoroughly cleaned. Bone irregularities may be reshaped and bone regenerative material may be placed around my teeth. My gum will then be sutured back into position and a periodontal bandage or dressing may be placed.\n\nI further understand that unforeseen conditions may call for a modification or change from the anticipated surgical plan. These may include, but are not limited to:",
+          "numbered": [
+            "Extraction of decayed teeth to enhance healing of adjacent teeth.",
+            "The removal of a decayed root of a multi-rooted tooth so as to preserve the tooth.",
+            "Termination of the procedure prior to completion of all the surgery originally outlined."
+          ]
+        },
+        {
+          "heading": "Expected Benefits",
+          "body": "The purpose of periodontal surgery is to reduce infection and inflammation and to restore my gum and bone. The surgery is intended to help me keep my teeth in the operated areas and to make my oral hygiene effective."
+        },
+        {
+          "heading": "Principal Risks and Complications",
+          "body": "I understand that a small number of patients do not respond successfully to periodontal surgery and in such cases, the involved teeth may eventually be lost. Periodontal surgery may not be successful in preserving function or appearance. Because each patient’s condition is unique, long-term success may not be possible.\n\nI understand that complications may result from the periodontal surgery, drugs or anesthetics.\n\nThese complications include, but are not limited to:",
+          "items": [
+            "post-surgical infection,",
+            "bleeding,",
+            "swelling and pain,",
+            "facial discoloration,",
+            "transient but on occasion permanent numbness of the jaw, lip, tongue, teeth, chin or gum (more likely with performing a connective tissue or free gingival grafting procedure),",
+            "jaw joint injuries or associated muscle spasm,",
+            "tooth sensitivity to hot, cold, sweet or acidic foods,",
+            "shrinkage of the gum upon healing resulting in elongation of some teeth and greater spaces between some teeth,",
+            "cracking or bruising of the corners of the mouth,",
+            "restricted ability to open the mouth for few days or more,",
+            "impact on speech,",
+            "allergic reactions and",
+            "accidental swallowing of foreign matter."
+          ],
+          "footer": "The exact duration of any complications cannot be determined and may be irreversible. There is no method that will accurately predict or evaluate how my gum and bone will heal. I understand that there may be a need for a second procedure if the initial results are not satisfactory.\n\nIn addition, the success of periodontal procedures can be affected by medical condition, dietary and nutritional problems, smoking, alcohol consumption, clenching and grinding of teeth, inadequate oral hygiene and medications that I may be taking.\n\nTo my knowledge, I have reported to my dentist any prior drug reactions, allergies, diseases, symptoms, habits or conditions that might in any way relate to this surgical procedure.\n\nI understand that taking care as recommended by my dentist and medications as prescribed is important to the ultimate success of the procedure."
+        },
+        {
+          "heading": "Alternatives to Suggested Treatment",
+          "body": "I understand that alternatives to periodontal surgery include:",
+          "numbered": [
+            "Possible advancement of my condition may result in premature loss of teeth.",
+            "Extraction of teeth involved with periodontal disease.",
+            "Non-surgical scraping of tooth roots and lining of the gum (scaling and root planing), with or without medication, in an attempt to further reduce bacteria and tartar under the gumline."
+          ]
+        },
+        {
+          "heading": "Necessary Follow-up Care and Self-Care",
+          "body": "I understand that it is important for me to see my dentist on a regular basis. Existing restorative dentistry can be an important factor in the success or failure of periodontal therapy. From time to time, my dentist may make recommendations for the placement of restorations, the replacement or modification of existing restorations, the joining together of two or more of my teeth, the extraction of one or more teeth, the performance of root canal therapy or the movement of one, several or all of my teeth. I understand that the failure to follow such recommendations could lead to ill effects. I recognize that natural teeth and their artificial replacements should be maintained daily in a clean, hygienic manner. I will need to come for appointments following my surgery so that my healing may be monitored and my dentist can evaluate and report on the outcome of surgery upon completion of healing. Smoking or alcohol intake may adversely affect gum healing and may limit the successful outcome of my surgery.\n\nI know that it is important (1) to abide by the specific prescriptions and instructions given by the dentist and (2) to see my dentist for periodic examination and preventive treatment. Maintenance also may include adjustment of prosthetic appliances."
+        },
+        {
+          "heading": "No Warranty or Guarantee",
+          "body": "I hereby acknowledge that no guarantee, warranty or assurance has been given to me that the proposed treatment will be successful. In most cases, the treatment should provide benefit in reducing the cause of my condition and should produce healing which will help me keep my teeth. Due to individual patient differences, however, a dentist cannot predict certain success. There is a risk of failure, relapse, additional treatment or even worsening of my present condition, including the possible loss of certain teeth, despite the best of care."
+        },
+        {
+          "heading": "Publication of Records",
+          "body": "I authorize photos, slides, X-rays or any other viewings of my care and treatment during or after its completion to be used for the advancement of dentistry and reimbursement purposes. My identity will not be revealed to the general public without my permission."
+        }
+      ],
+      "text": "On careful oral examination and study of my dental condition, {doctor} has advised me that I have periodontal (gum) disease. I understand that periodontal disease weakens support of my teeth and if untreated, can cause teeth loss and has other adverse consequences.\n\nMy dentist has recommended periodontal surgery ({procedure}) for the condition: {condition}. I understand that unforeseen conditions may call for a modification or change from the anticipated surgical plan.\n\nI hereby acknowledge that no guarantee, warranty or assurance has been given to me that the proposed treatment will be successful. There is a risk of failure, relapse, additional treatment or even worsening of my present condition, despite the best of care."
+    },
+    "pediatric": {
+      "label": "Pediatric Dentistry Consent for Dental Procedures",
+      "short": "Pediatric",
+      "sections": [
+        {
+          "heading": null,
+          "body": "It is the policy of this dental practice to inform parents of all procedures contemplated for your child. At each examination appointment, we will identify any dental treatment needed and describe this to you and your child.",
+          "items": [
+            "Each regular examination visit consists of oral hygiene instructions, cleaning of the teeth, topical application of fluoride, radiographs (X-rays) if needed and examination of the teeth, hard and soft tissues of the mouth and the bite.",
+            "Any other treatment needed such as fillings, caps, extractions, etc. will be performed at a separate appointment after obtaining your permission."
+          ],
+          "footer": "Indian Law requires that we obtain your written informed consent for any treatment given to your child as a legal minor."
+        },
+        {
+          "heading": null,
+          "numbered": [
+            "I hereby authorize and direct {doctor} assisted by other dentists and/or dental auxiliaries of his/her choice, to perform the following dental treatment or oral surgery procedures, including the use of any necessary or advisable local anesthesia, radiographs (X-rays) or diagnostic aids.",
+            "In general terms the dental procedures or operation will include: Cleaning of the teeth and the application of topical fluoride. Application of plastic “sealants” to the grooves of the teeth. Treatment of the diseased or injured teeth with dental restoration (filling or caps). Replacement of missing teeth with dental prosthesis. Treatment of malposed (crooked) teeth and/or oral developmental or growth abnormalities.",
+            "Use of local anesthesia, by injection, to numb the teeth worked on. Numbness usually lasts from 1½ to 3 hours. Allergic reactions are rare. Your child will be cautioned not to bite the numb lip and cheek. Please do not tell your child that they are going to get a “shot” as we have our special way of informing them about this.",
+            "Nitrous Oxide (laughing gas) is used to relax children so that they feel less pain of the injection. This gas is placed over the child’s nose. Again, this gas is very safe. The nose piece, as with all treatment, will not be forced on the child."
+          ],
+          "footer": "I fully understand there is a possibility of surgical and/or medical complications developing during or after the procedure.\n\nI further authorize {doctor} to perform treatment to preserve the dental health of my child.\n\nI further understand that parents must remain in the reception area for the duration of their child's visit. However, for the initial visit, that parent will accompany the child to the consultation area. Upon completion of consultation, the parent will be requested to return to the reception area.\n\nI hereby state that I have read and understand this consent form and that all questions about the procedures have been answered in a satisfactory manner. I understand that I have a right to be provided with answers to questions which may arise during the course of my child's treatment.\n\nI further understand that this consent will remain in effect until such time that I choose to terminate it."
+        },
+        {
+          "heading": "Behaviour Management Techniques",
+          "body": "Among the behaviours that can interfere with the proper provision of quality dental care are: Hyperactivity, resistive movements, refusing to open the mouth or keep it open long enough to perform the necessary dental treatment and even aggressive or physical resistance to treatment, such as kicking, screaming and grabbing the dentist's hands or the sharp dental instruments.\n\nAll efforts will be made to obtain the cooperation of the child dental patients by the use of warmth, friendliness, persuasion, humour, charm, gentleness, kindness and understanding. There are several behaviour management techniques that are used by paediatric dentists to gain the cooperation of child-patients to eliminate disruptive behaviour or prevent them from causing injury to themselves due to uncontrollable movements. The more frequently used paediatric dentistry behaviour management techniques are as follows:\n\nTell-show-do: The dentist or assistant explains to the child what is to be done using simple terminology and repetition and then shows the child what is to be done by demonstrating with instruments on a model or the child's or dentist's finger. Then the procedure is performed in the child's mouth as described. Praise is used to reinforce cooperative behaviour.",
+          "items": [
+            "Positive reinforcement: This technique rewards the child who displays any behaviour which is desirable. Rewards include compliments.",
+            "Voice control: The attention of a disruptive child is gained by changing the tone or increasing the volume of the dentist's voice. Content of the conversation is less important than the abrupt or sudden nature of a command.",
+            "Mouth props: A rubber or plastic device is placed in the child's mouth to prevent closing when a child refuses or has difficulty maintaining an open mouth.",
+            "Sedations: Sometimes drugs are used to relax a child who does not respond to other behaviour management techniques or who is unable to comprehend or cooperate for the dental procedures. These drugs may be administered orally, by injection or as a gas (nitrous oxide and oxygen). Your child will not be sedated without you being informed and obtaining your specific consent for such procedure.",
+            "General anesthesia: The dentist performs the dental treatment with the child anesthetized in the hospital operating room. Your child will not be given general anesthesia without you being informed and obtaining your specific consent for such procedure."
+          ]
+        }
+      ],
+      "text": "It is the policy of this dental practice to inform parents of all procedures contemplated for your child. Indian Law requires that we obtain your written informed consent for any treatment given to your child as a legal minor.\n\nI hereby authorize and direct {doctor} assisted by other dentists and/or dental auxiliaries of his/her choice, to perform the following dental treatment or oral surgery procedures, including the use of any necessary or advisable local anesthesia, radiographs (X-rays) or diagnostic aids: {procedure}\n\nI fully understand there is a possibility of surgical and/or medical complications developing during or after the procedure. I further understand that this consent will remain in effect until such time that I choose to terminate it."
+    },
+    "orthodontic": {
+      "label": "Orthodontic Consent and Information Form",
+      "short": "Orthodontic",
+      "sections": [
+        {
+          "heading": null,
+          "body": "I understand the nature of orthodontic treatment, expected treatment duration and the need for strict follow-up visits and oral hygiene during and after treatment."
+        },
+        {
+          "heading": "Risks and Responsibilities",
+          "items": [
+            "Treatment may require extraction of teeth depending on clinical findings.",
+            "Oral hygiene must be maintained to avoid gum problems and tooth decay during braces treatment.",
+            "Discomfort, appliance-related ulcers, delayed progress and occasional relapse may occur.",
+            "Retention appliances are necessary after active treatment to prevent relapse."
+          ]
+        },
+        {
+          "heading": "Consent",
+          "body": "I have had an opportunity to ask questions and I consent to proceed with orthodontic treatment as advised by {doctor}."
+        }
+      ],
+      "text": "I understand the nature of orthodontic treatment, expected duration, risks and follow-up requirements. I consent to proceed with {procedure} for {condition} as advised by {doctor}."
+    },
+    "prosthodontic": {
+      "label": "Prosthodontic Consent (Crown / Bridge / Denture)",
+      "short": "Prosthodontic",
+      "sections": [
+        {
+          "heading": null,
+          "body": "I understand the treatment plan for crown / bridge / removable or complete denture and available alternatives."
+        },
+        {
+          "heading": "Important Points",
+          "items": [
+            "Multiple appointments and adjustments may be required for best fit and comfort.",
+            "Speech and chewing adaptation period is expected after new prosthesis.",
+            "Periodic review and maintenance are required, including possible relining/repair/recementation.",
+            "Failure to maintain oral hygiene and follow-up can lead to gum/tooth complications."
+          ]
+        },
+        {
+          "heading": "Consent",
+          "body": "I have understood the benefits, limitations and maintenance needs, and I consent to proceed with {procedure} as advised by {doctor}."
+        }
+      ],
+      "text": "I understand the prosthodontic treatment plan, alternatives, maintenance needs and possible adjustments over time. I consent to proceed with {procedure} for {condition} as advised by {doctor}."
+    }
+  },
+  "ml": {
+    "general": {
+      "title": "ജനറൽ ദന്തചികിത്സ സമ്മതപത്രം",
+      "sections": [
+        {
+          "heading": "1. പരിശോധനയും എക്‌സ്-റേയും",
+          "body": "പരിശോധന, രോഗനിർണയം, ചികിത്സാ പദ്ധതി എന്നിവ പൂർണ്ണമാക്കുന്നതിനായി ആദ്യ സന്ദർശനത്തിൽ എക്‌സ്-റേ ചിത്രങ്ങൾ ആവശ്യമായി വരാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു."
+        },
+        {
+          "heading": "2. മരുന്നുകൾ, ഔഷധങ്ങൾ, സെഡേഷൻ",
+          "body": "ആന്റിബയോട്ടിക്കുകൾ, വേദനാശമന മരുന്നുകൾ, മറ്റു മരുന്നുകൾ എന്നിവ ചുവപ്പ്, വീക്കം, വേദന, ചൊറിച്ചിൽ, ഛർദ്ദി, അത്യപൂർവമായി അനാഫിലാക്റ്റിക് ഷോക്ക് പോലുള്ള അലർജി പ്രതികരണങ്ങൾ ഉണ്ടാക്കാമെന്ന് എനിക്ക് അറിയിച്ചു, ഞാൻ അത് മനസ്സിലാക്കുന്നു. ഇത്തരത്തിലുള്ള മരുന്നുകൾ മയക്കം, ജാഗ്രതക്കുറവ്, ഏകോപനക്കുറവ് എന്നിവ ഉണ്ടാക്കാം; മദ്യമോ മറ്റു മരുന്നുകളോ ഉപയോഗിച്ചാൽ ഇത് കൂടാനിടയുണ്ട്. ചികിത്സയ്ക്കായി നൽകിയ അനസ്‌തേഷ്യയുടെയും മരുന്നുകളുടെയും സ്വാധീനം പൂർണ്ണമായി മാറുന്നതുവരെ കുറഞ്ഞത് 12 മണിക്കൂർ വാഹനമോടിക്കുകയോ അപകടസാധ്യതയുള്ള യന്ത്രങ്ങൾ പ്രവർത്തിപ്പിക്കുകയോ ചെയ്യില്ലെന്ന് ഞാൻ സമ്മതിക്കുന്നു. നിർദ്ദേശിച്ച രീതിയിൽ മരുന്നുകൾ കഴിക്കാത്ത പക്ഷം അണുബാധയും വേദനയും തുടരാനോ വർധിക്കാനോ, ചികിത്സയുടെ ഫലപ്രാപ്തി കുറയാനോ സാധ്യതയുണ്ടെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. ആന്റിബയോട്ടിക്കുകൾ വായ് ഗർഭനിരോധന മരുന്നുകളുടെ ഫലപ്രാപ്തിയും കുറയ്ക്കാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു."
+        },
+        {
+          "heading": "3. ചികിത്സാ പദ്ധതിയിലെ മാറ്റങ്ങൾ",
+          "body": "ചികിത്സയ്ക്കിടെ പരിശോധന സമയത്ത് കണ്ടെത്താനായില്ലാത്ത അവസ്ഥകൾ പല്ലിൽ പ്രവർത്തിക്കുന്നതിനിടെ കണ്ടെത്താനിടയുള്ളതിനാൽ, ആവശ്യമായാൽ ചികിത്സാ രീതികൾ മാറ്റുകയോ കൂട്ടിച്ചേർക്കുകയോ ചെയ്യേണ്ടി വരാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. സാധാരണ റസ്റ്റോറേറ്റീവ് ചികിത്സകൾക്ക് ശേഷം റൂട്ട് കനാൽ ചികിത്സ ആവശ്യമായി വരുന്നതുപോലുള്ള സാഹചര്യം ഉണ്ടായേക്കാം. ആവശ്യമായ എല്ലാ മാറ്റങ്ങളും കൂട്ടിച്ചേർക്കലുകളും നടത്താൻ ഞാൻ ദന്തഡോക്ടറിന് അനുമതി നൽകുന്നു."
+        },
+        {
+          "heading": "4. ടെംപറോമാൻഡിബുലർ ജോയിന്റ് (TMJ) സംബന്ധമായ പ്രശ്നങ്ങൾ",
+          "body": "സാധാരണ ദന്തചികിത്സയ്ക്കിടെ വായ് ഏറെ നേരം തുറന്ന നിലയിൽ വയ്ക്കുന്നതിനാൽ താഴ്‌വായി സന്ധിയിൽ (ചെവിക്കരികിലെ ജോയിന്റ്) ക്ലിക്ക് ശബ്ദം, പൂട്ടൽ, വേദന എന്നിവ പോലുള്ള TMJ ലക്ഷണങ്ങൾ ഉണ്ടാകാനോ വർധിക്കാനോ ഇടയുണ്ടെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. എങ്കിലും ഇത്തരത്തിലുള്ള ലക്ഷണങ്ങൾ പലപ്പോഴും താത്കാലികവുമാണ്, ഭൂരിഭാഗം രോഗികളും അത് സഹിച്ചുപോകാറുണ്ട്. ഇതിന് പ്രത്യേക ചികിത്സ ആവശ്യമുണ്ടെങ്കിൽ വിദഗ്ധന്റെ അടുത്തേക്ക് റഫർ ചെയ്യപ്പെടാമെന്നും അതിന്റെ ചെലവ് എന്റെ ഉത്തരവാദിത്വമാണെന്നും ഞാൻ മനസ്സിലാക്കുന്നു."
+        },
+        {
+          "heading": "5. ഫില്ലിംഗുകൾ",
+          "body": "പുതുതായി ഇടുന്ന ഫില്ലിംഗ് പൊട്ടിപ്പോകാതിരിക്കാൻ ആദ്യ 24 മണിക്കൂർ കഠിനമായി ചവയ്ക്കുന്നത് ഒഴിവാക്കി ശ്രദ്ധിക്കണമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. പുതിയ ഫില്ലിംഗിന് ശേഷം കുറച്ച് പല്ല് സംവേദനക്ഷമത അനുഭവപ്പെടുന്നത് സാധാരണമായ അനുബന്ധഫലമാണെന്നും അറിയുന്നു."
+        },
+        {
+          "heading": "6. പല്ല് നീക്കം ചെയ്യൽ",
+          "body": "പല്ല് നീക്കം ചെയ്യുന്നതിനുള്ള ബദൽ ചികിത്സകൾ (റൂട്ട് കനാൽ ചികിത്സ, ക്രൗൺ, പെരിയോഡോണ്ടൽ സർജറി മുതലായവ) എനിക്ക് വിശദീകരിച്ചിട്ടുണ്ട്. പാരഗ്രാഫ് 3-ൽ പറഞ്ഞ കാരണങ്ങളാൽ ആവശ്യമായ പല്ലുകളെയും മറ്റു ആവശ്യമായ പല്ലുകളെയും നീക്കാൻ ഞാൻ ഡെന്റിസ്റ്റിന് അനുമതി നൽകുന്നു. പല്ല് നീക്കം ചെയ്‌തതുകൊണ്ട് അണുബാധ മുഴുവനായി മാറണമെന്നില്ല; ചിലപ്പോൾ കൂടുതൽ ചികിത്സ ആവശ്യമാകാമെന്നും ഞാൻ മനസ്സിലാക്കുന്നു. പല്ല് നീക്കം ചെയ്യുന്നതുമായി ബന്ധപ്പെട്ട അപകടസാധ്യതകളിൽ വേദന, വീക്കം, അണുബാധ പടരൽ, ഡ്രൈ സോക്കറ്റ്, പല്ല്, അധരം, നാവ്, ചുറ്റുമുള്ള ത്വക്കുകൾ എന്നിവിടങ്ങളിൽ അനുഭൂതി കുറഞ്ഞുപോകൽ (പാരസ്‌തീഷ്യ) ദീർഘകാലം തുടരുക, അത്യപൂർവമായി താടി പൊട്ടൽ എന്നിവ ഉൾപ്പെടാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. ചികിത്സയ്ക്കിടെയോ ശേഷം പ്രശ്നങ്ങൾ ഉണ്ടായാൽ വിദഗ്ധന്റെ ചികിത്സയോ ആശുപത്രിവാസമോ ആവശ്യമായി വരാനിടയുണ്ട്; അതിന്റെ ചെലവും എന്റെ ഉത്തരവാദിത്വമായിരിക്കും."
+        },
+        {
+          "heading": "7. ക്രൗൺ, ബ്രിഡ്ജ്, വിനീയർ, ബോണ്ടിംഗ്",
+          "body": "സ്വാഭാവിക പല്ലുകളുടെ നിറത്തോട് കൃത്രിമ പല്ലുകളുടെ നിറം എല്ലായ്പ്പോഴും കൃത്യമായി ഒത്തുചേരണമെന്നില്ലെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. താത്കാലിക ക്രൗണുകൾ ഉപയോഗിക്കുന്നുണ്ടെങ്കിൽ അവ എളുപ്പത്തിൽ അഴിയാനിടയുള്ളതിനാൽ സ്ഥിര ക്രൗൺ ഘടിപ്പിക്കുന്നതുവരെ അവ സൂക്ഷിച്ചുനടക്കേണ്ടതുണ്ടെന്നും മനസ്സിലാക്കുന്നു. പുതിയ ക്രൗൺ, ബ്രിഡ്ജ്, ക്യാപ് എന്നിവയുടെ ആകൃതി, പൊരുത്തം, വലുപ്പം, സ്ഥാപനം, നിറം എന്നിവയിൽ അന്തിമ മാറ്റങ്ങൾ സിമെന്റേഷൻ മുമ്പ് മാത്രമേ ചെയ്യാൻ കഴിയൂ എന്നും എനിക്ക് വ്യക്തമാക്കി. വളരെ അപൂർവമായി കോസ്മറ്റിക് ചികിത്സകൾക്ക് ശേഷം ഭാവിയിൽ റൂട്ട് കനാൽ ചികിത്സ ആവശ്യമാകാനിടയുണ്ടെന്നും അത് മുമ്പ് കൃത്യമായി പ്രവചിക്കാനാകില്ലെന്നും ഞാൻ മനസ്സിലാക്കുന്നു. ഇത്തരത്തിലുള്ള ചികിത്സകൾ പല്ലിന്റെ ഉപരിതലത്തെ ബാധിക്കാനും ദൈനംദിന ശുചീകരണ രീതികൾ മാറ്റേണ്ടതായി വരാനും ഇടയുണ്ട്."
+        },
+        {
+          "heading": "8. പൂർണ്ണമോ ഭാഗികമോ ആയ ഡെഞ്ചറുകൾ",
+          "body": "പൂർണ്ണമോ ഭാഗികമോ ആയ ഡെഞ്ചറുകൾ പ്ലാസ്റ്റിക്, ലോഹം, പോഴ്‌സലിന്‍ തുടങ്ങിയ വസ്തുക്കളാൽ നിർമ്മിച്ച കൃത്രിമ ഉപകരണങ്ങളാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. ഇത്തരത്തിലുള്ള ഉപകരണങ്ങൾ ഉപയോഗിക്കുമ്പോൾ അയവ്, വേദന, മുറിവ്, പൊട്ടൽ എന്നിവ പോലുള്ള പ്രശ്നങ്ങൾ ഉണ്ടാകാമെന്ന് എനിക്ക് വിശദീകരിച്ചിട്ടുണ്ട്. പുതിയ ഡെഞ്ചറിന്റെ ആകൃതി, പൊരുത്തം, വലുപ്പം, സ്ഥാപനം, നിറം എന്നിവയിൽ മാറ്റങ്ങൾ വരുത്താനുള്ള അവസാന അവസരം \"ടീത്ത് ഇൻ വാക്സ്\" ട്രൈ-ഇൻ സന്ദർശനത്തിലാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. ഭൂരിഭാഗം ഡെഞ്ചറുകൾക്കും ഘടിപ്പിച്ചതിന് ശേഷം ഏകദേശം മൂന്ന് മുതൽ പന്ത്രണ്ട് മാസം വരെ കഴിഞ്ഞ് റീലൈനിംഗ് ആവശ്യമാകാമെന്നും അതിന്റെ ചെലവ് ആദ്യ ഡെഞ്ചർ ഫീസിൽ ഉൾപ്പെടുന്നതല്ലെന്നും ഞാൻ മനസ്സിലാക്കുന്നു."
+        },
+        {
+          "heading": "9. എൻഡോഡോണ്ടിക് ചികിത്സ (റൂട്ട് കനാൽ)",
+          "body": "റൂട്ട് കനാൽ ചികിത്സ എന്റെ പല്ല് നിർബന്ധമായും രക്ഷിക്കുമെന്നുറപ്പ് ഇല്ലെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു. ചികിത്സയ്ക്കിടെ ചില സങ്കീർണതകൾ ഉണ്ടാകാം; ചിലപ്പോൾ ചെറിയ ലോഹോപകരണങ്ങൾ പല്ലിനുള്ളിൽ സിമെന്റുചെയ്യപ്പെടുകയോ വേരിന് പുറത്തേക്ക് നീളുകയോ ചെയ്യാം, എന്നാൽ അതൊന്നുകൊണ്ട് മാത്രം ചികിത്സ പരാജയപ്പെടണമെന്നില്ല. ചില സാഹചര്യങ്ങളിൽ റൂട്ട് കനാൽ ചികിത്സയ്ക്കു ശേഷം അധിക ശസ്ത്രക്രിയകൾ (ഉദാ: ആപ്പിക്കോഎക്ടമി) ആവശ്യമായി വരാമെന്നും ഞാൻ മനസ്സിലാക്കുന്നു."
+        },
+        {
+          "heading": "10. പെരിയോഡോണ്ടൽ ചികിത്സ",
+          "body": "എനിക്ക് മോണ അണുബാധയും അല്ലെങ്കിൽ അസ്ഥിനാശവും ഉണ്ടാക്കുന്ന ഗൗരവമുള്ള അവസ്ഥയുണ്ടെന്നും അത് പല്ലുകൾ നഷ്ടപ്പെടാൻ കാരണമാകാമെന്നും ഞാൻ മനസ്സിലാക്കുന്നു. ശസ്ത്രക്രിയയില്ലാത്ത ക്ലീനിംഗ്, മോണ ശസ്ത്രക്രിയ, പല്ല് നീക്കം ചെയ്യൽ തുടങ്ങിയ ബദൽ ചികിത്സാ പദ്ധതികളും എനിക്ക് വിശദീകരിച്ചിട്ടുണ്ട്. ചികിത്സയുടെ വിജയം ഭാഗികമായി ഞാൻ ദിവസേന ശരിയായി ബ്രഷ് ചെയ്യുകയും ഫ്ലോസ് ചെയ്യുകയും നിർദ്ദേശിച്ച ക്ലീനിംഗുകൾ സ്വീകരിക്കുകയും ആരോഗ്യകരമായ ആഹാരരീതി പാലിക്കുകയും പുകയില ഒഴിവാക്കുകയും മറ്റ് നിർദേശങ്ങൾ പിന്തുടരുകയും ചെയ്യുന്നതിൽ ആശ്രയിച്ചിരിക്കുന്നുവെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു."
+        }
+      ],
+      "text": "പരിശോധന, രോഗനിർണയം, ചികിത്സാ പദ്ധതി എന്നിവ പൂർണ്ണമാക്കുന്നതിനായി ആദ്യ സന്ദർശനത്തിൽ എക്‌സ്-റേ ചിത്രങ്ങൾ ആവശ്യമായി വരാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.\n\n{condition} എന്ന അവസ്ഥയ്ക്ക് {procedure} എന്ന ചികിത്സ {doctor} നിർദേശിച്ചതായി എനിക്ക് വിശദീകരിച്ചിട്ടുണ്ട്. ചികിത്സയ്ക്കിടെ മുമ്പ് കണ്ടെത്താനാകാത്ത അവസ്ഥകൾ കണ്ടെത്തുകയാണെങ്കിൽ ആവശ്യമായ മാറ്റങ്ങളും കൂട്ടിച്ചേർക്കലുകളും നടത്താൻ ഞാൻ സമ്മതിക്കുന്നു."
+    },
+    "endodontic": {
+      "title": "റൂട്ട് കനാൽ ചികിത്സ സമ്മതപത്രം",
+      "sections": [
+        "എന്നോട് റൂട്ട് കനാൽ/നേര് ചികിത്സ ചെയ്യേണ്ടതാണെന്ന് ദന്ത രോഗ വിദഗ്ധൻ വിശദീകരിച്ചിട്ടുണ്ട്.",
+        "റൂട്ട് കനാൽ ചികിത്സ എന്നത് സാധാരണ രീതിയിൽ അടച്ച് സംരക്ഷിക്കാൻ സാധിക്കാത്തതോ, അല്ലെങ്കിൽ നീക്കം ചെയ്യേണ്ടതായി വരാനിടയുള്ളതോ ആയ പല്ലിനെ സംരക്ഷിക്കാനായി നടത്തുന്ന ചികിത്സയാണ്.",
+        "ഈ ചികിത്സയ്ക്ക് നല്ല വിജയശതമാനം ഉണ്ടെങ്കിലും, മറ്റേതു ദന്തചികിത്സകളെപ്പോലെ തന്നെ ഫലത്തെക്കുറിച്ച് ഉറപ്പ് നൽകാൻ സാധിക്കില്ലെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "റൂട്ട് കനാൽ ചികിത്സ ഇപ്പോൾ നിലവിലുള്ളതോ ഉണ്ടാകാൻ സാധ്യതയുള്ളതോ ആയ ഒരു പ്രശ്നം പരിഹരിക്കുന്നതിനാണ്; ഭാവിയിൽ സമാനമായ ദന്തപ്രശ്നങ്ങൾ വീണ്ടും ഉണ്ടാകാതിരിക്കാൻ ഇത് പൂർണ്ണ ഉറപ്പ് നൽകുന്നില്ല.",
+        "ചില സാഹചര്യങ്ങളിൽ വീണ്ടും ചികിത്സ ആവശ്യമായേക്കാം; ആവശ്യമായാൽ ശസ്ത്രക്രിയ ചെയ്യുകയോ, പല്ല് തന്നെ നീക്കം ചെയ്യേണ്ടി വരുകയോ, താഴെ പറയുന്നതിനു പുറമേ മറ്റ് പാർശ്വഫലങ്ങൾ ഉണ്ടാകുകയോ ചെയ്യാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സ നടപടിയുമായി ബന്ധപ്പെട്ടും, അനസ്‌തേഷ്യ മൂലമോ ഉണ്ടാകാവുന്ന അപൂർവ അപകടസാധ്യതകളെക്കുറിച്ചും എന്നോട് വിശദീകരിച്ചിട്ടുണ്ട്.",
+        "റൂട്ട് കനാൽ ചികിത്സയ്ക്ക് ഉപയോഗിക്കുന്ന മരുന്നുകളോ ഫില്ലിംഗ് പദാർത്ഥങ്ങളോ ശരീരത്തിൽ പാർശ്വഫലങ്ങൾ ഉണ്ടാക്കാം.",
+        "ചികിത്സ സമയത്ത് പല്ലിനുള്ളിൽ ഉപയോഗിക്കുന്ന ചില ഉപകരണങ്ങളോ വസ്തുക്കളോ ഒടിഞ്ഞ് പോകുകയോ അബദ്ധത്തിൽ വിഴുങ്ങിപ്പോകുകയോ ചെയ്യാം.",
+        "വായ് തുറക്കുന്നതിൽ ബുദ്ധിമുട്ട് ഉണ്ടെങ്കിൽ അതിനായി കൂടുതൽ ചികിത്സ ആവശ്യമായി വരാം.",
+        "റൂട്ട് കനാൽ ചെയ്ത പല്ലിൽ പൊട്ടൽ, പല്ലിന്റെ ഭാഗങ്ങൾക്ക് ഇളക്കം, വേരിനുള്ളിൽ തുള (പെർഫറേഷൻ), അല്ലെങ്കിൽ കനാലിനെ തടസ്സപ്പെടുത്തുന്ന വസ്തുക്കൾ ഉണ്ടാകൽ പോലുള്ള ബുദ്ധിമുട്ടുകൾ ഉണ്ടാകാം.",
+        "പല്ലിന്റെ വേരിന്റെ അടിഭാഗത്ത് ഉള്ള അണുബാധ ഭേദമാകാതിരിക്കുകയോ, പെുപ്പ് രൂപപ്പെടുകയോ ചെയ്താൽ മരുന്ന് കഴിക്കേണ്ടി വരാം; ആവശ്യമായാൽ ശസ്ത്രക്രിയയോ പല്ല് നീക്കം ചെയ്യലോ വേണ്ടിവരും.",
+        "പല്ലുകളുടെ സമീപമുള്ള ഞരമ്പുകൾക്ക് ക്ഷതം സംഭവിക്കാമെന്നും, അതിനാൽ താടി, ചുണ്ട്, കവിൾ, മോണ, നാവ് എന്നിവിടങ്ങളിൽ വേദന, മരവിപ്പ്, കടിച്ചിൽ, അല്ലെങ്കിൽ മറ്റ് അസ്വസ്ഥതകൾ ഉണ്ടാകാമെന്നും, അത് ആഴ്ചകളോളം, മാസങ്ങളോളം, അപൂർവമായി സ്ഥിരമായും തുടരാമെന്നും ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "റൂട്ട് കനാൽ ചികിത്സയ്ക്ക് ശേഷം ഒരു മാസത്തിനകം പല്ലിന് ക്യാപ്/ക്രൗൺ ചികിത്സയോ പ്രത്യേക ഫില്ലിങ്ങുകളോ ചെയ്യേണ്ടത് നിർബന്ധമാണെന്ന് എനിക്ക് അറിയിച്ചിട്ടുണ്ട്.",
+        "അത് ചെയ്തില്ലെങ്കിൽ പല്ല് പൊട്ടിപ്പോകാനും, ചികിത്സ ഫലപ്രദമാകാതിരിക്കാനും സാധ്യതയുണ്ടെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സയുമായി ബന്ധപ്പെട്ട ചോദ്യങ്ങൾ ചോദിക്കാനും, എന്റെ ആശങ്കകൾ ഡോക്ടറുമായി ചർച്ച ചെയ്യാനും എനിക്ക് അവസരം ലഭിച്ചിട്ടുണ്ട്.",
+        "തിരഞ്ഞെടുക്കപ്പെട്ട അനസ്‌തേഷ്യ രീതിയുടെ പാർശ്വഫലങ്ങളും, റൂട്ട് കനാൽ ചികിത്സയ്ക്കിടെയോ ചികിത്സയ്ക്ക് ശേഷമോ ഉണ്ടാകാവുന്ന കോംപ്ലിക്കേഷനുകളും എന്നോട് വിശദീകരിച്ചിട്ടുണ്ട്.",
+        "കൺസൾട്ടേഷനിൽ എനിക്ക് അവതരിപ്പിച്ച ചികിത്സാരീതി, ചികിത്സാ പദ്ധതി എന്നിവ മനസ്സിലാക്കി ഞാൻ ഈ ചികിത്സയ്ക്ക് സമ്മതം നൽകുന്നു.",
+        "ഈ സമ്മതപത്രം ഞാൻ വായിക്കുകയും പൂർണ്ണമായി മനസ്സിലാക്കുകയും ചെയ്തതായി ഇതുവഴി സാക്ഷ്യപ്പെടുത്തുന്നു."
+      ]
+    },
+    "oral_surgery": {
+      "title": "ഓറൽ സർജറി / പല്ല് നീക്കം ചെയ്യൽ സമ്മതപത്രം",
+      "sections": [
+        "നിർദ്ദേശിച്ച ശസ്ത്രക്രിയയുടെ സ്വഭാവം, അനസ്‌തീഷ്യ ഓപ്ഷനുകൾ, ബദൽ മാർഗങ്ങൾ എന്നിവ ഡോക്ടർ വിശദീകരിച്ചു.",
+        "വേദന, വീക്കം, രക്തസ്രാവം, ഡ്രൈ സോക്കറ്റ്, വായ് തുറക്കുന്നതിലെ ബുദ്ധിമുട്ട്, അപൂർവമായി നാഡീസംബന്ധമായ മന്ദത എന്നിവ സാധ്യതയുള്ള അപകടങ്ങളാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചില അപൂർവ സാഹചര്യങ്ങളിൽ കൂടുതൽ ചികിത്സയോ വിദഗ്ധ റഫറലോ ആവശ്യമാകാമെന്ന് അറിയാം. നിർദ്ദേശിച്ച {procedure} ചികിത്സയ്ക്ക് ഞാൻ സമ്മതിക്കുന്നു."
+      ]
+    },
+    "implants": {
+      "title": "ഡെന്റൽ ഇംപ്ലാന്റ് ചികിത്സ",
+      "sections": [
+        "വയസ്സ് ........................... [ സ്ത്രീ / പുരുഷൻ ], [ എന്ന ഞാൻ / എന്ന രോഗിയുടെ ബൈസ്റ്റാൻഡർ ], എന്റെ നഷ്ടപ്പെട്ടതോ കേടായതോ ആയ പല്ല് മാറ്റിസ്ഥാപിക്കുന്നതിനുള്ള ഡെന്റൽ ഇംപ്ലാന്റ് ശസ്ത്രക്രിയയും, പ്രോസ്തെറ്റിക് പ്ലേസ്മെന്റ് പ്രക്രിയയും ചെയ്യുന്നതിനുള്ള ശസ്ത്രക്രിയയുടെ സ്വഭാവം, ഉദ്ദേശിക്കുന്ന ചികിത്സാരീതി, അതിന്റെ നടപടിക്രമം, അപകടസാധ്യതകളും നേട്ടങ്ങളും, ചികിത്സയുടെ സമയക്രമം, തിരഞ്ഞെടുത്ത അനസ്തേഷ്യയും, ലഭ്യമായ ബദൽ ചികിത്സകളും, തുടർനടപടികളുടെയും, സ്വയംപരിചരണത്തിന്റെ ആവശ്യകതയെക്കുറിച്ചും എന്നെ പൂർണ്ണമായി അറിയിച്ചിട്ടുണ്ട്.",
+        "ചികിത്സയെ സംബന്ധിച്ച സംശയങ്ങൾ ചോദിക്കാനും, എന്റെ ആശങ്കകൾ ഡോക്ടറുമായി ചർച്ച ചെയ്യാനും എനിക്ക് അവസരം ലഭിച്ചിട്ടുണ്ട്. തിരഞ്ഞെടുത്ത അനസ്തേഷ്യ മൂലം ഉണ്ടാകാവുന്ന കോംപ്ലിക്കേഷൻസും പാർശ്വഫലങ്ങളും, ഡെന്റൽ ഇംപ്ലാന്റ് ശസ്ത്രക്രിയയും, പ്രോസ്തെറ്റിക് പ്ലേസ്മെന്റ് പ്രക്രിയയും, അതിന്റെ സർജിക്കൽ കോംപ്ലിക്കേഷൻസും, ഏകദേശ ചിലവും എന്നോട് വിവരിച്ചിട്ടുണ്ട്.",
+        "കൺസൾട്ടേഷനിൽ എനിക്ക് അവതരിപ്പിച്ച ഡെന്റൽ ഇംപ്ലാന്റ് ശസ്ത്രക്രിയയും, പ്രോസ്തെറ്റിക് പ്ലേസ്മെന്റ് പ്രക്രിയയും, അതിന്റെ സമയക്രമം ഉൾപ്പെടെ എനിക്ക് വിവരിച്ചു തന്ന പ്രകാരം, ഞാൻ ഇതിനാൽ സമ്മതിക്കുന്നു."
+      ]
+    },
+    "periodontal": {
+      "title": "പെരിയോഡോണ്ടൽ ശസ്ത്രക്രിയ സമ്മതപത്രം",
+      "sections": [
+        "ഗം/പെരിയോഡോണ്ടൽ രോഗാവസ്ഥയുടെ ഗുരുത്വവും ചികിത്സയുടെ ആവശ്യകതയും എനിക്ക് വിശദീകരിച്ചു.",
+        "ചികിത്സയ്ക്കുശേഷം വേദന, വീക്കം, സെൻസിറ്റിവിറ്റി, പല്ലുകൾക്കിടയിലെ ഇടവേള മാറ്റങ്ങൾ, ചിലപ്പോള്‍ ദീർഘകാല അസ്വസ്ഥതകൾ ഉണ്ടാകാം എന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സയുടെ വിജയത്തിൽ സ്വയംപരിപാലനം, പുകവലി/മദ്യം ഒഴിവാക്കൽ, സ്ഥിരമായ ഫോളോ-അപ്പ് എന്നിവ നിർണായകമാണെന്ന് എനിക്ക് അറിയാം."
+      ]
+    },
+    "pediatric": {
+      "title": "കുട്ടികളുടെ ദന്തചികിത്സ സമ്മതപത്രം",
+      "sections": [
+        "ഞാൻ കുട്ടിയുടെ രക്ഷിതാവ്/നിയമപരമായ സംരക്ഷകനാണ്. നിർദ്ദേശിച്ച ചികിത്സയുടെ സ്വഭാവം, അപകടസാധ്യതകൾ, അനസ്‌തീഷ്യയും പെരുമാറ്റ നിയന്ത്രണ മാർഗങ്ങളും എനിക്ക് വിശദീകരിച്ചു.",
+        "ചികിത്സയ്ക്കിടെ അല്ലെങ്കിൽ ശേഷമോ ചില അപൂർവ മെഡിക്കൽ/ശസ്ത്രക്രിയാ പ്രശ്നങ്ങൾ ഉണ്ടായേക്കാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "എന്റെ കുട്ടിയുടെ ദന്താരോഗ്യം സംരക്ഷിക്കാൻ നിർദ്ദേശിച്ച {procedure} ചികിത്സയ്ക്ക് ഞാൻ സമ്മതം നൽകുന്നു."
+      ]
+    },
+    "orthodontic": {
+      "title": "ദന്തക്രമീകരണ ചികിത്സ സമ്മതപത്രം",
+      "sections": [
+        "ഞാൻ / എന്റെ രോഗിയുടെ രക്ഷിതാവ് / സഹായിയായി, പല്ല് ക്രമീകരണ ചികിത്സയുടെ സ്വഭാവം, രീതി, ലഭ്യമായ ബദൽ മാർഗങ്ങൾ, നടപടിക്രമങ്ങൾ, ഏകദേശ സമയം, നേട്ടങ്ങൾ, വരാനിടയുള്ള ബുദ്ധിമുട്ടുകൾ, തുടർനടപടികൾ, സ്വയംപരിചരണത്തിന്റെ ആവശ്യകത എന്നിവ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സയുടെ അപ്പോയിന്റ്മെന്റുകൾ കൃത്യമായി പാലിക്കേണ്ടതും, ചികിത്സയ്ക്കിടയിലും ശേഷവും വായ് ശുചിത്വം പാലിക്കേണ്ടതിന്റെ പ്രാധാന്യവും ഡോക്ടർ {doctor} വിശദീകരിച്ചിട്ടുണ്ട്.",
+        "താഴെപ്പറയുന്ന കാര്യങ്ങൾ ശ്രദ്ധിക്കണമെന്നും, അപൂർവമായി ചില ബുദ്ധിമുട്ടുകൾ ഉണ്ടാകാമെന്നും ഞാൻ മനസ്സിലാക്കുന്നു. ചികിത്സയുമായി ബന്ധപ്പെട്ട ചോദ്യങ്ങൾ ചോദിക്കാനും സംശയദൂരീകരണം നേടാനും എനിക്ക് അവസരം ലഭിച്ചിട്ടുണ്ട്.",
+        "ചികിത്സയുടെ ഭാഗമായി ആവശ്യമായ സാഹചര്യങ്ങളിൽ പല്ല് നീക്കം ചെയ്യേണ്ടിവരാമെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സാകാലയളവിൽ ദന്തശുചിത്വം കൃത്യമായി പാലിക്കാത്ത പക്ഷം മോണരോഗവും ദന്തക്ഷയവും ഉണ്ടാകാൻ സാധ്യതയുണ്ട്.",
+        "പല്ല് ദ്വാരം തടയുന്നതിനും ദന്തക്ഷയം കുറയ്ക്കുന്നതിനുമായി പ്രത്യേക പേസ്റ്റുകളും മൗത്ത് വാഷും ഉപയോഗിക്കണമെന്ന് നിർദ്ദേശം ലഭിച്ചിട്ടുണ്ട്.",
+        "ശരിയായ രീതിയിൽ ഓർത്തോ ടൂത്ത്‌ബ്രഷ് ഉപയോഗിച്ച് പല്ലുതേക്കേണ്ട വിധം എനിക്ക് പഠിപ്പിച്ചിട്ടുണ്ട്.",
+        "മുമ്പേ ക്ഷതം സംഭവിച്ച അല്ലെങ്കിൽ ക്ഷയമുള്ള പല്ലുകൾ സമയക്രമത്തിൽ നിർജീവമാകാൻ സാധ്യതയുണ്ട്; ഇത് ചികിത്സ മൂലമോ മറ്റു കാരണങ്ങളാലോ സംഭവിക്കാം.",
+        "ക്ഷയം/കാവിറ്റി അടച്ചുപൂട്ടാതെ വിട്ടാൽ അത് കൂടുതൽ വലുതാകാമെന്ന് എനിക്ക് അറിയിച്ചിട്ടുണ്ട്.",
+        "ചികിത്സയുടെ ഭാഗമായി പല്ലുകൾക്ക് വേദനയോ അസ്വസ്ഥതയോ ഉണ്ടായേക്കാം.",
+        "ഡോക്ടറുടെ നിർദ്ദേശങ്ങൾ കൃത്യമായി പാലിക്കാത്ത പക്ഷം അപ്ലയൻസുകൾ മൂലം വായ്ക്കുള്ളിൽ മുറിവുകൾ ഉണ്ടാകാം; അത്തരം സാഹചര്യത്തിൽ ഉപയോഗിക്കേണ്ട മരുന്ന്/ജെൽ സംബന്ധിച്ച് നിർദ്ദേശം ലഭിച്ചിട്ടുണ്ട്.",
+        "ഓരോ വ്യക്തിയുടെയും വളർച്ചാനിരക്ക്, ചികിത്സയോടുള്ള സഹകരണം, അപ്ലയൻസുകളുടെ ഉപയോഗരീതി തുടങ്ങിയവ ചികിത്സാദൈർഘ്യം വർദ്ധിപ്പിക്കാം.",
+        "ഡോക്ടർ നിർദ്ദേശിച്ച ദിവസങ്ങളിൽ ചികിത്സ തുടരാതിരുന്നാൽ ആകെ ചികിത്സാകാലം കൂടാനിടയുണ്ടെന്ന് എനിക്ക് അറിയിച്ചിട്ടുണ്ട്.",
+        "അപൂർവമായി ചിലർക്കു ചുണ്ട്, കവിൾ, താടി-സന്ധി എന്നിവിടങ്ങളിൽ വേദന, അപ്ലയൻസിന്റെ ഭാഗങ്ങൾ വിഴുങ്ങിപ്പോകൽ, അലർജി, പല്ലുകളുടെ ഇളക്കം തുടങ്ങിയ ബുദ്ധിമുട്ടുകൾ ഉണ്ടാകാം.",
+        "ഭക്ഷണാവശിഷ്ടങ്ങൾ പല്ലുകളും ബ്രാക്കറ്റുകളും ഇടയിൽ കുടുങ്ങിയാൽ പല്ലിന്റെ നിറംമാറ്റം, ഉപരിതല തകരാർ, ദന്തക്ഷയം എന്നിവ സംഭവിക്കാം.",
+        "ചികിത്സയ്ക്കിടെ ഭക്ഷണക്രമത്തിൽ നിയന്ത്രണം വേണമെന്നും, ചികിത്സയ്ക്ക് ശേഷം ആവശ്യമെങ്കിൽ ടൂത്ത് വൈറ്റനിംഗ് പോലുള്ള അധിക നടപടികൾക്ക് പ്രത്യേക ചെലവ് ഉണ്ടായേക്കാമെന്നും എനിക്ക് അറിയിച്ചിട്ടുണ്ട്.",
+        "ചികിത്സ പൂർത്തിയാകുന്നതിനു മുമ്പ് ബ്രേസ്സ് നീക്കിയാൽ പല്ലുകൾ പഴയ നിലയിലേക്ക് മടങ്ങാനുള്ള (റിലാപ്സ്) സാധ്യതയുണ്ടെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ചികിത്സ കഴിഞ്ഞ ശേഷവും പല്ലുകളുടെ സ്ഥാനം നിലനിർത്താൻ റിമൂവബിൾ അല്ലെങ്കിൽ ഫിക്സ്ഡ് റിട്ടെയ്‌നർ ഡോക്ടർ നിർദ്ദേശിക്കുന്ന കാലയളവിൽ ധരിക്കണം; അതിന് അധിക ചെലവ് ഉണ്ടായേക്കാം.",
+        "റിട്ടെയ്‌നർ ശരിയായി ഉപയോഗിക്കാത്ത പക്ഷം റിലാപ്സ് വേഗത്തിൽ ഉണ്ടാകാമെന്ന് എനിക്ക് വ്യക്തമാക്കിയിട്ടുണ്ട്.",
+        "ചികിത്സാ കാലയളവിൽ മാസാന്തരമായി നിശ്ചിത തുക നൽകേണ്ടതും, ബ്രാക്കറ്റ് നഷ്ടപ്പെട്ടാൽ പുനഃസ്ഥാപനത്തിന് അധികചെലവ് ഉണ്ടായേക്കാമെന്നും എനിക്ക് അറിയിച്ചിട്ടുണ്ട്.",
+        "വയസ്സാകുന്നതും താടി/എല്ല് വളർച്ചയുമായി ബന്ധപ്പെട്ട മാറ്റങ്ങളും കാരണം, പ്രത്യേകിച്ച് മുന്നിലെ പല്ലുകളുടെ നിരയിൽ വീണ്ടും ചെറിയ തെറ്റിച്ചേരൽ സംഭവിക്കാം; അത് ശരിയാക്കാൻ ഭാവിയിൽ വീണ്ടും ഫിക്സ്ഡ് ചികിത്സയോ ചിലപ്പോൾ ശസ്ത്രക്രിയയോ ആവശ്യമാകാം.",
+        "രോഗിയുടെ പൂർണ്ണ സഹകരണം ലഭ്യമല്ലാത്ത സാഹചര്യത്തിൽ ചികിത്സ അവസാനിപ്പിക്കാൻ ഡോക്ടർക്ക് പൂർണ്ണ അധികാരമുണ്ടെന്ന് ഞാൻ അംഗീകരിക്കുന്നു.",
+        "രോഗിയുടെ അസഹകരണത്തെ തുടർന്ന് ഉണ്ടാകുന്ന പ്രശ്നങ്ങൾക്ക് ഡോക്ടർക്കും സ്ഥാപനത്തിനും ഉത്തരവാദിത്തമില്ലെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ഫോട്ടോകൾ, എക്സ്-റേകൾ, സ്റ്റഡി മോഡലുകൾ, ചികിത്സയുമായി ബന്ധപ്പെട്ട മറ്റ് വിവരങ്ങൾ ഗവേഷണം, പഠനം, പ്രസിദ്ധീകരണം എന്നിവയ്ക്കായി ഉപയോഗിക്കാൻ ഞാൻ സമ്മതം നൽകുന്നു.",
+        "എന്റെ വ്യക്തിപരമായ കാരണങ്ങളാൽ ചികിത്സ മധ്യേ നിർത്തുകയാണെങ്കിൽ മുഴുവൻ ചികിത്സച്ചെലവും അടയ്ക്കാനുള്ള ബാധ്യത എന്റേതാണെന്ന് ഞാൻ മനസ്സിലാക്കുന്നു.",
+        "ദന്തക്രമീകരണ ചികിത്സാവിധികളും അതിന്റെ അനന്തരഫലങ്ങളും എനിക്ക് സംശയാതീതമായി വിശദീകരിച്ചിട്ടുണ്ടെന്നും, നിർദ്ദേശിച്ച രീതിയിൽ ചികിത്സ തുടരാൻ ഞാൻ പൂർണ്ണ സമ്മതം നൽകുന്നതായും ഇതുവഴി സാക്ഷ്യപ്പെടുത്തുന്നു."
+      ]
+    },
+    "prosthodontic": {
+      "title": "ക്രൗൺ / ബ്രിഡ്ജ് / ഡെഞ്ചർ സമ്മതപത്രം",
+      "sections": [
+        "ക്രൗൺ, ബ്രിഡ്ജ്, ഭാഗിക/പൂർണ്ണ കൃത്രിമ പല്ലുകൾ എന്നിവയുടെ ഗുണദോഷങ്ങളും ബദൽ മാർഗങ്ങളും എനിക്ക് വിശദീകരിച്ചു.",
+        "പുതിയ പ്രോസ്തീസിസ് ഉപയോഗത്തിന്റെ തുടക്കത്തിൽ സംസാരിക്കലിലും ഭക്ഷണം കഴിക്കലിലും അസൗകര്യം ഉണ്ടാകാം. ഫിറ്റ് മെച്ചപ്പെടുത്താൻ അധിക സന്ദർശനങ്ങൾ ആവശ്യമായി വരാം.",
+        "കാലക്രമേണ റിപയർ, റീലൈനിംഗ്, റീസിമെന്റേഷൻ, പുനഃക്രമീകരണം എന്നിവ ആവശ്യമായി വരാം. നിർദ്ദേശിച്ച ശുചിത്വവും ഫോളോ-അപ്പും പാലിക്കുമെന്ന് ഞാൻ ഉറപ്പുനൽകുന്നു."
+      ]
+    }
+  }
+}

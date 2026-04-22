@@ -10,6 +10,7 @@ DEFAULT_ALLOWED_PAGES = [
     "appointments",
     "patients",
     "prescriptions",
+    "consent_forms",
     "invoice",
     "financial_dashboard",
     "whatsapp-manager",
@@ -84,6 +85,14 @@ def get_practitioner_permissions(practitioner_doc) -> Dict[str, Any]:
 
     if not allowed_pages:
         allowed_pages = DEFAULT_ALLOWED_PAGES if is_clinic_admin else NON_ADMIN_DEFAULT_PAGES
+    elif is_clinic_admin:
+        # Backward compatibility: older admin permission blobs may miss newly introduced pages.
+        # Admins should retain access to all configured application sections.
+        allowed_pages = list(dict.fromkeys([*allowed_pages, *DEFAULT_ALLOWED_PAGES]))
+    elif "prescriptions" in allowed_pages and "consent_forms" not in allowed_pages:
+        # Consent builder lives in the patient prescription workflow.
+        # Keep non-admin users on older permission blobs unblocked.
+        allowed_pages.append("consent_forms")
 
     if is_clinic_admin and "settings" not in allowed_pages:
         allowed_pages.append("settings")

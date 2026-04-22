@@ -179,7 +179,7 @@ class TestPaymentAPI(unittest.TestCase):
             "Healthcare Practitioner",
             cls.practitioner_id,
             "allowed_pages_json",
-            '["home","appointments","patients","prescriptions","invoice","financial_dashboard","whatsapp-manager","settings"]',
+            '["home","appointments","patients","prescriptions","consent_forms","invoice","financial_dashboard","whatsapp-manager","settings"]',
         )
         frappe.db.set_value("Healthcare Practitioner", cls.associate_practitioner_id, "primary_company", company)
         
