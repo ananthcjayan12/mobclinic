@@ -407,6 +407,53 @@ def _upload_consent_file(
     return response.get("data") or {}
 
 
+def _upload_consent_pdf(
+    patient_id: str,
+    consent_type_id: str,
+    content_b64: str,
+    file_name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    suffix = frappe.utils.now_datetime().strftime("%Y%m%d%H%M%S")
+    safe_name = (file_name or "").strip() or f"consent-document-{patient_id}-{suffix}.pdf"
+    if not safe_name.lower().endswith(".pdf"):
+        safe_name = f"{safe_name}.pdf"
+
+    return _upload_consent_file(
+        patient_id=patient_id,
+        file_name=safe_name,
+        content_b64=content_b64,
+        description=description or f"Consent document ({consent_type_id})",
+        is_private=1,
+    )
+
+
+def _build_consent_session_payload(payload: Any) -> Dict[str, Any]:
+    parsed_payload = _parse_json(payload, default={})
+    return parsed_payload if isinstance(parsed_payload, dict) else {}
+
+
+def _serialize_consent_record(doc: Dict[str, Any]) -> Dict[str, Any]:
+    payload = _parse_json(doc.get("payload_json"), default={})
+    return {
+        "name": doc.get("name"),
+        "status": doc.get("status"),
+        "language": doc.get("language"),
+        "consent_type_id": doc.get("consent_type_id"),
+        "consent_type_label": doc.get("consent_type_label"),
+        "doctor": doc.get("doctor"),
+        "doctor_name": doc.get("doctor_name"),
+        "summary_text": doc.get("summary_text") or "",
+        "signed_on": doc.get("signed_on"),
+        "signed_by": doc.get("signed_by"),
+        "signer_role": doc.get("signer_role"),
+        "creation": doc.get("creation"),
+        "modified": doc.get("modified"),
+        "consent_file_id": doc.get("consent_file"),
+        "payload": payload if isinstance(payload, dict) else {},
+    }
+
+
 def _session_from_token(token: str):
     session_name = frappe.db.get_value("Consent Form Session", {"token": token}, "name")
     if not session_name:
@@ -712,6 +759,8 @@ def accept_shared_consent(
     signer_phone=None,
     signature_data_url=None,
     consent_html=None,
+    consent_pdf_base64=None,
+    consent_pdf_filename=None,
     summary_text=None,
 ):
     try:
@@ -737,17 +786,18 @@ def accept_shared_consent(
         if not signature_b64:
             frappe.throw("Invalid signature payload")
 
-        suffix = frappe.utils.now_datetime().strftime("%Y%m%d%H%M%S")
-        signature_upload = _upload_consent_file(
-            patient_id=session_doc.patient,
-            file_name=f"consent-signature-{session_doc.patient}-{suffix}.png",
-            content_b64=signature_b64,
-            description=f"Consent signature ({session_doc.consent_type_id})",
-            is_private=1,
-        )
-
         consent_upload = {}
-        if consent_html:
+        pdf_b64 = _extract_base64_payload(consent_pdf_base64 or "")
+        if pdf_b64:
+            consent_upload = _upload_consent_pdf(
+                patient_id=session_doc.patient,
+                consent_type_id=session_doc.consent_type_id,
+                content_b64=pdf_b64,
+                file_name=consent_pdf_filename,
+                description=f"Signed consent document ({session_doc.consent_type_id})",
+            )
+        elif consent_html:
+            suffix = frappe.utils.now_datetime().strftime("%Y%m%d%H%M%S")
             encoded_html = base64.b64encode((consent_html or "").encode("utf-8")).decode("utf-8")
             consent_upload = _upload_consent_file(
                 patient_id=session_doc.patient,
@@ -763,7 +813,7 @@ def accept_shared_consent(
         session_doc.signer_role = signer_role if signer_role in {"Patient", "Parent/Guardian"} else "Patient"
         session_doc.signer_phone = signer_phone or ""
         session_doc.summary_text = summary_text or session_doc.summary_text
-        session_doc.signature_file = signature_upload.get("file_id")
+        session_doc.signature_file = None
         if consent_upload.get("file_id"):
             session_doc.consent_file = consent_upload.get("file_id")
         session_doc.ip_address = getattr(frappe.local, "request_ip", None)
@@ -774,7 +824,7 @@ def accept_shared_consent(
             "data": {
                 "session_id": session_doc.name,
                 "status": session_doc.status,
-                "signature_file_id": signature_upload.get("file_id"),
+                "signature_file_id": None,
                 "consent_file_id": consent_upload.get("file_id"),
             },
         }
@@ -790,11 +840,17 @@ def accept_shared_consent(
 def save_consent_artifacts(
     patient_id,
     consent_type_id,
+    consent_type_label=None,
     language="en",
     clinic=None,
     summary_text=None,
     signature_data_url=None,
     consent_html=None,
+    consent_pdf_base64=None,
+    consent_pdf_filename=None,
+    payload=None,
+    signer_name=None,
+    signer_role="Patient",
 ):
     try:
         practitioner, clinic_name = _resolve_context(clinic=clinic, page_key="consent_forms")
@@ -802,21 +858,18 @@ def save_consent_artifacts(
         if not _can_access_patient(practitioner, patient_id, clinic_name):
             frappe.throw("Not permitted to access this patient", frappe.PermissionError)
 
-        suffix = frappe.utils.now_datetime().strftime("%Y%m%d%H%M%S")
-        signature_upload = {}
-        if signature_data_url:
-            signature_b64 = _extract_base64_payload(signature_data_url)
-            if signature_b64:
-                signature_upload = _upload_consent_file(
-                    patient_id=patient_id,
-                    file_name=f"consent-signature-{patient_id}-{suffix}.png",
-                    content_b64=signature_b64,
-                    description=f"Consent signature ({consent_type_id})",
-                    is_private=1,
-                )
-
         consent_upload = {}
-        if consent_html:
+        pdf_b64 = _extract_base64_payload(consent_pdf_base64 or "")
+        if pdf_b64:
+            consent_upload = _upload_consent_pdf(
+                patient_id=patient_id,
+                consent_type_id=consent_type_id,
+                content_b64=pdf_b64,
+                file_name=consent_pdf_filename,
+                description=f"Consent document ({consent_type_id}, {language})",
+            )
+        elif consent_html:
+            suffix = frappe.utils.now_datetime().strftime("%Y%m%d%H%M%S")
             encoded_html = base64.b64encode((consent_html or "").encode("utf-8")).decode("utf-8")
             consent_upload = _upload_consent_file(
                 patient_id=patient_id,
@@ -826,11 +879,50 @@ def save_consent_artifacts(
                 is_private=1,
             )
 
+        parsed_payload = _build_consent_session_payload(payload)
+        status = "Signed" if _extract_base64_payload(signature_data_url or "") else "Created"
+        if consent_upload.get("file_id"):
+            doctor_name = None
+            if practitioner.name and frappe.db.exists("Healthcare Practitioner", practitioner.name):
+                doctor_name = frappe.db.get_value("Healthcare Practitioner", practitioner.name, "practitioner_name")
+
+            session_doc = frappe.get_doc(
+                {
+                    "doctype": "Consent Form Session",
+                    "token": frappe.generate_hash(length=32),
+                    "status": status,
+                    "clinic": clinic_name,
+                    "patient": patient_id,
+                    "doctor": practitioner.name,
+                    "doctor_name": doctor_name,
+                    "consent_type_id": consent_type_id,
+                    "consent_type_label": consent_type_label or parsed_payload.get("consent_type_label") or consent_type_id,
+                    "language": (language or "en").strip().lower() or "en",
+                    "payload_json": json.dumps(parsed_payload, ensure_ascii=False),
+                    "summary_text": summary_text or "",
+                    "signed_on": now_datetime() if status == "Signed" else None,
+                    "signed_by": signer_name or "",
+                    "signer_role": signer_role if signer_role in {"Patient", "Parent/Guardian"} else "Patient",
+                    "consent_file": consent_upload.get("file_id"),
+                }
+            )
+            session_doc.insert(ignore_permissions=True)
+
+            return {
+                "message": "Consent artifacts saved",
+                "data": {
+                    "summary_text": summary_text or "",
+                    "signature_file_id": None,
+                    "consent_file_id": consent_upload.get("file_id"),
+                    "consent_record": _serialize_consent_record(session_doc.as_dict()),
+                },
+            }
+
         return {
             "message": "Consent artifacts saved",
             "data": {
                 "summary_text": summary_text or "",
-                "signature_file_id": signature_upload.get("file_id"),
+                "signature_file_id": None,
                 "consent_file_id": consent_upload.get("file_id"),
             },
         }
@@ -840,5 +932,57 @@ def save_consent_artifacts(
     except Exception as e:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(), "Save Consent Artifacts Error")
+        frappe.local.response["http_status_code"] = 500
+        return {"exc_type": "ServerError", "message": str(e)}
+
+
+@frappe.whitelist(methods=["GET"])
+def list_patient_consents(patient_id, clinic=None):
+    try:
+        practitioner, clinic_name = _resolve_context(clinic=clinic, page_key="consent_forms")
+
+        if not _can_access_patient(practitioner, patient_id, clinic_name):
+            frappe.throw("Not permitted to access this patient", frappe.PermissionError)
+
+        rows = frappe.get_all(
+            "Consent Form Session",
+            filters={
+                "clinic": clinic_name,
+                "patient": patient_id,
+                "consent_file": ["is", "set"],
+            },
+            fields=[
+                "name",
+                "status",
+                "language",
+                "doctor",
+                "doctor_name",
+                "consent_type_id",
+                "consent_type_label",
+                "summary_text",
+                "payload_json",
+                "signed_on",
+                "signed_by",
+                "signer_role",
+                "consent_file",
+                "creation",
+                "modified",
+            ],
+            order_by="creation desc",
+        )
+
+        return {
+            "message": "success",
+            "data": {
+                "patient_id": patient_id,
+                "records": [_serialize_consent_record(row) for row in rows],
+            },
+        }
+    except frappe.PermissionError:
+        frappe.local.response["http_status_code"] = 403
+        return {"exc_type": "PermissionError", "message": "Not permitted"}
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "List Patient Consents Error")
         frappe.local.response["http_status_code"] = 500
         return {"exc_type": "ServerError", "message": str(e)}
