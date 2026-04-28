@@ -986,3 +986,45 @@ def list_patient_consents(patient_id, clinic=None):
         frappe.log_error(frappe.get_traceback(), "List Patient Consents Error")
         frappe.local.response["http_status_code"] = 500
         return {"exc_type": "ServerError", "message": str(e)}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_patient_consent(consent_session_id, clinic=None):
+    try:
+        practitioner, clinic_name = _resolve_context(clinic=clinic, page_key="consent_forms")
+
+        if not consent_session_id:
+            frappe.throw("consent_session_id is required")
+
+        session_doc = frappe.get_doc("Consent Form Session", consent_session_id)
+        if session_doc.clinic != clinic_name:
+            frappe.throw("Consent record belongs to a different clinic", frappe.PermissionError)
+
+        if not _can_access_patient(practitioner, session_doc.patient, clinic_name):
+            frappe.throw("Not permitted to access this patient", frappe.PermissionError)
+
+        deleted_file_id = session_doc.consent_file
+        session_doc.delete(ignore_permissions=True)
+
+        if deleted_file_id and frappe.db.exists("File", deleted_file_id):
+            try:
+                frappe.delete_doc("File", deleted_file_id, ignore_permissions=True)
+            except Exception:
+                # Keep consent-session deletion successful even if file cleanup fails.
+                frappe.log_error(frappe.get_traceback(), "Delete Consent File Cleanup Error")
+
+        return {
+            "message": "Consent record deleted",
+            "data": {
+                "consent_session_id": consent_session_id,
+                "deleted_file_id": deleted_file_id,
+            },
+        }
+    except frappe.PermissionError:
+        frappe.local.response["http_status_code"] = 403
+        return {"exc_type": "PermissionError", "message": "Not permitted"}
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Delete Patient Consent Error")
+        frappe.local.response["http_status_code"] = 500
+        return {"exc_type": "ServerError", "message": str(e)}
