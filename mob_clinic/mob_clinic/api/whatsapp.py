@@ -549,8 +549,8 @@ def _get_whatsapp_credentials(clinic):
     
     settings = frappe.get_doc("Clinic Settings", clinic)
     
-    if not settings.whatsapp_enabled:
-        frappe.throw(_("WhatsApp integration is not enabled for this clinic"))
+    if not _parse_bool(settings.whatsapp_enabled):
+        frappe.throw(_("WhatsApp integration is not enabled for clinic {0}").format(clinic))
     
     if not settings.whatsapp_phone_number_id:
         frappe.throw(_("WhatsApp Phone Number ID is not configured"))
@@ -570,6 +570,42 @@ def _get_whatsapp_credentials(clinic):
             "invoice": settings.whatsapp_invoice_template
         }
     }
+
+
+def _is_whatsapp_enabled_for_clinic(clinic):
+    if not clinic or not frappe.db.exists("Clinic Settings", clinic):
+        return False
+    return _parse_bool(frappe.db.get_value("Clinic Settings", clinic, "whatsapp_enabled"))
+
+
+def _resolve_prescription_clinic(prescription, clinic_override=None):
+    """Resolve clinic for prescription send with fallback for legacy mismatched company values."""
+    if clinic_override:
+        return clinic_override
+
+    prescription_company = prescription.get("company") or prescription.get("clinic")
+    if prescription_company and _is_whatsapp_enabled_for_clinic(prescription_company):
+        return prescription_company
+
+    practitioner_primary_company = None
+    if prescription.get("practitioner"):
+        practitioner_primary_company = frappe.db.get_value(
+            "Healthcare Practitioner",
+            prescription.get("practitioner"),
+            "primary_company",
+        )
+
+    if practitioner_primary_company and _is_whatsapp_enabled_for_clinic(practitioner_primary_company):
+        if prescription_company and prescription_company != practitioner_primary_company:
+            frappe.logger("mob_clinic.whatsapp").warning(
+                "Prescription %s WhatsApp clinic fallback used: %s (stored company: %s)",
+                prescription.get("name"),
+                practitioner_primary_company,
+                prescription_company,
+            )
+        return practitioner_primary_company
+
+    return prescription_company or practitioner_primary_company
 
 
 def _format_phone_number(phone):
@@ -973,20 +1009,21 @@ def send_review_request(appointment_id):
 
 
 @frappe.whitelist()
-def send_prescription(prescription_id, patient_phone=None, pdf_base64=None, pdf_filename=None):
+def send_prescription(prescription_id, patient_phone=None, pdf_base64=None, pdf_filename=None, clinic=None):
     """
     Share prescription via WhatsApp
     
     Args:
         prescription_id: Prescription record ID
         patient_phone: Override phone number (optional)
+        clinic: Explicit clinic/company override (optional)
     """
     try:
         # Try to get from Patient Prescription first
         if frappe.db.exists("Patient Prescription", prescription_id):
             prescription = frappe.get_doc("Patient Prescription", prescription_id)
             patient_id = prescription.patient
-            clinic = prescription.company or prescription.clinic
+            clinic = _resolve_prescription_clinic(prescription, clinic_override=clinic)
         else:
             return {"success": False, "error": "Prescription not found"}
         

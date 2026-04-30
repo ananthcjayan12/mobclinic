@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import nowdate
 import json
+from mob_clinic.mob_clinic.api import clinic as clinic_helper
 
 
 def get_session_practitioner():
@@ -52,6 +53,17 @@ def create_patient_prescription(patient_id, **kwargs):
                 frappe.throw(_("Selected practitioner was not found"))
             practitioner = selected_practitioner
 
+        resolved_clinic = clinic_helper.resolve_active_clinic(
+            practitioner_name=practitioner.get("name") if practitioner else None,
+            clinic_param=kwargs.get("clinic") or kwargs.get("company"),
+        )
+
+        if practitioner and resolved_clinic and not clinic_helper.validate_practitioner_access(
+            practitioner.get("name"),
+            resolved_clinic,
+        ):
+            frappe.throw(_("Practitioner does not have access to the requested clinic"), frappe.PermissionError)
+
         # Get patient name
         patient_name = frappe.db.get_value("Patient", patient_id, "patient_name")
 
@@ -67,7 +79,7 @@ def create_patient_prescription(patient_id, **kwargs):
             "symptoms": kwargs.get("symptoms"),
             "diagnosis": kwargs.get("diagnosis"),
             "treatment_plan": kwargs.get("treatment_plan"),
-            "company": kwargs.get("company") or frappe.defaults.get_user_default("Company"),
+            "company": resolved_clinic or kwargs.get("company") or frappe.defaults.get_user_default("Company"),
             "status": "Draft"
         })
 
@@ -313,4 +325,3 @@ def update_patient_prescription(prescription_id, **kwargs):
         frappe.log_error(str(e)[:500], "Update Patient Prescription Error")
         frappe.local.response["http_status_code"] = 500
         return {"exc_type": "ServerError", "message": str(e)}
-
